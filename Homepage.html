@@ -25,12 +25,6 @@
             color: #3B1D14;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-
         /* ---------- NAVBAR ---------- */
         .navbar {
             display: flex;
@@ -207,208 +201,6 @@
             max-width: 600px;
         }
 
-        /* ---------- ABOUT US PAGE STYLES ---------- */
-        .about-page, .help-page, .faq-page {
-            min-height: 100vh;
-            padding: 80px 5% 40px;
-        }
-
-        .page-hero {
-            text-align: center;
-            margin-bottom: 60px;
-        }
-
-        .page-hero h1 {
-            font-family: 'Italianno', cursive;
-            font-size: 60px;
-            color: #E0B973;
-            margin-bottom: 20px;
-        }
-
-        .page-hero p {
-            font-size: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-
-        .mission-vision {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 40px;
-            margin-bottom: 60px;
-        }
-
-        .mission, .vision {
-            flex: 1;
-            min-width: 300px;
-            background-color: #5A2E1F;
-            padding: 30px;
-            border-radius: 12px;
-            border-left: 4px solid #E0B973;
-        }
-
-        .mission h2, .vision h2 {
-            color: #E0B973;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .story-section {
-            background-color: #5A2E1F;
-            padding: 40px;
-            border-radius: 12px;
-            margin-bottom: 60px;
-        }
-
-        .story-section h2 {
-            color: #E0B973;
-            margin-bottom: 20px;
-            font-size: 32px;
-            text-align: center;
-        }
-
-        .values-section {
-            background-color: #5A2E1F;
-            padding: 40px;
-            border-radius: 12px;
-            margin-bottom: 60px;
-        }
-
-        .values-section h2 {
-            text-align: center;
-            font-size: 32px;
-            margin-bottom: 40px;
-            color: #E0B973;
-        }
-
-        .values-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-        }
-
-        .value-item {
-            text-align: center;
-            padding: 20px;
-        }
-
-        .value-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
-            color: #E0B973;
-        }
-
-        .value-item h3 {
-            color: #E0B973;
-            margin-bottom: 10px;
-        }
-
-        /* ---------- HELP PAGE STYLES ---------- */
-        .help-categories {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-bottom: 60px;
-        }
-
-        .help-category {
-            background-color: #5A2E1F;
-            padding: 30px;
-            border-radius: 12px;
-            border-top: 4px solid #E0B973;
-        }
-
-        .help-category h3 {
-            color: #E0B973;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .help-category ul {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        .help-category li {
-            margin-bottom: 10px;
-            padding-left: 20px;
-            position: relative;
-        }
-
-        .help-category li:before {
-            content: "•";
-            color: #E0B973;
-            position: absolute;
-            left: 0;
-        }
-
-        .contact-support {
-            background-color: #5A2E1F;
-            padding: 40px;
-            border-radius: 12px;
-            text-align: center;
-        }
-
-        .contact-support h2 {
-            color: #E0B973;
-            margin-bottom: 20px;
-        }
-
-        /* ---------- FAQ PAGE STYLES ---------- */
-        .faq-category {
-            margin-bottom: 40px;
-        }
-
-        .faq-category h2 {
-            color: #E0B973;
-            margin-bottom: 20px;
-            font-size: 28px;
-            border-bottom: 2px solid #E0B973;
-            padding-bottom: 10px;
-        }
-
-        .faq-item {
-            background-color: #5A2E1F;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .faq-question {
-            padding: 20px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 500;
-        }
-
-        .faq-question:hover {
-            background-color: #4a281a;
-        }
-
-        .faq-answer {
-            padding: 0 20px;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease, padding 0.3s ease;
-        }
-
-        .faq-answer.active {
-            padding: 0 20px 20px 20px;
-            max-height: 500px;
-        }
-
-        .faq-toggle {
-            font-size: 20px;
-            transition: transform 0.3s ease;
-        }
-
-        .faq-toggle.active {
-            transform: rotate(45deg);
-        }
-
         /* ---------- FOOTER ---------- */
         .footer {
             padding: 40px 5%;
@@ -459,7 +251,7 @@
             scroll-behavior: smooth;
         }
 
-        /* ---------- MODALS ---------- */
+        /* ---------- SIGN UP MODAL ---------- */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -734,10 +526,6 @@
                 padding: 60px 5%;
             }
 
-            .page-hero h1 {
-                font-size: 48px;
-            }
-
             .logo-text {
                 font-size: 42px;
             }
@@ -771,19 +559,6 @@
             .signup-modal, .login-modal {
                 padding: 20px;
             }
-
-            .page-hero h1 {
-                font-size: 36px;
-            }
-        }
-
-        /* Hide pages initially */
-        .page {
-            display: none;
-        }
-
-        .page.active {
-            display: block;
         }
     </style>
 </head>
@@ -796,280 +571,76 @@
         </div>
         <button class="menu-toggle">☰</button>
         <div class="nav-links">
-            <a href="#" class="nav-link" data-page="home">Home</a>
-            <a href="#" class="nav-link" data-page="about">About Us</a>
-            <a href="#" class="nav-link" data-page="help">Help</a>
-            <a href="#" class="nav-link" data-page="faq">FAQ</a>
+            <a href="#about">About Us</a>
+            <a href="#messages">Messages</a>
+            <a href="#discussion-board">Discussion Board</a>
+            <a href="#voice-room">Voice Room</a>
         </div>
     </nav>
 
-    <!-- Home Page -->
-    <div id="home" class="page active">
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="hero-left">
-                <p class="hero-line">Join where every book finds its reader</p>
-                <div class="hero-buttons">
-                    <button class="btn-signin">Sign up</button>
-                    <button class="btn-login">Login</button>
-                </div>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-left">
+            <p class="hero-line">Join where every book finds its reader</p>
+            <div class="hero-buttons">
+                <button class="btn-signin">Sign up</button>
+                <button class="btn-login">Login</button>
             </div>
-            <div class="hero-right"></div>
-        </section>
+        </div>
+        <div class="hero-right"></div>
+    </section>
 
-        <p class="mid-line">Great books deserve great conversations</p>
+    <p class="mid-line">Great books deserve great conversations</p>
 
-        <!-- Chat Feature Section -->
-        <section id="messages" class="feature-section">
-            <div class="feature-image fade-in-section">
-                <img src="images/chat-logo.png" alt="Chat">
-            </div>
-            <div class="feature-text fade-in-section delay-1">
-                Connect with other readers through fast, real-time messaging. 
-                Share thoughts, use spoiler tags, and keep conversations 
-                focused on your favorite books.
-            </div>
-        </section>
+    <!-- Chat Feature Section -->
+    <section id="messages" class="feature-section">
+        <div class="feature-image fade-in-section">
+            <img src="images/chat-logo.png" alt="Chat">
+        </div>
+        <div class="feature-text fade-in-section delay-1">
+            Connect with other readers through fast, real-time messaging. 
+            Share thoughts, use spoiler tags, and keep conversations 
+            focused on your favorite books.
+        </div>
+    </section>
 
-        <!-- Discussion Section -->
-        <section id="discussion-board" class="feature-section">
-            <div class="feature-text fade-in-section delay-1">
-                Join book-focused discussions organized by book covers and genres. 
-                Explore threads, read opinions and contribute to meaningful conversations.
-            </div>
-            <div class="feature-image fade-in-section">
-                <img src="images/books.png" alt="Books">
-            </div>
-        </section>
+    <!-- Discussion Section -->
+    <section id="discussion-board" class="feature-section">
+        <div class="feature-text fade-in-section delay-1">
+            Join book-focused discussions organized by book covers and genres. 
+            Explore threads, read opinions and contribute to meaningful conversations.
+        </div>
+        <div class="feature-image fade-in-section">
+            <img src="images/books.png" alt="Books">
+        </div>
+    </section>
 
-        <!-- Voice Room Section -->
-        <section id="voice-room" class="feature-section">
-            <div class="feature-image fade-in-section">
-                <img src="images/microphone.png" alt="Voice Room">
-            </div>
-            <div class="feature-text fade-in-section delay-1">
-                Join live audio rooms for book discussions. Talk, listen and interact 
-                with readers around the world like a digital book club.
-            </div>
-        </section>
+    <!-- Voice Room Section -->
+    <section id="voice-room" class="feature-section">
+        <div class="feature-image fade-in-section">
+            <img src="images/microphone.png" alt="Voice Room">
+        </div>
+        <div class="feature-text fade-in-section delay-1">
+            Join live audio rooms for book discussions. Talk, listen and interact 
+            with readers around the world like a digital book club.
+        </div>
+    </section>
 
-        <!-- About Section -->
-        <section id="about" class="about-section">
-            <h2>ABOUT US</h2>
-            <p>
-                Litlink is a digital reading corner for everyone who loves books. 
-                We believe stories are better when shared, and we built a space 
-                where readers can talk, learn and connect.
-            </p>
-        </section>
-    </div>
-
-    <!-- About Us Page -->
-    <div id="about-page" class="page">
-        <section class="about-page">
-            <div class="container">
-                <div class="page-hero">
-                    <h1>About Litlink</h1>
-                    <p>Where stories come to life through shared experiences and meaningful conversations among book lovers worldwide.</p>
-                </div>
-
-                <div class="story-section">
-                    <h2>Our Story</h2>
-                    <p>Litlink was born from a simple passion: the love of books and the conversations they inspire. As an avid reader, I noticed how books create invisible threads connecting people across distances and differences. Yet, there wasn't a dedicated space where these connections could flourish naturally.</p>
-                    <p>What started as a personal project to connect with fellow book enthusiasts has grown into Litlink - a platform where every book finds its reader, and every reader finds their community. We believe that stories are meant to be shared, discussed, and cherished together.</p>
-                    <p>Today, Litlink serves thousands of readers worldwide, creating a digital home for book lovers to connect, share insights, and build lasting friendships through their shared love of literature.</p>
-                </div>
-
-                <div class="mission-vision">
-                    <div class="mission">
-                        <h2>Our Mission</h2>
-                        <p>To create a vibrant digital community where readers can connect, share insights, and discover new perspectives through the power of shared storytelling.</p>
-                    </div>
-                    <div class="vision">
-                        <h2>Our Vision</h2>
-                        <p>To become the world's most welcoming platform for book enthusiasts, fostering lifelong reading habits and meaningful literary connections.</p>
-                    </div>
-                </div>
-
-                <div class="values-section">
-                    <h2>Our Values</h2>
-                    <div class="values-grid">
-                        <div class="value-item">
-                            <div class="value-icon">🤝</div>
-                            <h3>Community First</h3>
-                            <p>We prioritize meaningful connections between readers</p>
-                        </div>
-                        <div class="value-item">
-                            <div class="value-icon">📚</div>
-                            <h3>Love for Reading</h3>
-                            <p>We celebrate all genres and reading preferences</p>
-                        </div>
-                        <div class="value-item">
-                            <div class="value-icon">💬</div>
-                            <h3>Open Dialogue</h3>
-                            <p>We encourage respectful and diverse conversations</p>
-                        </div>
-                        <div class="value-item">
-                            <div class="value-icon">🌍</div>
-                            <h3>Global Perspective</h3>
-                            <p>We connect readers across cultures and borders</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <!-- Help Page -->
-    <div id="help-page" class="page">
-        <section class="help-page">
-            <div class="container">
-                <div class="page-hero">
-                    <h1>Help Center</h1>
-                    <p>Get the support you need to make the most of your Litlink experience</p>
-                </div>
-
-                <div class="help-categories">
-                    <div class="help-category">
-                        <h3>Getting Started</h3>
-                        <ul>
-                            <li>Creating your account</li>
-                            <li>Setting up your reading profile</li>
-                            <li>Finding and joining book clubs</li>
-                            <li>Navigating the platform</li>
-                        </ul>
-                    </div>
-                    <div class="help-category">
-                        <h3>Account & Settings</h3>
-                        <ul>
-                            <li>Updating your profile information</li>
-                            <li>Changing password and security</li>
-                            <li>Managing notification preferences</li>
-                            <li>Privacy settings</li>
-                        </ul>
-                    </div>
-                    <div class="help-category">
-                        <h3>Features Guide</h3>
-                        <ul>
-                            <li>Using the messaging system</li>
-                            <li>Participating in discussion boards</li>
-                            <li>Joining voice rooms</li>
-                            <li>Creating and managing book clubs</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="contact-support">
-                    <h2>Still Need Help?</h2>
-                    <p>Our support team is here to assist you with any questions or issues you may encounter.</p>
-                    <p>Email us at: <strong>support@litlink.com</strong></p>
-                    <p>We typically respond within 24 hours.</p>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <!-- FAQ Page -->
-    <div id="faq-page" class="page">
-        <section class="faq-page">
-            <div class="container">
-                <div class="page-hero">
-                    <h1>Frequently Asked Questions</h1>
-                    <p>Quick answers to common questions about Litlink</p>
-                </div>
-
-                <div class="faq-category">
-                    <h2>Account & Registration</h2>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            How do I create a Litlink account?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Click the "Sign Up" button on the homepage and follow the registration process. You'll need to provide your name, email address, and create a password that meets our security requirements.
-                        </div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            Is Litlink free to use?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Yes! Litlink is completely free for all users. We believe in making literary communities accessible to everyone.
-                        </div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            I forgot my password. How can I reset it?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Click "Login" then "Forgot Password" on the login modal. Enter your email address, and we'll send you a password reset link.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="faq-category">
-                    <h2>Features & Usage</h2>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            How do I join a book discussion?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Navigate to the Discussion Board section, browse through available topics organized by genres or book titles, and click on any discussion to join the conversation.
-                        </div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            What are Voice Rooms?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Voice Rooms are live audio discussions where you can talk with other readers in real-time, similar to a digital book club meeting. You can listen or participate by speaking.
-                        </div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            Can I create my own book club?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Absolutely! You can create a private or public book club, invite members, schedule meetings, and manage discussions all within Litlink.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="faq-category">
-                    <h2>Privacy & Safety</h2>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            Is my reading data private?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Yes, we take your privacy seriously. Your reading preferences and activity are private by default, and you control what information is visible to other users.
-                        </div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            How do I report inappropriate content?
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Use the "Report" button available on all posts, messages, and user profiles. Our moderation team reviews all reports promptly.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <h2>ABOUT US</h2>
+        <p>
+            Litlink is a digital reading corner for everyone who loves books. 
+            We believe stories are better when shared, and we built a space 
+            where readers can talk, learn and connect.
+        </p>
+    </section>
 
     <footer class="footer">
         <div class="footer-links">
-            <a href="#" class="nav-link" data-page="help">Help</a>
-            <a href="#" class="nav-link" data-page="about">About Us</a>
-            <a href="#" class="nav-link" data-page="faq">FAQ</a>
+            <a href="#">Help</a>
+            <a href="#">About Us</a>
+            <a href="#">FAQ</a>
         </div>
         <p class="copyright">All Rights Reserved ©</p>
     </footer>
@@ -1164,47 +735,86 @@
     </div>
 
     <script>
-        // Page Navigation
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const pageId = link.getAttribute('data-page');
-                
-                // Hide all pages
-                document.querySelectorAll('.page').forEach(page => {
-                    page.classList.remove('active');
-                });
-                
-                // Show selected page
-                if (pageId === 'home') {
-                    document.getElementById('home').classList.add('active');
-                } else if (pageId === 'about') {
-                    document.getElementById('about-page').classList.add('active');
-                } else if (pageId === 'help') {
-                    document.getElementById('help-page').classList.add('active');
-                } else if (pageId === 'faq') {
-                    document.getElementById('faq-page').classList.add('active');
-                }
-                
-                // Close mobile menu if open
-                document.querySelector('.nav-links').classList.remove('active');
-            });
-        });
+        // API Configuration
+        const API_BASE = 'http://localhost:3001/api';
 
-        // FAQ Toggle functionality
-        document.querySelectorAll('.faq-question').forEach(question => {
-            question.addEventListener('click', () => {
-                const answer = question.nextElementSibling;
-                const toggle = question.querySelector('.faq-toggle');
+        // API Functions
+        async function handleSignup(formData) {
+            try {
+                showLoading('signupSubmit', 'Signing up...');
+                const response = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
                 
-                // Toggle active class
-                answer.classList.toggle('active');
-                toggle.classList.toggle('active');
+                if (data.success) {
+                    alert('🎉 Sign up successful! You can now login.');
+                    closeModal();
+                    // Switch to login modal
+                    setTimeout(() => {
+                        document.getElementById('signupModal').classList.remove('active');
+                        document.getElementById('loginModal').classList.add('active');
+                    }, 500);
+                } else {
+                    alert('❌ Sign up failed: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                alert('🌐 Network error during signup. Make sure backend is running on port 3001.');
+            } finally {
+                hideLoading('signupSubmit', 'Sign up');
+            }
+        }
+
+        async function handleLogin(formData) {
+            try {
+                showLoading('loginSubmit', 'Logging in...');
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
                 
-                // Change toggle symbol
-                toggle.textContent = answer.classList.contains('active') ? '−' : '+';
-            });
-        });
+                if (data.success) {
+                    alert('🎉 Login successful!');
+                    // Save user data to localStorage
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    // Close modal and redirect to profile
+                    closeModal();
+                    setTimeout(() => {
+                        window.location.href = 'profile.html';
+                    }, 1000);
+                } else {
+                    alert('❌ Login failed: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('🌐 Network error during login. Make sure backend is running on port 3001.');
+            } finally {
+                hideLoading('loginSubmit', 'Login');
+            }
+        }
+
+        function showLoading(buttonId, text) {
+            const button = document.getElementById(buttonId);
+            button.innerHTML = `<span class="loading">${text}...</span>`;
+            button.disabled = true;
+        }
+
+        function hideLoading(buttonId, text) {
+            const button = document.getElementById(buttonId);
+            button.textContent = text;
+            button.disabled = false;
+        }
 
         // Scroll animations
         const sections = document.querySelectorAll('.fade-in-section');
@@ -1275,6 +885,14 @@
             loginModal.classList.remove('active');
             signupModal.classList.add('active');
         });
+
+        // Close modal function
+        function closeModal() {
+            document.querySelectorAll('.modal-overlay').forEach(modal => {
+                modal.classList.remove('active');
+            });
+            document.body.style.overflow = 'auto';
+        }
 
         // Password validation
         const passwordInput = document.getElementById('password');
@@ -1384,17 +1002,33 @@
                 return;
             }
             
-            alert('Sign up successful! (This is a demo)');
-            signupModal.classList.remove('active');
-            document.body.style.overflow = 'auto';
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                password: password,
+                username: document.getElementById('email').value.split('@')[0]
+            };
+            
+            handleSignup(formData);
         });
 
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            alert('Login successful! (This is a demo)');
-            loginModal.classList.remove('active');
-            document.body.style.overflow = 'auto';
+            const formData = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            };
+            
+            handleLogin(formData);
         });
+
+        // Add loading button for login form
+        const loginSubmit = document.createElement('button');
+        loginSubmit.type = 'submit';
+        loginSubmit.className = 'login-btn';
+        loginSubmit.id = 'loginSubmit';
+        loginSubmit.textContent = 'Login';
+        document.querySelector('#loginForm button[type="submit"]').replaceWith(loginSubmit);
     </script>
 </body>
 </html>
