@@ -29,11 +29,13 @@ router.get('/:userId', async (req, res) => {
         pronouns: user.pronouns,
         favoriteGenres: user.favoriteGenres,
         favoriteAuthors: user.favoriteAuthors,
+        favoriteBooks: user.favoriteBooks,
+        readingHabit: user.readingHabit,
+        readingGoal: user.readingGoal,
         stats: {
           booksRead: user.booksRead.length,
           following: user.following.length,
-          followers: user.followers.length,
-          reviews: 0 // We'll add this later
+          followers: user.followers.length
         },
         bookshelf: {
           currentlyReading: user.currentlyReading,

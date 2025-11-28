@@ -6,8 +6,7 @@
     <title>Litlink - Home</title>
     <link href="https://fonts.googleapis.com/css2?family=Italianno&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* ---------- GLOBAL ---------- */
-        * {
+                * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -25,20 +24,30 @@
             color: #3B1D14;
         }
 
-        /* ---------- NAVBAR ---------- */
+        /* NAVBAR */
         .navbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             background-color: #D7B899;
             padding: 15px 5%;
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar.hidden {
+            transform: translateY(-100%);
         }
 
         .logo-container {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 30px;
         }
 
         .logo-img {
@@ -50,7 +59,6 @@
             font-family: 'Italianno', cursive;
             font-size: 52px;
             color: #3B1D14;
-            margin: 0;
         }
 
         .nav-links {
@@ -59,9 +67,9 @@
         }
 
         .nav-links a {
-            font-size: 16px;
             color: #3B1D14;
             transition: color 0.3s;
+            cursor: pointer;
         }
 
         .nav-links a:hover {
@@ -77,16 +85,16 @@
             cursor: pointer;
         }
 
-        /* ---------- HERO SECTION ---------- */
+        /* HERO SECTION */
         .hero {
             display: flex;
             flex-wrap: wrap;
             width: 100%;
-            min-height: 730px;
-            background-color: #5A2E1F;  
+            min-height: 760px;
+            background-color: #5A2E1F;
+            margin-top: 0;
         }
 
-        /* LEFT SIDE */
         .hero-left {
             width: 50%;
             display: flex;
@@ -136,16 +144,15 @@
             transform: translateY(-2px);
         }
 
-        /* RIGHT SIDE */
         .hero-right {
             width: 50%;
-            background-image: url("images/litlink-logo.png");
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: contain;
+            background: #5A2E1F;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 120px;
         }
 
-        /* ---------- MID LINE ---------- */
         .mid-line {
             margin: 40px 0;
             font-size: 20px;
@@ -153,7 +160,7 @@
             padding: 0 20px;
         }
 
-        /* ---------- FEATURE SECTIONS ---------- */
+        /* FEATURE SECTIONS */
         .feature-section {
             display: flex;
             flex-wrap: wrap;
@@ -184,7 +191,7 @@
             line-height: 1.7;
         }
 
-        /* ---------- ABOUT SECTION ---------- */
+        /* ABOUT SECTION */
         .about-section {
             padding: 80px 5%;
             max-width: 1200px;
@@ -201,10 +208,217 @@
             max-width: 600px;
         }
 
-        /* ---------- FOOTER ---------- */
+        /* PAGE SECTIONS */
+        .page-section {
+            display: none;
+            min-height: 80vh;
+            padding: 100px 5% 40px;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        .page-hero {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .page-hero h1 {
+            font-family: 'Italianno', cursive;
+            font-size: 60px;
+            color: #E0B973;
+            margin-bottom: 20px;
+        }
+
+        .page-hero p {
+            font-size: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* ABOUT US PAGE */
+        .mission-vision {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .mission, .vision {
+            flex: 1;
+            min-width: 300px;
+            background-color: #5A2E1F;
+            padding: 30px;
+            border-radius: 12px;
+            border-left: 4px solid #E0B973;
+        }
+
+        .mission h2, .vision h2 {
+            color: #E0B973;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .story-section {
+            background-color: #5A2E1F;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 60px;
+        }
+
+        .story-section h2 {
+            color: #E0B973;
+            margin-bottom: 20px;
+            font-size: 32px;
+            text-align: center;
+        }
+
+        .values-section {
+            background-color: #5A2E1F;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 60px;
+        }
+
+        .values-section h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 40px;
+            color: #E0B973;
+        }
+
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+        }
+
+        .value-item {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .value-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+            color: #E0B973;
+        }
+
+        .value-item h3 {
+            color: #E0B973;
+            margin-bottom: 10px;
+        }
+
+        /* HELP PAGE */
+        .help-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .help-category {
+            background-color: #5A2E1F;
+            padding: 30px;
+            border-radius: 12px;
+            border-top: 4px solid #E0B973;
+        }
+
+        .help-category h3 {
+            color: #E0B973;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .help-category ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .help-category li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .help-category li:before {
+            content: "•";
+            color: #E0B973;
+            position: absolute;
+            left: 0;
+        }
+
+        .contact-support {
+            background-color: #5A2E1F;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .contact-support h2 {
+            color: #E0B973;
+            margin-bottom: 20px;
+        }
+
+        /* FAQ PAGE */
+        .faq-category {
+            margin-bottom: 40px;
+        }
+
+        .faq-category h2 {
+            color: #E0B973;
+            margin-bottom: 20px;
+            font-size: 28px;
+            border-bottom: 2px solid #E0B973;
+            padding-bottom: 10px;
+        }
+
+        .faq-item {
+            background-color: #5A2E1F;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+        }
+
+        .faq-question:hover {
+            background-color: #4a281a;
+        }
+
+        .faq-answer {
+            padding: 0 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .faq-answer.active {
+            padding: 0 20px 20px 20px;
+            max-height: 500px;
+        }
+
+        .faq-toggle {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .faq-toggle.active {
+            transform: rotate(45deg);
+        }
+
+        /* FOOTER */
         .footer {
             padding: 40px 5%;
-            position: relative;
             border-top: 1px solid #5A2E1F;
         }
 
@@ -217,8 +431,8 @@
 
         .footer-links a {
             color: #F5E6CC;
-            font-size: 16px;
             transition: color 0.3s;
+            cursor: pointer;
         }
 
         .footer-links a:hover {
@@ -230,28 +444,22 @@
             margin-top: 20px;
         }
 
-        /* ---------- SCROLL ANIMATIONS ---------- */
-        .fade-in-section {
-            opacity: 0;
-            transform: translateY(40px);
-            transition: all 0.8s ease-out;
+        /* BACK TO HOME BUTTON */
+        .back-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #E0B973;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: color 0.3s;
         }
 
-        .fade-in-section.visible {
-            opacity: 1;
-            transform: translateY(0);
+        .back-home:hover {
+            color: #d4ab5f;
         }
 
-        .delay-1 {
-            transition-delay: 0.3s;
-        }
-
-        /* ---------- SMOOTH SCROLL ---------- */
-        html {
-            scroll-behavior: smooth;
-        }
-
-        /* ---------- SIGN UP MODAL ---------- */
+        /* MODALS */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -273,7 +481,7 @@
             opacity: 1;
         }
 
-        .signup-modal, .login-modal {
+        .signup-modal, .login-modal, .onboarding-modal {
             background-color: #D7B899;
             color: #3B1D14;
             width: 90%;
@@ -286,8 +494,15 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
 
+        .onboarding-modal {
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
         .modal-overlay.active .signup-modal,
-        .modal-overlay.active .login-modal {
+        .modal-overlay.active .login-modal,
+        .modal-overlay.active .onboarding-modal {
             transform: translateY(0);
         }
 
@@ -309,11 +524,6 @@
             font-size: 24px;
             cursor: pointer;
             color: #3B1D14;
-            transition: transform 0.3s;
-        }
-
-        .close-btn:hover {
-            transform: rotate(90deg);
         }
 
         .form-group {
@@ -334,8 +544,8 @@
             border-radius: 6px;
             background-color: #F5E6CC;
             color: #3B1D14;
-            box-sizing: border-box;
             font-family: 'Poppins', sans-serif;
+            box-sizing: border-box;
         }
 
         .form-group input:focus {
@@ -441,17 +651,12 @@
         .switch-link {
             text-align: center;
             margin-top: 20px;
-            font-size: 14px;
         }
 
         .switch-link a {
             color: #3B1D14;
             text-decoration: underline;
             cursor: pointer;
-        }
-
-        .switch-link a:hover {
-            color: #5A2E1F;
         }
 
         .forgot-password {
@@ -465,8 +670,146 @@
             text-decoration: underline;
         }
 
-        /* ---------- RESPONSIVE DESIGN ---------- */
-        @media (max-width: 992px) {
+        /* QUESTIONNAIRE */
+        .question-step {
+            display: none;
+        }
+
+        .question-step.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background-color: #B89A7A;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #E0B973;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .genre-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .genre-option, .reading-habit-option {
+            padding: 12px;
+            background-color: #F5E6CC;
+            border: 2px solid #B89A7A;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .genre-option.selected, .reading-habit-option.selected {
+            background-color: #E0B973;
+            border-color: #3B1D14;
+        }
+
+        .reading-habit-option {
+            margin-bottom: 10px;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+        }
+
+        .btn-prev {
+            background-color: #F5E6CC;
+            color: #3B1D14;
+        }
+
+        .btn-next {
+            background-color: #E0B973;
+            color: #3B1D14;
+        }
+
+        .btn-submit {
+            background-color: #E0B973;
+            color: #3B1D14;
+            width: 100%;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #B89A7A;
+            border-radius: 4px;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #E0B973;
+            cursor: pointer;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        /* SCROLL ANIMATIONS */
+        .fade-in-section {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.8s ease-out;
+        }
+
+        .fade-in-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .delay-1 {
+            transition-delay: 0.3s;
+        }
+
+        /* SMOOTH SCROLL */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .menu-toggle {
+                display: block;
+            }
+            
             .hero-left, .hero-right {
                 width: 100%;
             }
@@ -475,172 +818,296 @@
                 min-height: 300px;
             }
             
-            .feature-section {
-                flex-direction: column;
-                text-align: center;
+            .genre-grid {
+                grid-template-columns: 1fr;
             }
-            
-            .feature-text {
-                order: 2;
-            }
-            
-            #discussion-board .feature-text {
-                order: 1;
-            }
-            
-            #discussion-board .feature-image {
-                order: 2;
-            }
-        }
 
-        @media (max-width: 768px) {
-            .navbar {
-                flex-wrap: wrap;
+            .help-categories {
+                grid-template-columns: 1fr;
             }
-            
-            .nav-links {
-                display: none;
-                width: 100%;
-                flex-direction: column;
-                gap: 10px;
-                margin-top: 15px;
-            }
-            
-            .nav-links.active {
-                display: flex;
-            }
-            
-            .menu-toggle {
-                display: block;
-            }
-            
-            .hero-line {
-                font-size: 24px;
-            }
-            
-            .hero-buttons {
+
+            .mission-vision {
                 flex-direction: column;
             }
-            
-            .feature-section {
-                padding: 60px 5%;
-            }
 
-            .logo-text {
-                font-size: 42px;
-            }
-
-            .logo-img {
-                height: 50px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .logo-text {
-                font-size: 36px;
-            }
-
-            .logo-img {
-                height: 40px;
-            }
-            
-            .hero-line {
-                font-size: 20px;
-            }
-            
-            .mid-line {
-                font-size: 18px;
-            }
-            
-            .feature-text {
-                font-size: 16px;
-            }
-            
-            .signup-modal, .login-modal {
-                padding: 20px;
+            .page-section {
+                padding: 120px 5% 40px;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
+    <!-- Navigation -->
     <nav class="navbar">
         <div class="logo-container">
-            <img src="images/litlink-logo.png" alt="Litlink Logo" class="logo-img">
             <div class="logo-text">Litlink</div>
         </div>
         <button class="menu-toggle">☰</button>
         <div class="nav-links">
-            <a href="#about">About Us</a>
-            <a href="#messages">Messages</a>
-            <a href="#discussion-board">Discussion Board</a>
-            <a href="#voice-room">Voice Room</a>
+            <a class="nav-link" data-page="home">Home</a>
+            <a class="nav-link" data-page="about">About Us</a>
+            <a class="nav-link" data-page="help">Help</a>
+            <a class="nav-link" data-page="faq">FAQ</a>
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-left">
-            <p class="hero-line">Join where every book finds its reader</p>
-            <div class="hero-buttons">
-                <button class="btn-signin">Sign up</button>
-                <button class="btn-login">Login</button>
+
+    <!-- HOME PAGE -->
+    <div id="home-page" class="page-section active">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-left">
+                <p class="hero-line">Join where every book finds its reader</p>
+                <div class="hero-buttons">
+                    <button class="btn-signin">Sign up</button>
+                    <button class="btn-login">Login</button>
+                </div>
+            </div>
+            <div class="hero-right">📚</div>
+        </section>
+
+        <p class="mid-line">Great books deserve great conversations</p>
+
+        <!-- Features -->
+        <section class="feature-section">
+            <div class="feature-image fade-in-section">
+                <div style="width:300px;height:300px;background:#D7B899;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:80px;">💬</div>
+            </div>
+            <div class="feature-text fade-in-section delay-1">
+                Connect with other readers through fast, real-time messaging. 
+                Share thoughts, use spoiler tags, and keep conversations 
+                focused on your favorite books.
+            </div>
+        </section>
+
+        <section class="feature-section">
+            <div class="feature-text fade-in-section delay-1">
+                Join book-focused discussions organized by book covers and genres. 
+                Explore threads, read opinions and contribute to meaningful conversations.
+            </div>
+            <div class="feature-image fade-in-section">
+                <div style="width:300px;height:300px;background:#D7B899;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:80px;">📖</div>
+            </div>
+        </section>
+
+        <section class="feature-section">
+            <div class="feature-image fade-in-section">
+                <div style="width:300px;height:300px;background:#D7B899;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:80px;">🎤</div>
+            </div>
+            <div class="feature-text fade-in-section delay-1">
+                Join live audio rooms for book discussions. Talk, listen and interact 
+                with readers around the world like a digital book club.
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="about-section">
+            <h2>ABOUT US</h2>
+            <p>
+                Litlink is a digital reading corner for everyone who loves books. 
+                We believe stories are better when shared, and we built a space 
+                where readers can talk, learn and connect.
+            </p>
+        </section>
+    </div>
+
+    <!-- ABOUT US PAGE -->
+    <div id="about-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>About Litlink</h1>
+            <p>Where stories come to life through shared experiences and meaningful conversations among book lovers worldwide.</p>
+        </div>
+
+        <div class="story-section">
+            <h2>Our Story</h2>
+            <p>Litlink was born from a simple passion: the love of books and the conversations they inspire. As an avid reader, I noticed how books create invisible threads connecting people across distances and differences. Yet, there wasn't a dedicated space where these connections could flourish naturally.</p>
+            <p>What started as a personal project to connect with fellow book enthusiasts has grown into Litlink - a platform where every book finds its reader, and every reader finds their community. We believe that stories are meant to be shared, discussed, and cherished together.</p>
+            <p>Today, Litlink serves thousands of readers worldwide, creating a digital home for book lovers to connect, share insights, and build lasting friendships through their shared love of literature.</p>
+        </div>
+
+        <div class="mission-vision">
+            <div class="mission">
+                <h2>Our Mission</h2>
+                <p>To create a vibrant digital community where readers can connect, share insights, and discover new perspectives through the power of shared storytelling.</p>
+            </div>
+            <div class="vision">
+                <h2>Our Vision</h2>
+                <p>To become the world's most welcoming platform for book enthusiasts, fostering lifelong reading habits and meaningful literary connections.</p>
             </div>
         </div>
-        <div class="hero-right"></div>
-    </section>
 
-    <p class="mid-line">Great books deserve great conversations</p>
+        <div class="values-section">
+            <h2>Our Values</h2>
+            <div class="values-grid">
+                <div class="value-item">
+                    <div class="value-icon">🤝</div>
+                    <h3>Community First</h3>
+                    <p>We prioritize meaningful connections between readers</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">📚</div>
+                    <h3>Love for Reading</h3>
+                    <p>We celebrate all genres and reading preferences</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">💬</div>
+                    <h3>Open Dialogue</h3>
+                    <p>We encourage respectful and diverse conversations</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">🌍</div>
+                    <h3>Global Perspective</h3>
+                    <p>We connect readers across cultures and borders</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Chat Feature Section -->
-    <section id="messages" class="feature-section">
-        <div class="feature-image fade-in-section">
-            <img src="images/chat-logo.png" alt="Chat">
+    <!-- HELP PAGE -->
+    <div id="help-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>Help Center</h1>
+            <p>Get the support you need to make the most of your Litlink experience</p>
         </div>
-        <div class="feature-text fade-in-section delay-1">
-            Connect with other readers through fast, real-time messaging. 
-            Share thoughts, use spoiler tags, and keep conversations 
-            focused on your favorite books.
-        </div>
-    </section>
 
-    <!-- Discussion Section -->
-    <section id="discussion-board" class="feature-section">
-        <div class="feature-text fade-in-section delay-1">
-            Join book-focused discussions organized by book covers and genres. 
-            Explore threads, read opinions and contribute to meaningful conversations.
+        <div class="help-categories">
+            <div class="help-category">
+                <h3>Getting Started</h3>
+                <ul>
+                    <li>Creating your account</li>
+                    <li>Setting up your reading profile</li>
+                    <li>Finding and joining book clubs</li>
+                    <li>Navigating the platform</li>
+                </ul>
+            </div>
+            <div class="help-category">
+                <h3>Account & Settings</h3>
+                <ul>
+                    <li>Updating your profile information</li>
+                    <li>Changing password and security</li>
+                    <li>Managing notification preferences</li>
+                    <li>Privacy settings</li>
+                </ul>
+            </div>
+            <div class="help-category">
+                <h3>Features Guide</h3>
+                <ul>
+                    <li>Using the messaging system</li>
+                    <li>Participating in discussion boards</li>
+                    <li>Joining voice rooms</li>
+                    <li>Creating and managing book clubs</li>
+                </ul>
+            </div>
         </div>
-        <div class="feature-image fade-in-section">
-            <img src="images/books.png" alt="Books">
-        </div>
-    </section>
 
-    <!-- Voice Room Section -->
-    <section id="voice-room" class="feature-section">
-        <div class="feature-image fade-in-section">
-            <img src="images/microphone.png" alt="Voice Room">
+        <div class="contact-support">
+            <h2>Still Need Help?</h2>
+            <p>Our support team is here to assist you with any questions or issues you may encounter.</p>
+            <p>Email us at: <strong>support@litlink.com</strong></p>
+            <p>We typically respond within 24 hours.</p>
         </div>
-        <div class="feature-text fade-in-section delay-1">
-            Join live audio rooms for book discussions. Talk, listen and interact 
-            with readers around the world like a digital book club.
-        </div>
-    </section>
+    </div>
 
-    <!-- About Section -->
-    <section id="about" class="about-section">
-        <h2>ABOUT US</h2>
-        <p>
-            Litlink is a digital reading corner for everyone who loves books. 
-            We believe stories are better when shared, and we built a space 
-            where readers can talk, learn and connect.
-        </p>
-    </section>
+    <!-- FAQ PAGE -->
+    <div id="faq-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>Frequently Asked Questions</h1>
+            <p>Quick answers to common questions about Litlink</p>
+        </div>
+
+        <div class="faq-category">
+            <h2>Account & Registration</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I create a Litlink account?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Click the "Sign Up" button on the homepage and follow the registration process. You'll need to provide your name, email address, and create a password that meets our security requirements.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Is Litlink free to use?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes! Litlink is completely free for all users. We believe in making literary communities accessible to everyone.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    I forgot my password. How can I reset it?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Click "Login" then "Forgot Password" on the login modal. Enter your email address, and we'll send you a password reset link.
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Features & Usage</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I join a book discussion?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Navigate to the Discussion Board section, browse through available topics organized by genres or book titles, and click on any discussion to join the conversation.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    What are Voice Rooms?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Voice Rooms are live audio discussions where you can talk with other readers in real-time, similar to a digital book club meeting. You can listen or participate by speaking.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Can I create my own book club?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Absolutely! You can create a private or public book club, invite members, schedule meetings, and manage discussions all within Litlink.
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Privacy & Safety</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Is my reading data private?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes, we take your privacy seriously. Your reading preferences and activity are private by default, and you control what information is visible to other users.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I report inappropriate content?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Use the "Report" button available on all posts, messages, and user profiles. Our moderation team reviews all reports promptly.
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer class="footer">
         <div class="footer-links">
-            <a href="#">Help</a>
-            <a href="#">About Us</a>
-            <a href="#">FAQ</a>
+            <a onclick="showPage('help')">Help</a>
+            <a onclick="showPage('about')">About Us</a>
+            <a onclick="showPage('faq')">FAQ</a>
         </div>
         <p class="copyright">All Rights Reserved ©</p>
     </footer>
@@ -714,7 +1181,7 @@
                 <div class="forgot-password">
                     <a href="#">Forgot Password?</a>
                 </div>
-                <button type="submit" class="login-btn">Login</button>
+                <button type="submit" class="login-btn" id="loginSubmit">Login</button>
             </form>
             <div class="divider">
                 <span>or</span>
@@ -734,9 +1201,286 @@
         </div>
     </div>
 
+    <!-- Questionnaire Modal -->
+    <div class="modal-overlay" id="onboardingModal">
+        <div class="onboarding-modal">
+            <div class="modal-header">
+                <h2>Tell Us About Your Reading Preferences 📚</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <!-- Step 1: Genres -->
+            <div class="question-step active" id="step1">
+                <h3>What are your favorite genres?</h3>
+                <p>Select all that apply</p>
+                <div class="genre-grid" id="genreGrid"></div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-next" onclick="nextStep(2)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Favorite Authors -->
+            <div class="question-step" id="step2">
+                <h3>Who are your favorite authors?</h3>
+                <p>List 2-3 authors you love</p>
+                <div class="form-group">
+                    <input type="text" id="author1" placeholder="e.g., J.K. Rowling">
+                    <input type="text" id="author2" placeholder="e.g., Brandon Sanderson" style="margin-top: 10px;">
+                    <input type="text" id="author3" placeholder="e.g., Jane Austen" style="margin-top: 10px;">
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(1)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(3)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Favorite Books -->
+            <div class="question-step" id="step3">
+                <h3>What are your favorite books?</h3>
+                <p>List 2-3 books that you absolutely love</p>
+                <div class="form-group">
+                    <input type="text" id="book1" placeholder="e.g., Harry Potter and the Sorcerer's Stone">
+                    <input type="text" id="book2" placeholder="e.g., The Name of the Wind" style="margin-top: 10px;">
+                    <input type="text" id="book3" placeholder="e.g., Pride and Prejudice" style="margin-top: 10px;">
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(2)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(4)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Reading Habits -->
+            <div class="question-step" id="step4">
+                <h3>How often do you read?</h3>
+                <p>Select the option that best describes your reading habits</p>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Daily reader - I read almost every day</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Weekly reader - I read a few times a week</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Occasional reader - I read a few times a month</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Seasonal reader - I read in bursts</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(3)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(5)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Discussion Preferences -->
+            <div class="question-step" id="step5">
+                <h3>What kind of book discussions do you enjoy?</h3>
+                <p>Select all that interest you</p>
+                <div class="genre-option" onclick="toggleSelection(this)">In-depth analysis of themes and characters</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Casual chatting about favorite moments</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Debating different interpretations</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Sharing recommendations</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Reading challenges and goals</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(4)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(6)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 6: Reading Goals -->
+            <div class="question-step" id="step6">
+                <h3>Do you set reading goals?</h3>
+                <p>How many books do you aim to read in a year?</p>
+                <div class="slider-container">
+                    <input type="range" min="0" max="100" value="12" class="slider" id="readingGoal">
+                    <div class="slider-labels">
+                        <span>0</span>
+                        <span>12</span>
+                        <span>25</span>
+                        <span>50</span>
+                        <span>100+</span>
+                    </div>
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(5)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(7)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 7: Format Preferences -->
+            <div class="question-step" id="step7">
+                <h3>What formats do you prefer?</h3>
+                <p>Select all that apply</p>
+                <div class="genre-option" onclick="toggleSelection(this)">Physical books</div>
+                <div class="genre-option" onclick="toggleSelection(this)">E-books</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Audiobooks</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Graphic novels</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(6)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(8)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 8: Final Step -->
+            <div class="question-step" id="step8">
+                <h3>Almost done!</h3>
+                <p>Would you like to receive book recommendations and community updates?</p>
+                <div class="genre-option" onclick="toggleSelection(this)">Yes, send me recommendations and updates</div>
+                <div class="genre-option" onclick="toggleSelection(this)">No, I prefer to discover books on my own</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(7)">← Previous</button>
+                    <button class="nav-btn btn-submit" onclick="submitQuestionnaire()">Complete Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // API Configuration
-        const API_BASE = 'http://localhost:3001/api';
+        const API_BASE = 'http://localhost:5002/api';
+
+        // Questionnaire Data
+        const genres = [
+            'Fantasy', 'Science Fiction', 'Romance', 'Mystery', 'Thriller',
+            'Historical Fiction', 'Non-Fiction', 'Biography', 'Young Adult',
+            'Classics', 'Horror', 'Comedy', 'Drama', 'Adventure', 'Poetry'
+        ];
+
+        // Page Navigation
+        function showPage(page) {
+            // Hide all pages
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected page
+            document.getElementById(`${page}-page`).classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // FAQ functionality
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const item = question.parentElement;
+                const answer = question.nextElementSibling;
+                
+                // Close all other FAQs
+                document.querySelectorAll('.faq-item').forEach(faq => {
+                    if (faq !== item) {
+                        faq.classList.remove('active');
+                        faq.querySelector('.faq-answer').classList.remove('active');
+                    }
+                });
+                
+                // Toggle current FAQ
+                item.classList.toggle('active');
+                answer.classList.toggle('active');
+            });
+        });
+
+        // Initialize questionnaire
+        function initQuestionnaire() {
+            const genreGrid = document.getElementById('genreGrid');
+            genreGrid.innerHTML = '';
+            genres.forEach(genre => {
+                const genreOption = document.createElement('div');
+                genreOption.className = 'genre-option';
+                genreOption.textContent = genre;
+                genreOption.onclick = () => genreOption.classList.toggle('selected');
+                genreGrid.appendChild(genreOption);
+            });
+        }
+
+        // Navigation functions
+        function nextStep(step) {
+            document.querySelector('.question-step.active').classList.remove('active');
+            document.getElementById(`step${step}`).classList.add('active');
+            updateProgress(step);
+        }
+
+        function prevStep(step) {
+            document.querySelector('.question-step.active').classList.remove('active');
+            document.getElementById(`step${step}`).classList.add('active');
+            updateProgress(step);
+        }
+
+        function updateProgress(currentStep) {
+            const progress = (currentStep / 8) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+        }
+
+        function selectReadingHabit(element) {
+            const options = document.querySelectorAll('.reading-habit-option');
+            options.forEach(option => option.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        function toggleSelection(element) {
+            element.classList.toggle('selected');
+        }
+
+        // Show questionnaire
+        function showQuestionnaire(userId) {
+            document.getElementById('onboardingModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            initQuestionnaire();
+            document.getElementById('onboardingModal').dataset.userId = userId;
+        }
+
+        // Submit questionnaire
+        async function submitQuestionnaire() {
+            const userId = document.getElementById('onboardingModal').dataset.userId;
+            
+            const questionnaireData = {
+                selectedGenres: Array.from(document.querySelectorAll('#step1 .genre-option.selected'))
+                    .map(el => el.textContent),
+                favoriteAuthors: [
+                    document.getElementById('author1').value,
+                    document.getElementById('author2').value,
+                    document.getElementById('author3').value
+                ].filter(author => author.trim() !== ''),
+                favoriteBooks: [
+                    document.getElementById('book1').value,
+                    document.getElementById('book2').value,
+                    document.getElementById('book3').value
+                ].filter(book => book.trim() !== ''),
+                readingHabit: document.querySelector('#step4 .reading-habit-option.selected')?.textContent || '',
+                readingGoal: document.getElementById('readingGoal').value,
+                preferredFormats: Array.from(document.querySelectorAll('#step7 .genre-option.selected'))
+                    .map(el => el.textContent),
+                discussionPreferences: Array.from(document.querySelectorAll('#step5 .genre-option.selected'))
+                    .map(el => el.textContent),
+                receiveRecommendations: document.querySelector('#step8 .genre-option.selected')?.textContent === 
+                    'Yes, send me recommendations and updates'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/questionnaire`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userId: userId,
+                        questionnaireData: questionnaireData
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('🎉 Profile completed! Welcome to Litlink!');
+                    closeModal();
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    localStorage.setItem('token', data.token);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    alert('❌ Failed to save questionnaire: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Questionnaire error:', error);
+                alert('🌐 Network error. Make sure backend is running on port 5002.');
+            }
+        }
 
         // API Functions
         async function handleSignup(formData) {
@@ -753,19 +1497,18 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('🎉 Sign up successful! You can now login.');
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
                     closeModal();
-                    // Switch to login modal
                     setTimeout(() => {
-                        document.getElementById('signupModal').classList.remove('active');
-                        document.getElementById('loginModal').classList.add('active');
+                        showQuestionnaire(data.user.id);
                     }, 500);
                 } else {
                     alert('❌ Sign up failed: ' + data.message);
                 }
             } catch (error) {
                 console.error('Signup error:', error);
-                alert('🌐 Network error during signup. Make sure backend is running on port 3001.');
+                alert('🌐 Network error. Make sure backend is running on port 5002.');
             } finally {
                 hideLoading('signupSubmit', 'Sign up');
             }
@@ -785,20 +1528,19 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('🎉 Login successful!');
-                    // Save user data to localStorage
+                    localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
-                    // Close modal and redirect to profile
+                    alert('🎉 Login successful!');
                     closeModal();
                     setTimeout(() => {
-                        window.location.href = 'profile.html';
+                        window.location.reload();
                     }, 1000);
                 } else {
                     alert('❌ Login failed: ' + data.message);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                alert('🌐 Network error during login. Make sure backend is running on port 3001.');
+                alert('🌐 Network error. Make sure backend is running on port 5002.');
             } finally {
                 hideLoading('loginSubmit', 'Login');
             }
@@ -829,14 +1571,6 @@
 
         sections.forEach(section => observer.observe(section));
 
-        // Mobile menu toggle
-        const menuToggle = document.querySelector('.menu-toggle');
-        const navLinks = document.querySelector('.nav-links');
-
-        menuToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
-        });
-
         // Modal functionality
         const signupBtn = document.querySelector('.btn-signin');
         const loginBtn = document.querySelector('.btn-login');
@@ -846,19 +1580,16 @@
         const switchToLogin = document.getElementById('switchToLogin');
         const switchToSignup = document.getElementById('switchToSignup');
 
-        // Open signup modal
         signupBtn.addEventListener('click', () => {
             signupModal.classList.add('active');
             document.body.style.overflow = 'hidden';
         });
 
-        // Open login modal
         loginBtn.addEventListener('click', () => {
             loginModal.classList.add('active');
             document.body.style.overflow = 'hidden';
         });
 
-        // Close modals
         closeBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const modal = e.target.closest('.modal-overlay');
@@ -867,7 +1598,6 @@
             });
         });
 
-        // Close modals when clicking outside
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal-overlay')) {
                 e.target.classList.remove('active');
@@ -875,7 +1605,6 @@
             }
         });
 
-        // Switch between login and signup
         switchToLogin.addEventListener('click', () => {
             signupModal.classList.remove('active');
             loginModal.classList.add('active');
@@ -886,7 +1615,6 @@
             signupModal.classList.add('active');
         });
 
-        // Close modal function
         function closeModal() {
             document.querySelectorAll('.modal-overlay').forEach(modal => {
                 modal.classList.remove('active');
@@ -1022,13 +1750,39 @@
             handleLogin(formData);
         });
 
-        // Add loading button for login form
-        const loginSubmit = document.createElement('button');
-        loginSubmit.type = 'submit';
-        loginSubmit.className = 'login-btn';
-        loginSubmit.id = 'loginSubmit';
-        loginSubmit.textContent = 'Login';
-        document.querySelector('#loginForm button[type="submit"]').replaceWith(loginSubmit);
+        // Check login status
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = localStorage.getItem('user');
+            if (user) {
+                const userData = JSON.parse(user);
+                document.querySelector('.hero-buttons').innerHTML = `
+                    <button class="btn-signin">Welcome, ${userData.name}!</button>
+                    <button class="btn-login" onclick="logout()">Logout</button>
+                `;
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            window.location.reload();
+        }
+
+        // Mobile menu
+        const menuToggle = document.querySelector('.menu-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        menuToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+        });
+
+        // Navigation links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = link.getAttribute('data-page');
+                showPage(page);
+            });
+        });
     </script>
 </body>
 </html>

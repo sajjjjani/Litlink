@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  password: {
+    type: String,
+    required: true
+  },
   profilePicture: {
     type: String,
     default: '📚'
@@ -31,8 +35,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Questionnaire fields
   favoriteGenres: [String],
   favoriteAuthors: [String],
+  favoriteBooks: [String],
+  readingHabit: String,
+  readingGoal: Number,
+  preferredFormats: [String],
+  discussionPreferences: [String],
+  receiveRecommendations: {
+    type: Boolean,
+    default: true
+  },
+  // Bookshelf
   booksRead: [{
     bookId: String,
     title: String,
