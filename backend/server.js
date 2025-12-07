@@ -57,7 +57,7 @@ const connectToMongoDB = async () => {
 
 connectToMongoDB();
 
-const PORT = process.env.PORT || 5002; // CHANGED FROM 3001 to 5001
+const PORT = process.env.PORT || 5002; 
 app.listen(PORT, () => {
   console.log('='.repeat(50));
   console.log('🚀 Litlink Backend Server Started!');

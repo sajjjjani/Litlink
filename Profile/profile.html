@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - Litlink</title>
+    <link rel="stylesheet" href="/Homepage/styles.css">
+    <link rel="stylesheet" href="profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span class="brand-name">Litlink</span>
+            </div>
+            <div class="nav-links">
+                <a href="/Homepage/index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="#" class="nav-link" data-section="bookshelf"><i class="fas fa-book"></i> Bookshelf</a>
+                <a href="#" class="nav-link" data-section="community"><i class="fas fa-users"></i> Community</a>
+                <a href="#" class="nav-link" data-section="reviews"><i class="fas fa-star"></i> My Reviews</a>
+                <a href="#" class="nav-link active" data-section="profile"><i class="fas fa-user"></i> Profile</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Content -->
+    <div class="profile-container">
+        <!-- Profile Header -->
+        <div class="profile-header">
+            <div class="profile-pic-container">
+                <img src="https://via.placeholder.com/150" alt="Profile Picture" class="profile-pic" id="profilePicture">
+                <button class="edit-pic-btn" onclick="editProfilePicture()">
+                    <i class="fas fa-camera"></i> Edit
+                </button>
+            </div>
+            <div class="profile-info">
+                <h1 id="profileName">Loading...</h1>
+                <div class="username" id="profileUsername">@username</div>
+                <div class="location-pronouns">
+                    <span class="location" id="profileLocation"><i class="fas fa-map-marker-alt"></i> Not set</span>
+                    <span class="pronouns" id="profilePronouns"><i class="fas fa-user"></i> Not set</span>
+                </div>
+                <div class="bio" id="profileBio">No bio yet. Click edit to add one!</div>
+                
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <div class="stat-number" id="statBooks">0</div>
+                        <div class="stat-label">Books Read</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statFollowing">0</div>
+                        <div class="stat-label">Following</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statFollowers">0</div>
+                        <div class="stat-label">Followers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statGoal">0</div>
+                        <div class="stat-label">Goal Progress</div>
+                    </div>
+                </div>
+                
+                <div class="profile-actions">
+                    <button class="action-btn edit" onclick="editProfile()">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </button>
+                    <button class="action-btn delete" onclick="showDeleteAccountModal()">
+                        <i class="fas fa-trash-alt"></i> Delete Account
+                    </button>
+                    <button class="action-btn share" onclick="shareProfile()">
+                        <i class="fas fa-share-alt"></i> Share
+                    </button>
+                    <button class="action-btn logout" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Sections -->
+        <div class="profile-sections">
+            <!-- Profile Section -->
+            <div class="profile-section" id="profileSection">
+                <!-- Reading Stats -->
+                <div class="section-title">
+                    <span><i class="fas fa-chart-line"></i> Reading Stats</span>
+                </div>
+                <div class="reading-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-book-reader"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Reading Habit</div>
+                            <div class="stat-value" id="readingHabit">Not set</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-flag-checkered"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Reading Goal</div>
+                            <div class="stat-value" id="readingGoal">0 books/year</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Member Since</div>
+                            <div class="stat-value" id="memberSince">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Favorite Genres -->
+                <div class="section-title">
+                    <span><i class="fas fa-tags"></i> Favorite Genres</span>
+                </div>
+                <div class="tags-container" id="favoriteGenres">
+                    <div class="empty-state">
+                        <i class="fas fa-tags"></i>
+                        <p>No genres selected yet</p>
+                    </div>
+                </div>
+
+                <!-- Favorite Authors -->
+                <div class="section-title">
+                    <span><i class="fas fa-pen-nib"></i> Favorite Authors</span>
+                </div>
+                <div class="tags-container" id="favoriteAuthors">
+                    <div class="empty-state">
+                        <i class="fas fa-user-edit"></i>
+                        <p>No favorite authors yet</p>
+                    </div>
+                </div>
+
+                <!-- Favorite Books -->
+                <div class="section-title">
+                    <span><i class="fas fa-book"></i> Favorite Books</span>
+                </div>
+                <div class="books-container" id="favoriteBooks">
+                    <div class="empty-state">
+                        <i class="fas fa-book-open"></i>
+                        <p>No favorite books yet</p>
+                    </div>
+                </div>
+
+                <!-- Reading Preferences -->
+                <div class="section-title">
+                    <span><i class="fas fa-sliders-h"></i> Reading Preferences</span>
+                </div>
+                <div class="preferences-container">
+                    <div class="preference-item">
+                        <span class="preference-label">Preferred Formats:</span>
+                        <div class="tags-container" id="preferredFormats">
+                            <span class="empty-tag">Not set</span>
+                        </div>
+                    </div>
+                    <div class="preference-item">
+                        <span class="preference-label">Discussion Preferences:</span>
+                        <div class="tags-container" id="discussionPreferences">
+                            <span class="empty-tag">Not set</span>
+                        </div>
+                    </div>
+                    <div class="preference-item">
+                        <span class="preference-label">Email Updates:</span>
+                        <span class="preference-value" id="receiveRecommendations">Not set</span>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="section-title">
+                    <span><i class="fas fa-history"></i> Recent Activity</span>
+                </div>
+                <div class="activity-container" id="recentActivity">
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="activity-content">
+                            <p>Joined Litlink!</p>
+                            <span class="activity-time" id="joinDate">Just now</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bookshelf Section (Placeholder) -->
+            <div class="profile-section" id="bookshelfSection" style="display: none;">
+                <div class="section-title">
+                    <span><i class="fas fa-book"></i> My Bookshelf</span>
+                </div>
+                <div class="empty-state">
+                    <i class="fas fa-books"></i>
+                    <p>Your bookshelf is empty</p>
+                    <p style="font-size: 0.9rem; margin-top: 10px;">Start adding books to your collection!</p>
+                </div>
+            </div>
+
+            <!-- Community Section (Placeholder) -->
+            <div class="profile-section" id="communitySection" style="display: none;">
+                <div class="section-title">
+                    <span><i class="fas fa-users"></i> Community</span>
+                </div>
+                <div class="empty-state">
+                    <i class="fas fa-comments"></i>
+                    <p>Join communities to connect with other readers</p>
+                </div>
+            </div>
+
+            <!-- Reviews Section (Placeholder) -->
+            <div class="profile-section" id="reviewsSection" style="display: none;">
+                <div class="section-title">
+                    <span><i class="fas fa-star"></i> My Reviews</span>
+                </div>
+                <div class="empty-state">
+                    <i class="fas fa-edit"></i>
+                    <p>No reviews yet</p>
+                    <p style="font-size: 0.9rem; margin-top: 10px;">Start writing reviews for books you've read!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal-overlay" id="editProfileModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Edit Profile</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label for="editName">Full Name</label>
+                    <input type="text" id="editName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editUsername">Username</label>
+                    <input type="text" id="editUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="editBio">Bio</label>
+                    <textarea id="editBio" rows="3" placeholder="Tell us about yourself and your reading journey..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editLocation">Location</label>
+                    <input type="text" id="editLocation" placeholder="City, Country">
+                </div>
+                <div class="form-group">
+                    <label for="editPronouns">Pronouns</label>
+                    <input type="text" id="editPronouns" placeholder="e.g., they/them, she/her, he/him">
+                </div>
+                <div class="form-group">
+                    <label for="editProfilePicture">Profile Picture URL</label>
+                    <input type="text" id="editProfilePicture" placeholder="https://example.com/image.jpg">
+                </div>
+                <div class="form-group">
+                    <label>Reading Goal (books per year)</label>
+                    <input type="number" id="editReadingGoal" min="1" max="500" value="12">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="save-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Account Modal -->
+    <div class="modal-overlay" id="deleteAccountModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Delete Account</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="warning-message">
+                <p><strong>⚠️ Warning: This action cannot be undone!</strong></p>
+                <p>All your data including:</p>
+                <ul>
+                    <li>Profile information</li>
+                    <li>Reading preferences</li>
+                    <li>Favorite books & authors</li>
+                    <li>Reading history</li>
+                </ul>
+                <p>will be permanently deleted.</p>
+            </div>
+            <div class="form-group">
+                <label for="confirmEmail">Enter your email to confirm:</label>
+                <input type="email" id="confirmEmail" placeholder="your@email.com">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="delete-btn" onclick="deleteAccount()">Delete My Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Loading profile...</p>
+    </div>
+
+    <!-- Auto-hide loading overlay after timeout -->
+    <script>
+        // Auto-hide loading after 3 seconds (safety net)
+        setTimeout(function() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay && overlay.style.display !== 'none') {
+                overlay.style.display = 'none';
+                console.log('⏰ Safety timeout: Loading overlay hidden');
+            }
+        }, 3000);
+    </script>
+
+    <!-- Load scripts -->
+    <script src="/Homepage/script.js"></script>
+    <script src="profile.js"></script>
+</body>
+</html>

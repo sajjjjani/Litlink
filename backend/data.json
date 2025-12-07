@@ -1,0 +1,49 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Sajani",
+      "email": "pandeysajani524@gmail.com",
+      "username": "pandeysajani524",
+      "password": "google-auth-1765071872897",
+      "isVerified": true,
+      "verificationExpiry": "2025-12-08T01:44:32.897Z",
+      "googleAuth": true,
+      "createdAt": "2025-12-07T01:44:32.897Z",
+      "questionnaireCompleted": true,
+      "favoriteGenres": [
+        "Fantasy",
+        "Romance",
+        "Young Adult"
+      ],
+      "favoriteAuthors": [
+        "Haruki Murakami",
+        "Khalaed Hosseini",
+        "Ali Hazelwood"
+      ],
+      "favoriteBooks": [
+        "Love Hypothesis",
+        "The Kite Runner",
+        "The Thousand Splendid Sun"
+      ],
+      "readingHabit": "Occasional reader - I read a few times a month",
+      "readingGoal": "12",
+      "preferredFormats": [
+        "Physical books",
+        "E-books"
+      ],
+      "discussionPreferences": [
+        "Debating different interpretations"
+      ],
+      "receiveRecommendations": false,
+      "bio": "",
+      "location": "",
+      "pronouns": "",
+      "profilePicture": "https://ui-avatars.com/api/?name=User&background=E0B973&color=3B1D14&size=150",
+      "booksRead": [],
+      "following": [],
+      "followers": []
+    }
+  ],
+  "nextId": 2
+}

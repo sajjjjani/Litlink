@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Litlink - Home</title>
+    <link href="https://fonts.googleapis.com/css2?family=Italianno&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo-container">
+            <div class="logo-text">Litlink</div>
+        </div>
+        <button class="menu-toggle">☰</button>
+        <div class="nav-links">
+            <a class="nav-link" data-page="home">Home</a>
+            <a class="nav-link" data-page="about">About Us</a>
+            <a class="nav-link" data-page="help">Help</a>
+            <a class="nav-link" data-page="faq">FAQ</a>
+        </div>
+    </nav>
+
+    <!-- HOME PAGE -->
+    <div id="home-page" class="page-section active">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-left">
+                <p class="hero-line">Join where every book finds its reader</p>
+                <div class="hero-buttons">
+                    <button class="btn-signin">Sign up</button>
+                    <button class="btn-login">Login</button>
+                </div>
+            </div>
+            <div class="hero-right">📚</div>
+        </section>
+
+        <p class="mid-line">Great books deserve great conversations</p>
+
+        <!-- Features -->
+        <section class="feature-section">
+            <div class="feature-image fade-in-section">
+                <div class="feature-icon">💬</div>
+            </div>
+            <div class="feature-text fade-in-section delay-1">
+                Connect with other readers through fast, real-time messaging. 
+                Share thoughts, use spoiler tags, and keep conversations 
+                focused on your favorite books.
+            </div>
+        </section>
+
+        <section class="feature-section">
+            <div class="feature-text fade-in-section delay-1">
+                Join book-focused discussions organized by book covers and genres. 
+                Explore threads, read opinions and contribute to meaningful conversations.
+            </div>
+            <div class="feature-image fade-in-section">
+                <div class="feature-icon">📖</div>
+            </div>
+        </section>
+
+        <section class="feature-section">
+            <div class="feature-image fade-in-section">
+                <div class="feature-icon">🎤</div>
+            </div>
+            <div class="feature-text fade-in-section delay-1">
+                Join live audio rooms for book discussions. Talk, listen and interact 
+                with readers around the world like a digital book club.
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="about-section">
+            <h2>ABOUT US</h2>
+            <p>
+                Litlink is a digital reading corner for everyone who loves books. 
+                We believe stories are better when shared, and we built a space 
+                where readers can talk, learn and connect.
+            </p>
+        </section>
+    </div>
+
+    <!-- ABOUT US PAGE -->
+    <div id="about-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>About Litlink</h1>
+            <p>Where stories come to life through shared experiences and meaningful conversations among book lovers worldwide.</p>
+        </div>
+
+        <div class="story-section">
+            <h2>Our Story</h2>
+            <p>Litlink was born from a simple passion: the love of books and the conversations they inspire. As an avid reader, I noticed how books create invisible threads connecting people across distances and differences. Yet, there wasn't a dedicated space where these connections could flourish naturally.</p>
+            <p>What started as a personal project to connect with fellow book enthusiasts has grown into Litlink - a platform where every book finds its reader, and every reader finds their community. We believe that stories are meant to be shared, discussed, and cherished together.</p>
+            <p>Today, Litlink serves thousands of readers worldwide, creating a digital home for book lovers to connect, share insights, and build lasting friendships through their shared love of literature.</p>
+        </div>
+
+        <div class="mission-vision">
+            <div class="mission">
+                <h2>Our Mission</h2>
+                <p>To create a vibrant digital community where readers can connect, share insights, and discover new perspectives through the power of shared storytelling.</p>
+            </div>
+            <div class="vision">
+                <h2>Our Vision</h2>
+                <p>To become the world's most welcoming platform for book enthusiasts, fostering lifelong reading habits and meaningful literary connections.</p>
+            </div>
+        </div>
+
+        <div class="values-section">
+            <h2>Our Values</h2>
+            <div class="values-grid">
+                <div class="value-item">
+                    <div class="value-icon">🤝</div>
+                    <h3>Community First</h3>
+                    <p>We prioritize meaningful connections between readers</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">📚</div>
+                    <h3>Love for Reading</h3>
+                    <p>We celebrate all genres and reading preferences</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">💬</div>
+                    <h3>Open Dialogue</h3>
+                    <p>We encourage respectful and diverse conversations</p>
+                </div>
+                <div class="value-item">
+                    <div class="value-icon">🌍</div>
+                    <h3>Global Perspective</h3>
+                    <p>We connect readers across cultures and borders</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HELP PAGE -->
+    <div id="help-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>Help Center</h1>
+            <p>Get the support you need to make the most of your Litlink experience</p>
+        </div>
+
+        <div class="help-categories">
+            <div class="help-category">
+                <h3>Getting Started</h3>
+                <ul>
+                    <li>Creating your account</li>
+                    <li>Setting up your reading profile</li>
+                    <li>Finding and joining book clubs</li>
+                    <li>Navigating the platform</li>
+                </ul>
+            </div>
+            <div class="help-category">
+                <h3>Account & Settings</h3>
+                <ul>
+                    <li>Updating your profile information</li>
+                    <li>Changing password and security</li>
+                    <li>Managing notification preferences</li>
+                    <li>Privacy settings</li>
+                </ul>
+            </div>
+            <div class="help-category">
+                <h3>Features Guide</h3>
+                <ul>
+                    <li>Using the messaging system</li>
+                    <li>Participating in discussion boards</li>
+                    <li>Joining voice rooms</li>
+                    <li>Creating and managing book clubs</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="contact-support">
+            <h2>Still Need Help?</h2>
+            <p>Our support team is here to assist you with any questions or issues you may encounter.</p>
+            <p>Email us at: <strong>support@litlink.com</strong></p>
+            <p>We typically respond within 24 hours.</p>
+        </div>
+    </div>
+
+    <!-- FAQ PAGE -->
+    <div id="faq-page" class="page-section">
+        <div class="back-home" onclick="showPage('home')">← Back to Home</div>
+        <div class="page-hero">
+            <h1>Frequently Asked Questions</h1>
+            <p>Quick answers to common questions about Litlink</p>
+        </div>
+
+        <div class="faq-category">
+            <h2>Account & Registration</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I create a Litlink account?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Click the "Sign Up" button on the homepage and follow the registration process. You'll need to provide your name, email address, and create a password that meets our security requirements.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Is Litlink free to use?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes! Litlink is completely free for all users. We believe in making literary communities accessible to everyone.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    I forgot my password. How can I reset it?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Click "Login" then "Forgot Password" on the login modal. Enter your email address, and we'll send you a password reset OTP to your email.
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Features & Usage</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I join a book discussion?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Navigate to the Discussion Board section, browse through available topics organized by genres or book titles, and click on any discussion to join the conversation.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    What are Voice Rooms?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Voice Rooms are live audio discussions where you can talk with other readers in real-time, similar to a digital book club meeting. You can listen or participate by speaking.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Can I create my own book club?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Absolutely! You can create a private or public book club, invite members, schedule meetings, and manage discussions all within Litlink.
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Privacy & Safety</h2>
+            <div class="faq-item">
+                <div class="faq-question">
+                    Is my reading data private?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes, we take your privacy seriously. Your reading preferences and activity are private by default, and you control what information is visible to other users.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I report inappropriate content?
+                    <span class="faq-toggle">+</span>
+                </div>
+                <div class="faq-answer">
+                    Use the "Report" button available on all posts, messages, and user profiles. Our moderation team reviews all reports promptly.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a onclick="showPage('help')">Help</a>
+            <a onclick="showPage('about')">About Us</a>
+            <a onclick="showPage('faq')">FAQ</a>
+        </div>
+        <p class="copyright">All Rights Reserved ©</p>
+    </footer>
+
+    <!-- Sign Up Modal -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="signup-modal">
+            <div class="modal-header">
+                <h2>SIGN UP</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" placeholder="Enter your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                    <button type="button" class="password-toggle" id="togglePassword">Show</button>
+                    <div class="password-requirements">Password must be at least 8 characters long</div>
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" placeholder="Confirm your password" required>
+                    <button type="button" class="password-toggle" id="toggleConfirmPassword">Show</button>
+                    <div class="error-message" id="confirmPasswordError"></div>
+                </div>
+                <button type="submit" class="signup-btn" id="signupSubmit">Sign up</button>
+            </form>
+            <div class="divider">
+                <span>or</span>
+            </div>
+            <button class="google-btn" onclick="signInWithGoogle()">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign up with Google
+            </button>
+            <div class="switch-link">
+                Already have an account? <a id="switchToLogin">Login</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="login-modal">
+            <div class="modal-header">
+                <h2>LOGIN</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                    <button type="button" class="password-toggle" id="toggleLoginPassword">Show</button>
+                </div>
+                <div class="forgot-password">
+                    <a href="#" onclick="showForgotPassword()">Forgot Password?</a>
+                </div>
+                <button type="submit" class="login-btn" id="loginSubmit">Login</button>
+            </form>
+            <div class="divider">
+                <span>or</span>
+            </div>
+            <button class="google-btn" onclick="signInWithGoogle()">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Login with Google
+            </button>
+            <div class="switch-link">
+                Don't have an account? <a id="switchToSignup">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay" id="forgotPasswordModal">
+        <div class="signup-modal">
+            <div class="modal-header">
+                <h2>Reset Your Password</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="forgotPasswordForm">
+                <div class="form-group">
+                    <label for="forgotEmail">Enter your email address</label>
+                    <input type="email" id="forgotEmail" placeholder="Your email address" required>
+                </div>
+                <button type="submit" class="signup-btn" id="forgotPasswordSubmit">Send Reset OTP</button>
+            </form>
+            <div class="switch-link">
+                Remember your password? <a id="switchToLoginFromForgot">Login</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OTP Verification Modal -->
+    <div class="modal-overlay" id="otpModal">
+        <div class="signup-modal">
+            <div class="modal-header">
+                <h2>Verify OTP</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="otpForm">
+                <div class="form-group">
+                    <label for="otpEmail">Email Address</label>
+                    <input type="email" id="otpEmail" placeholder="Enter your email" required readonly>
+                </div>
+                <div class="form-group">
+                    <label for="otpCode">Enter OTP</label>
+                    <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" required maxlength="6">
+                    <div class="password-requirements">Check your email for the OTP. It expires in 10 minutes.</div>
+                    <div class="error-message" id="otpError"></div>
+                </div>
+                <button type="submit" class="signup-btn" id="verifyOtpBtn">Verify OTP</button>
+            </form>
+            <div class="switch-link">
+                Didn't receive OTP? <a onclick="resendOTP()">Resend OTP</a>
+            </div>
+            <div class="switch-link">
+                <a onclick="switchToForgotPassword()">← Back to Forgot Password</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OTP Reset Password Modal -->
+    <div class="modal-overlay" id="otpResetModal">
+        <div class="signup-modal">
+            <div class="modal-header">
+                <h2>Create New Password</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="otpResetForm">
+                <div class="form-group">
+                    <label for="otpResetToken">Reset Token</label>
+                    <input type="text" id="otpResetToken" placeholder="Reset token from OTP verification" required readonly>
+                </div>
+                <div class="form-group">
+                    <label for="otpNewPassword">New Password</label>
+                    <input type="password" id="otpNewPassword" placeholder="Enter new password" required>
+                    <button type="button" class="password-toggle" id="toggleOtpNewPassword">Show</button>
+                    <div class="password-requirements">Password must be at least 8 characters long</div>
+                    <div class="error-message" id="otpNewPasswordError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="otpConfirmNewPassword">Confirm New Password</label>
+                    <input type="password" id="otpConfirmNewPassword" placeholder="Confirm new password" required>
+                    <button type="button" class="password-toggle" id="toggleOtpConfirmNewPassword">Show</button>
+                    <div class="error-message" id="otpConfirmNewPasswordError"></div>
+                </div>
+                <button type="submit" class="signup-btn" id="otpResetSubmit">Reset Password</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resend Verification Modal -->
+    <div class="modal-overlay" id="resendVerificationModal">
+        <div class="signup-modal">
+            <div class="modal-header">
+                <h2>Resend Verification Email</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="resendVerificationForm">
+                <div class="form-group">
+                    <label for="resendEmail">Enter your email address</label>
+                    <input type="email" id="resendEmail" placeholder="Your email address" required>
+                </div>
+                <button type="submit" class="signup-btn" id="resendVerificationSubmit">Resend Verification Email</button>
+            </form>
+            <div class="switch-link">
+                Verified your email? <a onclick="switchToLoginFromResend()">Login</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questionnaire Modal -->
+    <div class="modal-overlay" id="onboardingModal">
+        <div class="onboarding-modal">
+            <div class="modal-header">
+                <h2>Tell Us About Your Reading Preferences 📚</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <!-- Step 1: Genres -->
+            <div class="question-step active" id="step1">
+                <h3>What are your favorite genres?</h3>
+                <p>Select all that apply</p>
+                <div class="genre-grid" id="genreGrid"></div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-next" onclick="nextStep(2)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Favorite Authors -->
+            <div class="question-step" id="step2">
+                <h3>Who are your favorite authors?</h3>
+                <p>List 2-3 authors you love</p>
+                <div class="form-group">
+                    <input type="text" id="author1" placeholder="e.g., J.K. Rowling">
+                    <input type="text" id="author2" placeholder="e.g., Brandon Sanderson" style="margin-top: 10px;">
+                    <input type="text" id="author3" placeholder="e.g., Jane Austen" style="margin-top: 10px;">
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(1)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(3)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Favorite Books -->
+            <div class="question-step" id="step3">
+                <h3>What are your favorite books?</h3>
+                <p>List 2-3 books that you absolutely love</p>
+                <div class="form-group">
+                    <input type="text" id="book1" placeholder="e.g., Harry Potter and the Sorcerer's Stone">
+                    <input type="text" id="book2" placeholder="e.g., The Name of the Wind" style="margin-top: 10px;">
+                    <input type="text" id="book3" placeholder="e.g., Pride and Prejudice" style="margin-top: 10px;">
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(2)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(4)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Reading Habits -->
+            <div class="question-step" id="step4">
+                <h3>How often do you read?</h3>
+                <p>Select the option that best describes your reading habits</p>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Daily reader - I read almost every day</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Weekly reader - I read a few times a week</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Occasional reader - I read a few times a month</div>
+                <div class="reading-habit-option" onclick="selectReadingHabit(this)">Seasonal reader - I read in bursts</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(3)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(5)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Discussion Preferences -->
+            <div class="question-step" id="step5">
+                <h3>What kind of book discussions do you enjoy?</h3>
+                <p>Select all that interest you</p>
+                <div class="genre-option" onclick="toggleSelection(this)">In-depth analysis of themes and characters</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Casual chatting about favorite moments</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Debating different interpretations</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Sharing recommendations</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Reading challenges and goals</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(4)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(6)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 6: Reading Goals -->
+            <div class="question-step" id="step6">
+                <h3>Do you set reading goals?</h3>
+                <p>How many books do you aim to read in a year?</p>
+                <div class="slider-container">
+                    <input type="range" min="0" max="100" value="12" class="slider" id="readingGoal">
+                    <div class="slider-labels">
+                        <span>0</span>
+                        <span>12</span>
+                        <span>25</span>
+                        <span>50</span>
+                        <span>100+</span>
+                    </div>
+                </div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(5)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(7)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 7: Format Preferences -->
+            <div class="question-step" id="step7">
+                <h3>What formats do you prefer?</h3>
+                <p>Select all that apply</p>
+                <div class="genre-option" onclick="toggleSelection(this)">Physical books</div>
+                <div class="genre-option" onclick="toggleSelection(this)">E-books</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Audiobooks</div>
+                <div class="genre-option" onclick="toggleSelection(this)">Graphic novels</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(6)">← Previous</button>
+                    <button class="nav-btn btn-next" onclick="nextStep(8)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 8: Final Step -->
+            <div class="question-step" id="step8">
+                <h3>Almost done!</h3>
+                <p>Would you like to receive book recommendations and community updates?</p>
+                <div class="genre-option" onclick="toggleSelection(this)">Yes, send me recommendations and updates</div>
+                <div class="genre-option" onclick="toggleSelection(this)">No, I prefer to discover books on my own</div>
+                <div class="navigation-buttons">
+                    <button class="nav-btn btn-prev" onclick="prevStep(7)">← Previous</button>
+                    <button class="nav-btn btn-submit" onclick="submitQuestionnaire()">Complete Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resend Verification Modal -->
+<div class="modal-overlay" id="resendVerificationModal">
+    <div class="signup-modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Verify Your Email</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div id="verificationContent">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 50px; margin-bottom: 10px;">📧</div>
+                <h3 style="color: #3B1D14; margin-bottom: 10px;">Email Verification Required</h3>
+                <p>Please verify your email to continue using Litlink.</p>
+            </div>
+            
+            <form id="manualVerificationForm">
+                <div class="form-group">
+                    <label for="verifyEmail">Your Email</label>
+                    <input type="email" id="verifyEmail" placeholder="your@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="verifyCode">Verification Code</label>
+                    <input type="text" id="verifyCode" placeholder="6-digit code from email" required maxlength="6">
+                    <div class="password-requirements">Enter the code sent to your email</div>
+                </div>
+                <button type="submit" class="signup-btn">Verify Email</button>
+            </form>
+            
+            <div style="background: #F5E6CC; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin-bottom: 10px; font-weight: bold;">Don't have the code?</p>
+                <button class="btn" style="width: 100%; background: #F5E6CC; color: #3B1D14; border: 1px solid #B89A7A;" onclick="resendVerification()">
+                    Resend Verification Email
+                </button>
+            </div>
+            
+            <div class="switch-link">
+                Verified already? <a onclick="switchToLoginFromResend()">Go to Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update the verification form submission
+document.getElementById('manualVerificationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('verifyEmail').value;
+    const code = document.getElementById('verifyCode').value;
+    
+    if (!email || !code) {
+        alert('Please enter both email and verification code');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/verify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Email verified successfully!');
+            document.getElementById('resendVerificationModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            
+            // Remove pending user
+            localStorage.removeItem('pendingUser');
+            
+            // Remove verification alert if exists
+            const alertBanner = document.getElementById('verificationAlert');
+            if (alertBanner) alertBanner.remove();
+            
+            if (data.needsQuestionnaire) {
+                // Show questionnaire
+                showQuestionnaire(data.user.id);
+            } else {
+                // Already has questionnaire, login
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                updateWelcomeMessage(data.user);
+            }
+        } else {
+            alert('❌ ' + data.message);
+        }
+    } catch (error) {
+        alert('🌐 Network error');
+    }
+});
+
+// Update resend verification function
+async function resendVerification() {
+    const email = document.getElementById('verifyEmail').value;
+    if (!email) {
+        alert('Please enter your email first');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/resend-verification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ New verification code sent!\n\nFor testing, code is: ${data.verificationCode}\n\nOr go to: ${data.verificationUrl || 'verify-email.html'}`);
+            console.log('🔢 New verification code:', data.verificationCode);
+            console.log('🔗 Verification URL:', data.verificationUrl);
+            
+            // Update the code field
+            document.getElementById('verifyCode').value = data.verificationCode || '';
+            
+        } else {
+            alert('❌ ' + data.message);
+        }
+    } catch (error) {
+        alert('🌐 Network error');
+    }
+}
+
+// Update switch to login function
+function switchToLoginFromResend() {
+    document.getElementById('resendVerificationModal').classList.remove('active');
+    document.getElementById('loginModal').classList.add('active');
+}
+</script>
+
+    <script src="script.js"></script>
+</body>
+</html>
