@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - Litlink</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .about-hero {
+            min-height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 60px;
+            background: linear-gradient(135deg, #2c1810 0%, #3d2617 100%);
+            text-align: center;
+        }
+        
+        .about-hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f5e6d3 0%, #d4b5a0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .about-hero p {
+            font-size: 1.2rem;
+            color: #d4b5a0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .story-section, .mission-section, .team-section {
+            padding: 80px 20px;
+        }
+        
+        .story-section {
+            background: #3d2617;
+        }
+        
+        .mission-section {
+            background: #4a3123;
+        }
+        
+        .team-section {
+            background: #3d2617;
+        }
+        
+        .story-content, .mission-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+        
+        .story-text h2, .mission-text h2, .team-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #f5e6d3;
+        }
+        
+        .story-text p, .mission-text p {
+            color: #d4b5a0;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        
+        .story-image, .mission-image {
+            background: #f5e6d3;
+            height: 300px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            color: #2c1810;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .team-card {
+            background: #4a3123;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .team-card:hover {
+            transform: translateY(-10px);
+        }
+        
+        .team-avatar {
+            width: 100px;
+            height: 100px;
+            background: #f5e6d3;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: #2c1810;
+        }
+        
+        .team-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #f5e6d3;
+        }
+        
+        .team-card p {
+            color: #d4b5a0;
+            font-size: 0.9rem;
+        }
+        
+        .team-role {
+            color: #f5e6d3 !important;
+            font-weight: 600;
+            margin-bottom: 15px !important;
+        }
+        
+        @media (max-width: 768px) {
+            .story-content, .mission-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            
+            .about-hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .story-text h2, .mission-text h2, .team-section h2 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar (same as homepage) -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" style="text-decoration: none; color: inherit;">
+                    <div class="logo">
+                        <i class="fas fa-book-open"></i>
+                        <span>Litlink</span>
+                    </div>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html#loginBtn" class="btn btn-login">Login</a>
+                <a href="index.html#signupBtn" class="btn btn-signup">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- About Hero -->
+    <section class="about-hero">
+        <div class="container">
+            <h1>Our Story</h1>
+            <p>Connecting readers through their shared love of stories since 2024</p>
+        </div>
+    </section>
+
+    <!-- Our Story -->
+    <section class="story-section" id="story">
+        <div class="container">
+            <div class="story-content">
+                <div class="story-text">
+                    <h2>How It All Began</h2>
+                    <p>Litlink was founded in 2024 by a group of passionate readers who noticed something missing in the digital reading community. While there were plenty of platforms for reviewing books or tracking reading habits, there was no dedicated space for readers to truly connect with each other.</p>
+                    <p>Our founder, Sarah Chen, an avid book club organizer, realized that the most meaningful literary discussions happened face-to-face. She wanted to recreate that magic online—a place where you could not only discuss books but also find reading companions who shared your specific tastes.</p>
+                    <p>What started as a small book matching platform has grown into a vibrant community of over 10,000 readers worldwide, all connected by their love of stories.</p>
+                </div>
+                <div class="story-image">
+                    📚
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Our Mission -->
+    <section class="mission-section">
+        <div class="container">
+            <div class="mission-content">
+                <div class="mission-image">
+                    🌟
+                </div>
+                <div class="mission-text">
+                    <h2>Our Mission</h2>
+                    <p>At Litlink, we believe that every book is better when shared. Our mission is to build bridges between readers, creating meaningful connections through literature.</p>
+                    <p>We're not just another social media platform—we're a dedicated space for bibliophiles to find their reading tribe. Whether you're into epic fantasy, literary fiction, or niche nonfiction, there's a community here waiting for you.</p>
+                    <p>Through our AI-powered matching system, real-time chat features, and diverse discussion spaces, we're making it easier than ever to find and connect with fellow readers who understand why that particular paragraph moved you to tears or that plot twist kept you up all night.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Our Team -->
+    <section class="team-section" id="team">
+        <div class="container">
+            <h2>Meet Our Team</h2>
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-avatar">
+                        👩‍💼
+                    </div>
+                    <h3>Sarah Chen</h3>
+                    <p class="team-role">Founder & CEO</p>
+                    <p>Former book club organizer with 10+ years in community building</p>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">
+                        👨‍💻
+                    </div>
+                    <h3>Marcus Johnson</h3>
+                    <p class="team-role">CTO</p>
+                    <p>AI specialist passionate about connecting people through technology</p>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">
+                        👩‍🎨
+                    </div>
+                    <h3>Elena Rodriguez</h3>
+                    <p class="team-role">Head of Community</p>
+                    <p>Literary scholar dedicated to fostering meaningful discussions</p>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">
+                        👨‍💼
+                    </div>
+                    <h3>David Kim</h3>
+                    <p class="team-role">Product Designer</p>
+                    <p>Creates beautiful, intuitive experiences for book lovers</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer (same as homepage) -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>📚 Litlink</h3>
+                    <p>Connecting readers<br>through the stories<br>they love.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>About Us</h4>
+                        <ul>
+                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html#team">Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>FAQ</h4>
+                        <ul>
+                            <li><a href="faq.html#privacy">Privacy Policy</a></li>
+                            <li><a href="faq.html#terms">Terms</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Support</h4>
+                        <ul>
+                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 - Litlink. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

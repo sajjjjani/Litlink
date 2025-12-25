@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Litlink - Where Readers Connect Through Stories</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" class="logo">
+                    <i class="fas fa-book-open"></i>
+                    <span>Litlink</span>
+                </a>
+            </div>
+            <div class="nav-links">
+                <button class="btn btn-login" id="loginBtn">Login</button>
+                <button class="btn btn-signup" id="signupBtn">Sign Up</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Welcome Back</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                    </div>
+                    <div class="error-message" id="loginEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                        <button type="button" class="toggle-password" id="toggleLoginPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="error-message" id="loginPasswordError"></div>
+                </div>
+                <div class="form-options">
+                    <a href="#" class="forgot-password" id="forgotPasswordLink">Forgot password?</a>
+                </div>
+                <button type="submit" class="btn btn-modal-submit" id="loginSubmit">Login</button>
+                <div class="form-footer">
+                    <p>Don't have an account? <a href="#" id="switchToSignupLink">Sign up</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Join Litlink</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="signupName" placeholder="Enter your full name" required>
+                    </div>
+                    <div class="error-message" id="signupNameError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="signupEmail" placeholder="Enter your email" required>
+                    </div>
+                    <div class="error-message" id="signupEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="signupPassword" placeholder="Create a password" required>
+                        <button type="button" class="toggle-password" id="toggleSignupPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="password-requirements">
+                        <p>Password must contain:</p>
+                        <ul>
+                            <li id="req-length" class="req-unmet"><i class="fas fa-times"></i> At least 8 characters</li>
+                            <li id="req-uppercase" class="req-unmet"><i class="fas fa-times"></i> One uppercase letter</li>
+                            <li id="req-number" class="req-unmet"><i class="fas fa-times"></i> One number</li>
+                            <li id="req-special" class="req-unmet"><i class="fas fa-times"></i> One special character</li>
+                        </ul>
+                    </div>
+                    <div class="error-message" id="signupPasswordError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="confirmPassword" placeholder="Confirm your password" required>
+                        <button type="button" class="toggle-password" id="toggleConfirmPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="error-message" id="confirmPasswordError"></div>
+                </div>
+                <button type="submit" class="btn btn-modal-submit" id="signupSubmit">Create Account</button>
+                <div class="form-footer">
+                    <p>Already have an account? <a href="#" id="switchToLoginLink">Login</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay" id="forgotPasswordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reset Password</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="forgotPasswordForm">
+                <div class="form-group">
+                    <label for="forgotEmail">Enter your email address</label>
+                    <input type="email" id="forgotEmail" placeholder="Your email address" required>
+                </div>
+                <button type="submit" class="btn btn-modal-submit" id="forgotPasswordSubmit">Send Reset Link</button>
+            </form>
+            <div class="form-footer">
+                <p><a href="#" id="backToLoginLink">← Back to Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <h1 class="hero-title">Where Readers Connect Through Stories.</h1>
+                <p class="hero-subtitle">Discover people who love the same books you do. Join conversations, match with readers, and explore a thriving book community.</p>
+                
+                <div class="hero-buttons">
+                    <button class="btn btn-primary" id="heroSignupBtn">Join Litlink →</button>
+                    <button class="btn btn-secondary" id="exploreCommunityBtn">Explore Community</button>
+                </div>
+
+                <div class="hero-card">
+                    <div class="card-content">
+                        <div class="book-cover"></div>
+                        <div class="book-info">
+                            <div class="book-text">
+                                <div class="book-dot"></div>
+                                <div class="book-lines">
+                                    <div class="line"></div>
+                                    <div class="line"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="user-info">
+                            <div class="avatar"></div>
+                            <div class="user-text">
+                                <div class="user-name">Jane Mitchell</div>
+                                <div class="user-status">Now Reading</div>
+                            </div>
+                        </div>
+                        <div class="chat-icon">💬</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats">
+            <div class="container">
+                <div class="stat-item">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-number">10,000+</div>
+                    <div class="stat-label">Readers</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-number">500+</div>
+                    <div class="stat-label">Active Discussions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">💬</div>
+                    <div class="stat-number">Chat & Voice</div>
+                    <div class="stat-label">Multiple Channels</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">🤖</div>
+                    <div class="stat-number">Smart AI</div>
+                    <div class="stat-label">Matchmaking</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features">
+            <div class="container">
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>AI Matchmaking</h3>
+                        <p>Find readers who share your taste using AI-powered recommendations.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💬</div>
+                        <h3>Real-Time Chat</h3>
+                        <p>Talk 1-to-1 by with matched readers using a user-trusted chat tool.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📋</div>
+                        <h3>Discussion Boards</h3>
+                        <p>Join conversations and debates about your favorite books. Dive deep into stories with users through insightful discussions.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎙️</div>
+                        <h3>Voice Rooms</h3>
+                        <p>Have real conversations with live book clubs, author talks, and discussions.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Community Section -->
+        <section class="community">
+            <div class="container">
+                <h2 class="section-title">Explore the Community</h2>
+                <p class="section-subtitle">See what's happening right now, join in.</p>
+
+                <div class="community-grid">
+                    <div class="community-card">
+                        <div class="book-display">
+                            <div class="book-cover-large"></div>
+                        </div>
+                        <div class="book-details">
+                            <span class="genre-tag">Thriller</span>
+                            <h4>The Name of the Wind</h4>
+                            <p>"Love stories like this? Want to dive in? Connect with fellow fans for an electrifying journey."</p>
+                            <div class="book-stats">
+                                <span>👥 5.2k readers</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="community-card voice-card">
+                        <div class="voice-header">
+                            <div class="live-badge">🎙️</div>
+                            <h4>Sci-Fi Sunday</h4>
+                            <p>Weekly discussion</p>
+                        </div>
+                        <div class="voice-participants">
+                            <div class="participant"></div>
+                            <div class="participant"></div>
+                            <div class="participant"></div>
+                            <div class="participant"></div>
+                            <span>+4</span>
+                        </div>
+                    </div>
+
+                    <div class="community-card fiction-card">
+                        <div class="fiction-icon">📖</div>
+                        <h4>Literary Fiction</h4>
+                        <p>2.8k Followers</p>
+                    </div>
+
+                    <div class="community-card stats-card">
+                        <p>Readers currently matched & chatting</p>
+                        <div class="live-count">1,248</div>
+                        <div class="pulse-indicator"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="how-it-works">
+            <div class="container">
+                <h2 class="section-title">How It Works</h2>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <h3>Create Your Profile</h3>
+                        <p>Add your favorite authors, genres, book reviews.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-people-arrows"></i>
+                        </div>
+                        <h3>Get Matched</h3>
+                        <p>AI recommends readers similar to you.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3>Connect</h3>
+                        <p>Chat with readers, talk in book clubs.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta">
+            <div class="container">
+                <h2 class="cta-title">Start Connecting With Readers Today.</h2>
+                <button class="btn btn-cta" id="ctaSignupBtn">Create Account</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3><i class="fas fa-book-open"></i> Litlink</h3>
+                    <p>Connecting readers<br>through the stories<br>they love.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>About Us</h4>
+                        <ul>
+                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html#team">Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>FAQ</h4>
+                        <ul>
+                            <li><a href="faq.html">FAQ</a></li>
+                            <li><a href="faq.html#privacy">Privacy Policy</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Support</h4>
+                        <ul>
+                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 - Litlink. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Files -->
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

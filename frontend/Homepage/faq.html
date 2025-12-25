@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ - Litlink</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .faq-hero {
+            min-height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 60px;
+            background: linear-gradient(135deg, #2c1810 0%, #3d2617 100%);
+            text-align: center;
+        }
+        
+        .faq-hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f5e6d3 0%, #d4b5a0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .faq-hero p {
+            font-size: 1.2rem;
+            color: #d4b5a0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .faq-section {
+            padding: 80px 20px;
+            background: #3d2617;
+        }
+        
+        .policy-section {
+            padding: 80px 20px;
+            background: #4a3123;
+        }
+        
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .faq-item {
+            background: #4a3123;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+        }
+        
+        .faq-question {
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .faq-question:hover {
+            background: rgba(245, 230, 211, 0.05);
+        }
+        
+        .faq-question h3 {
+            font-size: 1.2rem;
+            color: #f5e6d3;
+            margin: 0;
+        }
+        
+        .faq-icon {
+            font-size: 1.2rem;
+            color: #d4b5a0;
+            transition: transform 0.3s ease;
+        }
+        
+        .faq-answer {
+            padding: 0 24px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+        
+        .faq-answer.open {
+            padding: 0 24px 24px 24px;
+            max-height: 500px;
+        }
+        
+        .faq-answer p {
+            color: #d4b5a0;
+            line-height: 1.6;
+            margin: 0;
+        }
+        
+        .faq-answer ul {
+            color: #d4b5a0;
+            padding-left: 20px;
+            margin: 15px 0;
+        }
+        
+        .faq-answer li {
+            margin-bottom: 8px;
+        }
+        
+        .policy-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .policy-content h2 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            color: #f5e6d3;
+        }
+        
+        .policy-content h3 {
+            font-size: 1.5rem;
+            margin: 30px 0 15px;
+            color: #f5e6d3;
+        }
+        
+        .policy-content p {
+            color: #d4b5a0;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+        
+        .search-box {
+            margin: 40px 0;
+            position: relative;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 16px 24px 16px 50px;
+            background: #3d2617;
+            border: 2px solid rgba(245, 230, 211, 0.2);
+            border-radius: 50px;
+            color: #f5e6d3;
+            font-size: 1rem;
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #d4b5a0;
+        }
+        
+        @media (max-width: 768px) {
+            .faq-hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .policy-content h2 {
+                font-size: 2rem;
+            }
+            
+            .faq-question {
+                padding: 20px;
+            }
+            
+            .faq-question h3 {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" style="text-decoration: none; color: inherit;">
+                    <div class="logo">
+                        <i class="fas fa-book-open"></i>
+                        <span>Litlink</span>
+                    </div>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html#loginBtn" class="btn btn-login">Login</a>
+                <a href="index.html#signupBtn" class="btn btn-signup">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- FAQ Hero -->
+    <section class="faq-hero">
+        <div class="container">
+            <h1>Frequently Asked Questions</h1>
+            <p>Find answers to common questions about Litlink</p>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <div class="faq-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="faqSearch" placeholder="Search for questions...">
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How does the AI matching system work?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Our AI analyzes your reading preferences, favorite genres, authors, and reading habits to find other users with similar tastes. The algorithm considers multiple factors including:</p>
+                        <ul>
+                            <li>Book ratings and reviews you've shared</li>
+                            <li>Genres and authors you follow</li>
+                            <li>Your reading activity and discussions</li>
+                            <li>Compatibility with other users' reading preferences</li>
+                        </ul>
+                        <p>Matches are updated regularly as you interact more with the platform.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>Is Litlink free to use?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Yes! Litlink is completely free for all basic features including:</p>
+                        <ul>
+                            <li>Creating a profile and adding books</li>
+                            <li>AI-powered reader matching</li>
+                            <li>Text chat with matched readers</li>
+                            <li>Joining and participating in discussion boards</li>
+                            <li>Basic voice room access</li>
+                        </ul>
+                        <p>We may introduce premium features in the future, but the core connection experience will always remain free.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do I join a voice room?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>To join a voice room:</p>
+                        <ol>
+                            <li>Navigate to the Community section</li>
+                            <li>Look for voice rooms marked with the 🎙️ icon</li>
+                            <li>Click on any active voice room</li>
+                            <li>Press the "Join Room" button</li>
+                            <li>Allow microphone access when prompted</li>
+                        </ol>
+                        <p>You can listen without speaking, or raise your virtual hand to contribute to the discussion.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>Can I create my own book club or discussion group?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Absolutely! To create your own group:</p>
+                        <ul>
+                            <li>Go to the Community section</li>
+                            <li>Click "Create Group" in the top right corner</li>
+                            <li>Choose between a discussion board or voice room group</li>
+                            <li>Set your group name, description, and privacy settings</li>
+                            <li>Invite members or make it public for anyone to join</li>
+                        </ul>
+                        <p>Group creators have moderation tools to manage discussions and members.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do I report inappropriate behavior?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Your safety is our priority. To report inappropriate behavior:</p>
+                        <ul>
+                            <li>In chat: Click the three dots next to any message and select "Report"</li>
+                            <li>In voice rooms: Click the participant's name and select "Report"</li>
+                            <li>On profiles: Visit the user's profile and click "Report User"</li>
+                            <li>Email us directly at: safety@litlink.com</li>
+                        </ul>
+                        <p>All reports are reviewed by our moderation team within 24 hours. We have a zero-tolerance policy for harassment.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>Can I use Litlink on mobile?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Yes! Litlink is fully responsive and works on all devices:</p>
+                        <ul>
+                            <li><strong>Mobile Web:</strong> Access through any mobile browser</li>
+                            <li><strong>iOS App:</strong> Available on the App Store (coming soon)</li>
+                            <li><strong>Android App:</strong> Available on Google Play (coming soon)</li>
+                        </ul>
+                        <p>All features are available on mobile, including voice rooms and real-time chat.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy & Terms Section -->
+    <section class="policy-section" id="privacy">
+        <div class="container">
+            <div class="policy-content">
+                <h2>Privacy Policy & Terms</h2>
+                
+                <div id="terms">
+                    <h3>Terms of Service</h3>
+                    <p>By using Litlink, you agree to these terms:</p>
+                    <ul>
+                        <li>You are at least 13 years old (or the minimum age in your country)</li>
+                        <li>You will not harass, bully, or harm other users</li>
+                        <li>You will not share inappropriate or illegal content</li>
+                        <li>You own or have rights to any content you share</li>
+                        <li>We may suspend accounts that violate these terms</li>
+                    </ul>
+                </div>
+                
+                <div id="privacy-details">
+                    <h3>Privacy Policy</h3>
+                    <p><strong>What we collect:</strong></p>
+                    <ul>
+                        <li>Account information (name, email, profile details)</li>
+                        <li>Reading preferences and book data</li>
+                        <li>Messages and discussions (to provide our services)</li>
+                        <li>Usage data to improve our platform</li>
+                    </ul>
+                    
+                    <p><strong>How we use your data:</strong></p>
+                    <ul>
+                        <li>To provide and improve our matching services</li>
+                        <li>To personalize your experience</li>
+                        <li>To communicate with you about updates</li>
+                        <li>To ensure platform safety and security</li>
+                    </ul>
+                    
+                    <p><strong>Your rights:</strong></p>
+                    <ul>
+                        <li>Access your personal data</li>
+                        <li>Correct inaccurate data</li>
+                        <li>Delete your account and data</li>
+                        <li>Opt out of marketing communications</li>
+                    </ul>
+                    
+                    <p>We never sell your personal data to third parties. For more details, contact privacy@litlink.com</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>📚 Litlink</h3>
+                    <p>Connecting readers<br>through the stories<br>they love.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>About Us</h4>
+                        <ul>
+                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html#team">Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>FAQ</h4>
+                        <ul>
+                            <li><a href="faq.html#privacy">Privacy Policy</a></li>
+                            <li><a href="faq.html#terms">Terms</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Support</h4>
+                        <ul>
+                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 - Litlink. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // FAQ Toggle
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const answer = question.nextElementSibling;
+                const icon = question.querySelector('.faq-icon');
+                
+                if (answer.classList.contains('open')) {
+                    answer.classList.remove('open');
+                    icon.textContent = '+';
+                } else {
+                    // Close other open FAQs
+                    document.querySelectorAll('.faq-answer.open').forEach(openAnswer => {
+                        openAnswer.classList.remove('open');
+                        openAnswer.previousElementSibling.querySelector('.faq-icon').textContent = '+';
+                    });
+                    
+                    answer.classList.add('open');
+                    icon.textContent = '−';
+                }
+            });
+        });
+        
+        // FAQ Search
+        document.getElementById('faqSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const faqItems = document.querySelectorAll('.faq-item');
+            
+            faqItems.forEach(item => {
+                const question = item.querySelector('.faq-question h3').textContent.toLowerCase();
+                const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
+                
+                if (question.includes(searchTerm) || answer.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

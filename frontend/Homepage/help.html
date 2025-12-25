@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center - Litlink</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .help-hero {
+            min-height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 60px;
+            background: linear-gradient(135deg, #2c1810 0%, #3d2617 100%);
+            text-align: center;
+        }
+        
+        .help-hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f5e6d3 0%, #d4b5a0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .help-hero p {
+            font-size: 1.2rem;
+            color: #d4b5a0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .help-categories {
+            padding: 80px 20px;
+            background: #3d2617;
+        }
+        
+        .contact-section {
+            padding: 80px 20px;
+            background: #4a3123;
+        }
+        
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .category-card {
+            background: #4a3123;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+        }
+        
+        .category-card:hover {
+            transform: translateY(-10px);
+            border-color: #f5e6d3;
+        }
+        
+        .category-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .category-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #f5e6d3;
+        }
+        
+        .category-card p {
+            color: #d4b5a0;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .category-link {
+            color: #f5e6d3;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .category-link:hover {
+            text-decoration: underline;
+        }
+        
+        .contact-form {
+            max-width: 600px;
+            margin: 40px auto 0;
+            background: #3d2617;
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+        }
+        
+        .contact-form h3 {
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            color: #f5e6d3;
+            text-align: center;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .contact-form .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .contact-form label {
+            display: block;
+            margin-bottom: 8px;
+            color: #d4b5a0;
+            font-weight: 500;
+        }
+        
+        .contact-form input,
+        .contact-form select,
+        .contact-form textarea {
+            width: 100%;
+            padding: 14px;
+            background: rgba(245, 230, 211, 0.1);
+            border: 2px solid rgba(245, 230, 211, 0.2);
+            border-radius: 12px;
+            color: #f5e6d3;
+            font-size: 1rem;
+        }
+        
+        .contact-form textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        .contact-form input:focus,
+        .contact-form select:focus,
+        .contact-form textarea:focus {
+            outline: none;
+            border-color: #f5e6d3;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            background: #f5e6d3;
+            color: #2c1810;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .submit-btn:hover {
+            background: #fff;
+            transform: translateY(-2px);
+        }
+        
+        .contact-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .info-card {
+            text-align: center;
+            padding: 30px;
+            background: #3d2617;
+            border-radius: 16px;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+        }
+        
+        .info-icon {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #f5e6d3;
+        }
+        
+        .info-card h4 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #f5e6d3;
+        }
+        
+        .info-card p {
+            color: #d4b5a0;
+            margin-bottom: 15px;
+        }
+        
+        .info-link {
+            color: #f5e6d3;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .info-link:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .help-hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .contact-form {
+                padding: 30px 20px;
+                margin: 30px 20px 0;
+            }
+            
+            .categories-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" style="text-decoration: none; color: inherit;">
+                    <div class="logo">
+                        <i class="fas fa-book-open"></i>
+                        <span>Litlink</span>
+                    </div>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html#loginBtn" class="btn btn-login">Login</a>
+                <a href="index.html#signupBtn" class="btn btn-signup">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Help Hero -->
+    <section class="help-hero">
+        <div class="container">
+            <h1>Help Center</h1>
+            <p>Find answers, guides, and support for using Litlink</p>
+        </div>
+    </section>
+
+    <!-- Help Categories -->
+    <section class="help-categories">
+        <div class="container">
+            <h2 class="section-title fade-in">How can we help you?</h2>
+            <p class="section-subtitle fade-in">Browse our help categories or search for specific topics</p>
+            
+            <div class="categories-grid">
+                <div class="category-card slide-up">
+                    <div class="category-icon">👤</div>
+                    <h3>Getting Started</h3>
+                    <p>New to Litlink? Learn how to set up your profile, add books, and find your first matches.</p>
+                    <a href="#getting-started" class="category-link">
+                        View Guides <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                
+                <div class="category-card slide-up">
+                    <div class="category-icon">💬</div>
+                    <h3>Chat & Messaging</h3>
+                    <p>Learn how to use our chat features, voice rooms, and manage your conversations.</p>
+                    <a href="#chat-help" class="category-link">
+                        Learn More <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                
+                <div class="category-card slide-up">
+                    <div class="category-icon">🔧</div>
+                    <h3>Troubleshooting</h3>
+                    <p>Having issues with the app? Find solutions to common technical problems.</p>
+                    <a href="#troubleshooting" class="category-link">
+                        Fix Issues <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                
+                <div class="category-card slide-up">
+                    <div class="category-icon">🔒</div>
+                    <h3>Account & Privacy</h3>
+                    <p>Manage your account settings, privacy controls, and data preferences.</p>
+                    <a href="#account-privacy" class="category-link">
+                        Manage Account <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact-section" id="contact">
+        <div class="container">
+            <h2 class="section-title fade-in">Contact Support</h2>
+            <p class="section-subtitle fade-in">Can't find what you're looking for? Send us a message</p>
+            
+            <div class="contact-form slide-up">
+                <h3>Send us a message</h3>
+                <form id="supportForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="name">Full Name</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <select id="subject" name="subject" required>
+                            <option value="">Select a topic</option>
+                            <option value="technical">Technical Issue</option>
+                            <option value="account">Account Problem</option>
+                            <option value="billing">Billing Question</option>
+                            <option value="safety">Safety Concern</option>
+                            <option value="feedback">Feature Request</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" placeholder="Describe your issue or question in detail..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">Send Message</button>
+                </form>
+            </div>
+            
+            <div class="contact-info">
+                <div class="info-card fade-in-up">
+                    <div class="info-icon">📧</div>
+                    <h4>Email Support</h4>
+                    <p>For general inquiries and support</p>
+                    <a href="mailto:support@litlink.com" class="info-link">support@litlink.com</a>
+                </div>
+                
+                <div class="info-card fade-in-up">
+                    <div class="info-icon">🛡️</div>
+                    <h4>Safety & Abuse</h4>
+                    <p>Report safety concerns or inappropriate behavior</p>
+                    <a href="mailto:safety@litlink.com" class="info-link">safety@litlink.com</a>
+                </div>
+                
+                <div class="info-card fade-in-up">
+                    <div class="info-icon">💼</div>
+                    <h4>Business Inquiries</h4>
+                    <p>For partnerships and collaborations</p>
+                    <a href="mailto:partnerships@litlink.com" class="info-link">partnerships@litlink.com</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>📚 Litlink</h3>
+                    <p>Connecting readers<br>through the stories<br>they love.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>About Us</h4>
+                        <ul>
+                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html#team">Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>FAQ</h4>
+                        <ul>
+                            <li><a href="faq.html#privacy">Privacy Policy</a></li>
+                            <li><a href="faq.html#terms">Terms</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Support</h4>
+                        <ul>
+                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 - Litlink. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Support Form Submission
+        document.getElementById('supportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('.submit-btn');
+            const originalText = submitBtn.textContent;
+            
+            // Disable button and show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            
+            // Simulate sending message
+            setTimeout(() => {
+                alert('Thank you! Your message has been sent. We\'ll get back to you within 24 hours.');
+                this.reset();
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }, 1500);
+        });
+        
+        // Smooth scroll for category links
+        document.querySelectorAll('.category-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.getAttribute('href').startsWith('#')) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 100,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            });
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

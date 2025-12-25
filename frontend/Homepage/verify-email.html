@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - Litlink</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Verify Your Email</h2>
+                <a href="index.html" class="close-btn">&times;</a>
+            </div>
+            
+            <div class="verification-content" id="verificationContent">
+                <div class="verification-icon">
+                    <i class="fas fa-envelope-open-text"></i>
+                </div>
+                
+                <h3>Check Your Email</h3>
+                <p>We've sent a verification code to your email address.</p>
+                
+                <div class="verification-email" id="verificationEmail">
+                    Loading email...
+                </div>
+                
+                <form id="verifyEmailForm">
+                    <div class="form-group">
+                        <label for="verificationCode">Enter Verification Code</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-key"></i>
+                            <input type="text" id="verificationCode" placeholder="6-digit code" maxlength="6" required>
+                        </div>
+                        <div class="error-message" id="verificationCodeError"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-modal-submit" id="verifySubmit">Verify Email</button>
+                </form>
+                
+                <div class="verification-footer">
+                    <p>Didn't receive the code? <a href="#" id="resendCodeLink">Resend Code</a></p>
+                    <p>Already verified? <a href="index.html">Go to Login</a></p>
+                    <p><a href="index.html">← Back to Home</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get email from URL or sessionStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const emailFromURL = urlParams.get('email');
+        const codeFromURL = urlParams.get('code');
+        
+        const email = emailFromURL || sessionStorage.getItem('pendingVerificationEmail');
+        const storedCode = codeFromURL || sessionStorage.getItem('verificationCode');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const emailElement = document.getElementById('verificationEmail');
+            const codeInput = document.getElementById('verificationCode');
+            const verifyForm = document.getElementById('verifyEmailForm');
+            const resendLink = document.getElementById('resendCodeLink');
+            const verificationContent = document.getElementById('verificationContent');
+            
+            if (email) {
+                emailElement.textContent = email;
+                if (storedCode) {
+                    codeInput.value = storedCode;
+                }
+            } else {
+                emailElement.textContent = 'No email found. Please sign up again.';
+                emailElement.style.color = '#ef4444';
+            }
+            
+            // Form submission
+            verifyForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const code = codeInput.value.trim();
+                
+                if (!code || code.length !== 6) {
+                    alert('Please enter a valid 6-digit code');
+                    codeInput.focus();
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('http://localhost:5002/api/auth/verify-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, code })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show success message
+                        verificationContent.innerHTML = `
+                            <div class="verification-icon" style="color: #10b981;">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <h3>Email Verified Successfully!</h3>
+                            <p>Your email has been verified. You can now login to your account.</p>
+                            <div style="margin: 30px 0;">
+                                <button onclick="window.location.href='index.html'" class="btn btn-modal-submit">
+                                    Go to Login
+                                </button>
+                            </div>
+                            <div class="verification-footer">
+                                <p><a href="index.html">← Back to Home</a></p>
+                            </div>
+                        `;
+                        
+                        // Clear session storage
+                        sessionStorage.removeItem('pendingVerificationEmail');
+                        sessionStorage.removeItem('verificationCode');
+                    } else {
+                        alert('Verification failed: ' + data.message);
+                        codeInput.focus();
+                    }
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    alert('Unable to connect to the server. Please check your internet connection and try again.');
+                }
+            });
+            
+            // Resend code
+            resendLink.addEventListener('click', async function(e) {
+                e.preventDefault();
+                
+                try {
+                    const response = await fetch('http://localhost:5002/api/auth/resend-verification', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('New verification code sent! Please check your email.');
+                        codeInput.value = data.verificationCode;
+                        sessionStorage.setItem('verificationCode', data.verificationCode);
+                    } else {
+                        alert('Failed to resend code: ' + data.message);
+                    }
+                } catch (error) {
+                    console.error('Resend error:', error);
+                    alert('Unable to connect to the server. Please check your internet connection and try again.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

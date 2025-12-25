@@ -1,0 +1,1158 @@
+[file name]: explore.html
+[file content begin]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LitLink - Discover Book Clubs</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Add these temporary styles for explore page until we add them to style.css */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 15, 10, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 999;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .search-bar {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+            margin: 0 20px;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #d4b5a0;
+        }
+        
+        .search-bar input {
+            width: 100%;
+            padding: 12px 20px 12px 45px;
+            background: rgba(245, 230, 211, 0.1);
+            border: 2px solid rgba(245, 230, 211, 0.2);
+            border-radius: 50px;
+            color: #f5e6d3;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        .search-bar input:focus {
+            outline: none;
+            border-color: #f5e6d3;
+            background: rgba(245, 230, 211, 0.05);
+        }
+        
+        .explore-hero {
+            padding-top: 140px !important;
+            min-height: 70vh !important;
+        }
+        
+        .highlight {
+            color: #f5e6d3;
+            font-weight: 700;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .highlight::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #f5e6d3;
+            border-radius: 2px;
+        }
+        
+        /* Sections styling */
+        section:not(.hero) {
+            padding: 80px 0;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            color: #f5e6d3;
+        }
+        
+        .section-icon {
+            font-size: 1.8rem;
+        }
+        
+        /* Genres Grid - Updated for side-scrolling */
+        .genres-container {
+            position: relative;
+            margin-bottom: 40px;
+        }
+        
+        .genres-scroll-container {
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            padding: 20px 0;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        
+        .genres-scroll-container::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+        
+        .scroll-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(61, 38, 23, 0.9);
+            border: 2px solid rgba(245, 230, 211, 0.3);
+            border-radius: 50%;
+            color: #f5e6d3;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            z-index: 10;
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .genres-container:hover .scroll-btn {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .scroll-btn:hover {
+            background: rgba(245, 230, 211, 0.2);
+            border-color: #f5e6d3;
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .scroll-left {
+            left: 0;
+        }
+        
+        .scroll-right {
+            right: 0;
+        }
+        
+        .genre-card {
+            flex: 0 0 auto;
+            width: 160px;
+            height: 160px;
+            background: #3d2617;
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 20px;
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .genre-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #f5e6d3, #d4b5a0);
+            transform: translateY(-100%);
+            transition: transform 0.4s ease;
+        }
+        
+        .genre-card:hover {
+            background: #4a3123;
+            border-color: #f5e6d3;
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .genre-card:hover::before {
+            transform: translateY(0);
+        }
+        
+        .genre-card.active {
+            background: #f5e6d3;
+            color: #2c1810;
+            border-color: #f5e6d3;
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .genre-card.active::before {
+            transform: translateY(0);
+            background: #2c1810;
+        }
+        
+        .genre-card.active .genre-name {
+            color: #2c1810;
+        }
+        
+        .genre-card.active .genre-icon {
+            color: #2c1810;
+        }
+        
+        .genre-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            transition: transform 0.4s ease;
+        }
+        
+        .genre-card:hover .genre-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+        
+        .genre-name {
+            font-weight: 600;
+            color: #f5e6d3;
+            font-size: 1rem;
+        }
+        
+        .genre-card.active .genre-name {
+            color: #2c1810;
+            font-weight: 700;
+        }
+        
+        /* Scroll indicator dots */
+        .scroll-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+        }
+        
+        .scroll-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(245, 230, 211, 0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .scroll-dot.active {
+            background: #f5e6d3;
+            transform: scale(1.2);
+        }
+        
+        /* Preview Sections */
+        .voice-rooms-section,
+        .discussions-section,
+        .matches-section,
+        .clubs-section {
+            background: #4a3123;
+        }
+        
+        .voice-rooms-preview,
+        .discussions-preview,
+        .matches-preview,
+        .clubs-preview {
+            background: #3d2617;
+            border-radius: 24px;
+            padding: 48px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+        
+        .preview-content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .preview-icon-large {
+            font-size: 4rem;
+            margin-bottom: 24px;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .preview-content h3 {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            color: #f5e6d3;
+        }
+        
+        .preview-content p {
+            color: #d4b5a0;
+            margin-bottom: 32px;
+            line-height: 1.6;
+            font-size: 1.1rem;
+        }
+        
+        .preview-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 32px;
+        }
+        
+        .preview-stat {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .preview-stat:nth-child(1) {
+            animation: fadeInUp 0.6s ease 0.3s forwards;
+        }
+        
+        .preview-stat:nth-child(2) {
+            animation: fadeInUp 0.6s ease 0.5s forwards;
+        }
+        
+        .preview-stat .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            margin-bottom: 4px;
+        }
+        
+        .preview-stat .stat-label {
+            color: #d4b5a0;
+            font-size: 0.9rem;
+        }
+        
+        /* Quick Actions */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+        
+        .action-card {
+            background: #f5e6d3;
+            color: #2c1810;
+            padding: 32px;
+            border-radius: 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        
+        .action-card:nth-child(1) { animation-delay: 0.1s; }
+        .action-card:nth-child(2) { animation-delay: 0.2s; }
+        .action-card:nth-child(3) { animation-delay: 0.3s; }
+        .action-card:nth-child(4) { animation-delay: 0.4s; }
+        
+        .action-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+        }
+        
+        .action-icon {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+            transition: transform 0.3s ease;
+        }
+        
+        .action-card:hover .action-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+        
+        .action-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+        
+        .action-card p {
+            color: #5a4234;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .action-btn {
+            background: #2c1810;
+            color: #f5e6d3;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            width: 100%;
+        }
+        
+        .action-btn:hover {
+            background: #3d2617;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Fix spacing issues */
+        .quick-actions-section {
+            padding-bottom: 100px;
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        /* Animation classes */
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 1s ease forwards;
+        }
+        
+        .fade-in-up {
+            opacity: 0;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+        
+        .slide-in-left {
+            opacity: 0;
+            animation: slideInLeft 0.8s ease forwards;
+        }
+        
+        .slide-in-right {
+            opacity: 0;
+            animation: slideInRight 0.8s ease forwards;
+        }
+        
+        .scale-in {
+            opacity: 0;
+            animation: scaleIn 0.6s ease forwards;
+        }
+        
+        /* Delays */
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+        .delay-6 { animation-delay: 0.6s; }
+        
+        /* Responsive fixes */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .search-bar {
+                width: 100%;
+                max-width: 100%;
+                margin: 10px 0;
+            }
+            
+            .explore-hero {
+                padding-top: 180px !important;
+            }
+            
+            .voice-rooms-preview,
+            .discussions-preview,
+            .matches-preview,
+            .clubs-preview {
+                padding: 32px 20px;
+            }
+            
+            .preview-content h3 {
+                font-size: 1.5rem;
+            }
+            
+            .preview-stats {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .genre-card {
+                width: 140px;
+                height: 140px;
+            }
+            
+            .scroll-btn {
+                opacity: 1;
+                visibility: visible;
+                background: rgba(61, 38, 23, 0.7);
+            }
+            
+            section:not(.hero) {
+                padding: 60px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Welcome Back</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="loginEmail" placeholder="Enter your email">
+                    </div>
+                    <div class="error-message" id="loginEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="loginPassword" placeholder="Enter your password">
+                        <button type="button" class="toggle-password" id="toggleLoginPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="error-message" id="loginPasswordError"></div>
+                </div>
+                <div class="form-options">
+                    <label class="checkbox">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+                <button type="submit" class="btn btn-modal-submit">Login</button>
+                <div class="form-footer">
+                    <p>Don't have an account? <a href="#" class="switch-form" data-form="signup">Sign up</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Join Litlink</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="signupName" placeholder="Enter your full name">
+                    </div>
+                    <div class="error-message" id="signupNameError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="signupEmail" placeholder="Enter your email">
+                    </div>
+                    <div class="error-message" id="signupEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="signupPassword" placeholder="Create a password">
+                        <button type="button" class="toggle-password" id="toggleSignupPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="password-requirements">
+                        <p>Password must contain:</p>
+                        <ul>
+                            <li id="req-length" class="req-unmet"><i class="fas fa-times"></i> At least 8 characters</li>
+                            <li id="req-uppercase" class="req-unmet"><i class="fas fa-times"></i> One uppercase letter</li>
+                            <li id="req-number" class="req-unmet"><i class="fas fa-times"></i> One number</li>
+                            <li id="req-special" class="req-unmet"><i class="fas fa-times"></i> One special character</li>
+                        </ul>
+                    </div>
+                    <div class="error-message" id="signupPasswordError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="confirmPassword" placeholder="Confirm your password">
+                        <button type="button" class="toggle-password" id="toggleConfirmPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="error-message" id="confirmPasswordError"></div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox">
+                        <input type="checkbox" id="terms" required>
+                        <span>I agree to the <a href="faq.html#privacy">Terms of Service</a> and <a href="faq.html#privacy">Privacy Policy</a></span>
+                    </label>
+                    <div class="error-message" id="termsError"></div>
+                </div>
+                <button type="submit" class="btn btn-modal-submit">Create Account</button>
+                <div class="form-footer">
+                    <p>Already have an account? <a href="#" class="switch-form" data-form="login">Login</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay" id="forgotPasswordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reset Password</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="forgotPasswordForm">
+                <div class="form-group">
+                    <label for="forgotEmail">Enter your email address</label>
+                    <input type="email" id="forgotEmail" placeholder="Your email address" required>
+                </div>
+                <button type="submit" class="btn btn-modal-submit" id="forgotPasswordSubmit">Send Reset Link</button>
+            </form>
+            <div class="form-footer">
+                <p><a href="#" id="backToLoginLink">← Back to Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header fade-in">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <a href="index.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-book-open"></i>
+                        <span class="logo-text">Litlink</span>
+                    </a>
+                </div>
+                <div class="search-bar">
+                    <span class="search-icon"><i class="fas fa-search"></i></span>
+                    <input type="text" placeholder="Search book clubs, genres, users...">
+                </div>
+                <div class="header-auth-buttons">
+                    <button class="btn btn-login" id="exploreLoginBtn">Login</button>
+                    <button class="btn btn-signup" id="exploreSignupBtn">Sign Up</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero explore-hero">
+        <div class="container">
+            <h1 class="hero-title fade-in-up">
+                Discover book clubs,<br>
+                join discussions, and<br>
+                <span class="highlight">connect with readers</span>.
+            </h1>
+            <p class="hero-subtitle fade-in-up delay-1">
+                Your community hub for everything books. Find your next favorite story and the people who love it too.
+            </p>
+        </div>
+    </section>
+
+    <!-- Explore Genres -->
+    <section class="genres-section fade-in-up delay-2">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="section-icon">🎭</span>
+                    <h2>Explore Genres</h2>
+                </div>
+            </div>
+            <div class="genres-container">
+                <button class="scroll-btn scroll-left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="scroll-btn scroll-right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="genres-scroll-container" id="genresScroll">
+                    <!-- Genre cards will be generated by JavaScript -->
+                </div>
+                <div class="scroll-indicator" id="scrollDots">
+                    <!-- Dots will be generated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Voice Rooms -->
+    <section class="voice-rooms-section fade-in-up delay-3">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="section-icon">🎙️</span>
+                    <h2>Live Voice Rooms</h2>
+                </div>
+            </div>
+            <div class="voice-rooms-preview">
+                <div class="preview-content">
+                    <div class="preview-icon-large">🎙️</div>
+                    <h3>Connect with readers in real-time</h3>
+                    <p>Join live voice discussions about your favorite books. Share thoughts, ask questions, and make new friends.</p>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <div class="stat-number">24+</div>
+                            <div class="stat-label">Active Rooms</div>
+                        </div>
+                        <div class="preview-stat">
+                            <div class="stat-number">1.2k</div>
+                            <div class="stat-label">Listeners Online</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="previewSignupBtn1">Sign Up to Join Voice Rooms</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trending Discussions -->
+    <section class="discussions-section fade-in-up delay-4">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="section-icon">🔥</span>
+                    <h2>Trending Discussions</h2>
+                </div>
+            </div>
+            <div class="discussions-preview">
+                <div class="preview-content">
+                    <div class="preview-icon-large">💬</div>
+                    <h3>Join the conversation</h3>
+                    <p>See what readers are talking about. Share your thoughts on books you love (or hate!).</p>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <div class="stat-number">156+</div>
+                            <div class="stat-label">Active Threads</div>
+                        </div>
+                        <div class="preview-stat">
+                            <div class="stat-number">5.2k</div>
+                            <div class="stat-label">Comments Today</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="previewSignupBtn2">Sign Up to Join Discussions</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Reader Matches -->
+    <section class="matches-section fade-in-up delay-5">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="section-icon">✨</span>
+                    <h2>Reader Matches</h2>
+                </div>
+            </div>
+            <div class="matches-preview">
+                <div class="preview-content">
+                    <div class="preview-icon-large">🤝</div>
+                    <h3>Find your reading soulmates</h3>
+                    <p>Our AI will match you with readers who share your taste in books. Start meaningful conversations.</p>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <div class="stat-number">91%</div>
+                            <div class="stat-label">Average Match Rate</div>
+                        </div>
+                        <div class="preview-stat">
+                            <div class="stat-number">248</div>
+                            <div class="stat-label">Matches Made Today</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="previewSignupBtn3">Sign Up to Find Matches</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Suggested Book Clubs -->
+    <section class="clubs-section fade-in-up">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="section-icon">📚</span>
+                    <h2>Suggested Book Clubs</h2>
+                </div>
+            </div>
+            <div class="clubs-preview">
+                <div class="preview-content">
+                    <div class="preview-icon-large">👥</div>
+                    <h3>Join book clubs tailored for you</h3>
+                    <p>From cozy readers to thriller lovers, find the perfect community for your reading style.</p>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <div class="stat-number">50+</div>
+                            <div class="stat-label">Active Clubs</div>
+                        </div>
+                        <div class="preview-stat">
+                            <div class="stat-number">15k</div>
+                            <div class="stat-label">Total Members</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="previewSignupBtn4">Sign Up to Join Clubs</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="quick-actions-section fade-in-up">
+        <div class="container">
+            <h2 class="section-title" style="text-align: center;">Ready to Dive In?</h2>
+            <div class="actions-grid">
+                <div class="action-card">
+                    <div class="action-icon">💬</div>
+                    <h3>Start Discussion</h3>
+                    <p>Create a post to ask a reading topic.</p>
+                    <button class="action-btn" id="actionBtn1">Sign Up to Start</button>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-icon">🎭</div>
+                    <h3>Create Book Club</h3>
+                    <p>Gather friends and new readers together.</p>
+                    <button class="action-btn" id="actionBtn2">Sign Up to Create</button>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-icon">🎙️</div>
+                    <h3>Join Voice Room</h3>
+                    <p>Hop into a discussion happening now.</p>
+                    <button class="action-btn" id="actionBtn3">Sign Up to Join</button>
+                </div>
+
+                <div class="action-card">
+                    <div class="action-icon">📚</div>
+                    <h3>Browse All Genres</h3>
+                    <p>Explore our full library of topics.</p>
+                    <button class="action-btn" id="actionBtn4">Sign Up to Browse</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta fade-in-up">
+        <div class="container">
+            <h2 class="cta-title">Start Your Reading Journey Today</h2>
+            <button class="btn btn-cta" id="exploreCtaSignupBtn">Join Litlink →</button>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer fade-in-up">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3><i class="fas fa-book-open"></i> Litlink</h3>
+                    <p>Connecting readers<br>through the stories<br>they love.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>About Us</h4>
+                        <ul>
+                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html#team">Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>FAQ</h4>
+                        <ul>
+                            <li><a href="faq.html#privacy">Privacy Policy</a></li>
+                            <li><a href="faq.html#terms">Terms</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Support</h4>
+                        <ul>
+                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2024 - Litlink. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Enhanced explore page functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎬 Explore page enhanced features loaded');
+            
+            // Genre data
+            const genres = [
+                { name: 'Fantasy', icon: '📖', color: '#FF6B6B' },
+                { name: 'Mystery', icon: '🔍', color: '#4ECDC4' },
+                { name: 'Romance', icon: '💕', color: '#FF9F43' },
+                { name: 'Non-Fiction', icon: '📚', color: '#1DD1A1' },
+                { name: 'Sci-Fi', icon: '🚀', color: '#54A0FF' },
+                { name: 'Young Adult', icon: '📖', color: '#5F27CD' },
+                { name: 'Classics', icon: '📜', color: '#F368E0' },
+                { name: 'Horror', icon: '😱', color: '#FF3838' },
+                { name: 'Historical', icon: '🏛️', color: '#10A881' },
+                { name: 'Biography', icon: '👤', color: '#FF9FF3' },
+                { name: 'Poetry', icon: '✒️', color: '#FECA57' },
+                { name: 'Graphic Novels', icon: '🖼️', color: '#48DBFB' }
+            ];
+            
+            // Generate genre cards
+            const genresScroll = document.getElementById('genresScroll');
+            const scrollDots = document.getElementById('scrollDots');
+            
+            genres.forEach((genre, index) => {
+                // Create genre card
+                const genreCard = document.createElement('div');
+                genreCard.className = `genre-card ${index === 0 ? 'active' : ''}`;
+                genreCard.innerHTML = `
+                    <div class="genre-icon">${genre.icon}</div>
+                    <span class="genre-name">${genre.name}</span>
+                `;
+                genreCard.style.setProperty('--genre-color', genre.color);
+                
+                // Add click event to open signup modal
+                genreCard.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log(`📚 Genre clicked: ${genre.name}`);
+                    
+                    // Remove active class from all cards
+                    document.querySelectorAll('.genre-card').forEach(card => {
+                        card.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked card
+                    this.classList.add('active');
+                    
+                    // Open signup modal
+                    openModal('signupModal');
+                    
+                    // Optional: Show a notification about the selected genre
+                    const submitBtn = document.querySelector('#signupForm .btn-modal-submit');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = `Join ${genre.name} Community →`;
+                        // Reset after 3 seconds
+                        setTimeout(() => {
+                            submitBtn.textContent = 'Create Account';
+                        }, 3000);
+                    }
+                });
+                
+                genresScroll.appendChild(genreCard);
+                
+                // Create scroll dot
+                const dot = document.createElement('div');
+                dot.className = `scroll-dot ${index === 0 ? 'active' : ''}`;
+                dot.dataset.index = index;
+                dot.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    scrollToGenre(index);
+                });
+                scrollDots.appendChild(dot);
+            });
+            
+            // Scroll functionality
+            const scrollLeftBtn = document.querySelector('.scroll-left');
+            const scrollRightBtn = document.querySelector('.scroll-right');
+            const genreCards = document.querySelectorAll('.genre-card');
+            
+            // Calculate scroll amount (width of 3 cards + gaps)
+            const scrollAmount = 176 * 3; // 160px card + 16px gap = 176px per card
+            
+            scrollLeftBtn.addEventListener('click', function() {
+                genresScroll.scrollBy({
+                    left: -scrollAmount,
+                    behavior: 'smooth'
+                });
+                updateActiveDot();
+            });
+            
+            scrollRightBtn.addEventListener('click', function() {
+                genresScroll.scrollBy({
+                    left: scrollAmount,
+                    behavior: 'smooth'
+                });
+                updateActiveDot();
+            });
+            
+            // Auto-scroll dots update
+            genresScroll.addEventListener('scroll', updateActiveDot);
+            
+            function updateActiveDot() {
+                const scrollLeft = genresScroll.scrollLeft;
+                const cardWidth = genreCards[0].offsetWidth + 16; // card width + gap
+                const activeIndex = Math.round(scrollLeft / cardWidth);
+                
+                document.querySelectorAll('.scroll-dot').forEach((dot, index) => {
+                    if (index === activeIndex) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+            }
+            
+            function scrollToGenre(index) {
+                const cardWidth = genreCards[0].offsetWidth + 16;
+                const targetScroll = index * cardWidth;
+                genresScroll.scrollTo({
+                    left: targetScroll,
+                    behavior: 'smooth'
+                });
+            }
+            
+            // Add keyboard navigation
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowLeft') {
+                    genresScroll.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+                    updateActiveDot();
+                } else if (e.key === 'ArrowRight') {
+                    genresScroll.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+                    updateActiveDot();
+                }
+            });
+            
+            // Add hover effect with sound simulation
+            genreCards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-8px) scale(1.05)';
+                    // Add subtle sound effect simulation
+                    const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+                    audio.volume = 0.1;
+                    audio.play().catch(() => {});
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    if (!this.classList.contains('active')) {
+                        this.style.transform = 'translateY(0) scale(1)';
+                    }
+                });
+            });
+            
+            // Add intersection observer for scroll animations
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1
+            };
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animated');
+                    }
+                });
+            }, observerOptions);
+            
+            // Observe sections for animations
+            document.querySelectorAll('section').forEach(section => {
+                observer.observe(section);
+            });
+            
+            // Add loading animation
+            document.body.classList.add('loaded');
+            
+            // Pulse effect for active genre
+            setInterval(() => {
+                const activeCard = document.querySelector('.genre-card.active');
+                if (activeCard) {
+                    activeCard.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.4)';
+                    setTimeout(() => {
+                        if (activeCard.classList.contains('active')) {
+                            activeCard.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.3)';
+                        }
+                    }, 500);
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
+[file content end]

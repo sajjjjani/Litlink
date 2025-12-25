@@ -3,21 +3,39 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
     required: true,
-    unique: true
-  },
-  username: {
-    type: String,
-    required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   },
   password: {
     type: String,
     required: true
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationCode: {
+    type: String,
+    default: null
+  },
+  verificationExpiry: {
+    type: Date,
+    default: null
+  },
+  resetToken: {
+    type: String,
+    default: null
+  },
+  resetTokenExpiry: {
+    type: Date,
+    default: null
   },
   profilePicture: {
     type: String,
@@ -75,5 +93,9 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Add index for faster queries
+userSchema.index({ email: 1 });
+userSchema.index({ isVerified: 1 });
 
 module.exports = mongoose.model('User', userSchema);
