@@ -1,5 +1,102 @@
-// ===== API CONFIGURATION =====
+// ===== CONFIGURATION =====
 const API_BASE_URL = 'http://localhost:5002/api';
+
+// ===== PATH DEBUG =====
+console.log('=== PATH DEBUG ===');
+console.log('Current full URL:', window.location.href);
+console.log('Current path:', window.location.pathname);
+console.log('Current folder:', window.location.pathname.split('/').pop());
+console.log('Auth.js location: Homepage folder');
+
+// ===== AUTH STATE MANAGEMENT - COMPLETELY FIXED =====
+class AuthState {
+  static getToken() {
+    // Check ALL possible token keys
+    return localStorage.getItem('litlink_token') || 
+           localStorage.getItem('authToken') || 
+           localStorage.getItem('token');
+  }
+
+  static getUser() {
+    // Check ALL possible user keys
+    const userStr = localStorage.getItem('litlink_user') || 
+                    localStorage.getItem('user');
+    try {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return null;
+    }
+  }
+
+  static getUserId() {
+    // Check ALL possible userId keys
+    const userId = localStorage.getItem('litlink_userId') || 
+                   localStorage.getItem('userId');
+    
+    if (userId) return userId;
+    
+    // Fallback: Extract from user object
+    const user = this.getUser();
+    return user?.id || user?._id || null;
+  }
+
+  static setAuth(token, user) {
+    // Store in NEW format (litlink_*)
+    localStorage.setItem('litlink_token', token);
+    localStorage.setItem('litlink_user', JSON.stringify(user));
+    localStorage.setItem('litlink_userId', user.id || user._id);
+    
+    // Store in OLD format (backward compatibility)
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('userId', user.id || user._id);
+    
+    console.log('✅ Auth data stored in ALL formats:', {
+      token: token.substring(0, 20) + '...',
+      user: user.name || user.email,
+      userId: user.id || user._id
+    });
+    
+    // Verify storage immediately
+    this.verifyStorage();
+  }
+
+  static clearAuth() {
+    // Clear ALL possible auth keys
+    const keys = [
+      'litlink_token', 'litlink_user', 'litlink_userId',
+      'authToken', 'token', 'user', 'userId'
+    ];
+    
+    keys.forEach(key => {
+      localStorage.removeItem(key);
+      console.log(`🗑️ Cleared: ${key}`);
+    });
+    
+    console.log('✅ All auth data cleared');
+  }
+
+  static isAuthenticated() {
+    return !!this.getToken();
+  }
+
+  static isAdmin() {
+    const user = this.getUser();
+    return user?.isAdmin === true;
+  }
+
+  static verifyStorage() {
+    console.log('🔍 Storage Verification:');
+    console.log('- litlink_token:', !!localStorage.getItem('litlink_token'));
+    console.log('- litlink_user:', !!localStorage.getItem('litlink_user'));
+    console.log('- litlink_userId:', localStorage.getItem('litlink_userId'));
+    console.log('- token:', !!localStorage.getItem('token'));
+    console.log('- user:', !!localStorage.getItem('user'));
+    console.log('- userId:', localStorage.getItem('userId'));
+  }
+}
 
 // ===== Modal Functions =====
 function openModal(modalId) {
@@ -234,7 +331,7 @@ async function handleSignup(formData) {
             // Close modal and redirect to verify-email.html
             closeAllModals();
             
-            // Wait a moment then redirect
+            // Wait a moment then redirect (verify-email.html is in same Homepage folder)
             setTimeout(() => {
                 window.location.href = `verify-email.html?email=${encodeURIComponent(formData.email)}&code=${data.verificationCode}`;
             }, 1000);
@@ -250,10 +347,16 @@ async function handleSignup(formData) {
     }
 }
 
-// ===== LOGIN =====
+// ===== LOGIN - COMPLETELY FIXED =====
 async function handleLogin(formData) {
     try {
         showLoading('loginSubmit', 'Logging in');
+        
+        console.log('=== LOGIN DEBUG INFO ===');
+        console.log('Current location:', window.location.href);
+        console.log('Current pathname:', window.location.pathname);
+        console.log('Auth.js location: Homepage folder');
+        console.log('Trying to login with:', formData.email);
         
         console.log('Sending login request:', { 
             email: formData.email
@@ -284,17 +387,36 @@ async function handleLogin(formData) {
         console.log('Login response:', data);
         
         if (data.success) {
-            // Save user data
-            localStorage.setItem('authToken', data.token);
-            localStorage.setItem('userData', JSON.stringify(data.user));
+            // CRITICAL: Save auth data using FIXED method
+            AuthState.setAuth(data.token, data.user);
             
-            // Show success and redirect
-            alert('Login successful! Redirecting to your profile...');
+            console.log('✅ Auth data saved to localStorage');
+            
+            // Show success message
+            alert('Login successful! Redirecting...');
             closeAllModals();
             
-            // Redirect to profile page
+            // FIXED: Reliable redirect logic
             setTimeout(() => {
-                window.location.href = data.redirectTo || 'profile.html';
+                console.log('📄 DEBUG Redirect Info:', {
+                    serverRedirect: data.redirectTo,
+                    userIsAdmin: data.user.isAdmin,
+                    userName: data.user.name
+                });
+                
+                // Use server-provided redirect path
+                if (data.redirectTo) {
+                    console.log('📄 Using server redirect:', data.redirectTo);
+                    window.location.href = data.redirectTo;
+                }
+                // Fallback based on user type
+                else if (data.user.isAdmin) {
+                    console.log('📄 Admin detected, redirecting to admin dashboard');
+                    window.location.href = '../Admin%20Dashboard/admin.html';
+                } else {
+                    console.log('📄 Regular user, redirecting to profile');
+                    window.location.href = '../Profile/profile.html';
+                }
             }, 1000);
             
         } else if (data.requiresVerification) {
@@ -307,7 +429,7 @@ async function handleLogin(formData) {
             // Close modal and redirect to verification
             closeAllModals();
             
-            // Redirect to verify-email page
+            // Redirect to verify-email page (in same Homepage folder)
             setTimeout(() => {
                 window.location.href = `verify-email.html?email=${encodeURIComponent(formData.email)}`;
             }, 1000);
@@ -356,7 +478,7 @@ async function handleForgotPassword(email) {
             // Close modal and redirect to verify-otp.html
             closeAllModals();
             
-            // Redirect to OTP verification page
+            // Redirect to OTP verification page (in same Homepage folder)
             setTimeout(() => {
                 window.location.href = `verify-otp.html?email=${encodeURIComponent(email)}`;
             }, 1000);
@@ -403,6 +525,118 @@ async function resendVerificationCode() {
     } catch (error) {
         console.error('Resend verification error:', error);
         alert('Unable to connect to the server. Please check your internet connection and try again.');
+    }
+}
+
+// ===== LOGOUT =====
+function handleLogout() {
+    AuthState.clearAuth();
+    alert('Logged out successfully');
+    
+    setTimeout(() => {
+        // If we're in homepage already, just reload
+        if (window.location.pathname.includes('Homepage')) {
+            window.location.href = 'index.html';
+        } else {
+            // Go back to homepage from any other folder
+            window.location.href = '../Homepage/index.html';
+        }
+    }, 1000);
+}
+
+// ===== CHECK AUTH ON PAGE LOAD - FIXED NO REDIRECT LOOP =====
+function checkAuthentication() {
+    const token = AuthState.getToken();
+    const user = AuthState.getUser();
+    
+    console.log('=== AUTH CHECK (NO AUTO-REDIRECT) ===');
+    console.log('Has token:', !!token);
+    console.log('User:', user?.name || user?.email || 'None');
+    console.log('Current path:', window.location.pathname);
+    
+    // Get current path
+    const currentPath = window.location.pathname;
+    
+    // PROTECTED PAGES: Only redirect if trying to access these without auth
+    const protectedPages = ['profile', 'dashboard', 'settings'];
+    const isProtectedPage = protectedPages.some(page => currentPath.includes(page));
+    
+    // ADMIN PAGES: Redirect if not admin
+    const isAdminPage = (currentPath.includes('admin') || currentPath.includes('Admin')) 
+        && !currentPath.includes('index.html');
+    
+    // ===== CRITICAL FIX: NO AUTO-REDIRECT FROM HOMEPAGE =====
+    // User can stay on homepage even if logged in
+    
+    // Redirect ONLY if trying to access protected page without auth
+    if (isProtectedPage && !token) {
+        console.log('❌ Protected page requires authentication, redirecting...');
+        alert('Please login first');
+        setTimeout(() => {
+            window.location.href = '../Homepage/index.html';
+        }, 1500);
+        return false;
+    }
+    
+    // Redirect ONLY if trying to access admin page without admin privileges
+    if (isAdminPage && (!token || !user?.isAdmin)) {
+        console.log('❌ Admin page requires admin authentication, redirecting...');
+        alert('Admin access required. Redirecting to homepage...');
+        setTimeout(() => {
+            window.location.href = '../Homepage/index.html';
+        }, 1500);
+        return false;
+    }
+    
+    console.log('✅ Auth check passed - User can stay on current page');
+    return true;
+}
+
+// ===== SAFARI FIXES =====
+function fixSafariStorage() {
+    if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+        console.log('🦁 Safari detected, applying fixes...');
+        
+        // Force localStorage sync
+        window.addEventListener('beforeunload', function() {
+            localStorage.setItem('__safari_sync', Date.now().toString());
+        });
+        
+        // Check for lost auth on profile pages
+        window.addEventListener('load', function() {
+            const token = AuthState.getToken();
+            if (!token && window.location.pathname.includes('profile')) {
+                console.log('⚠️ Safari may have lost auth data');
+                // Don't auto-redirect, let the page handle it
+            }
+        });
+    }
+}
+
+// ===== DEBUG UTILITIES =====
+function debugLocalStorage() {
+    console.log('🔍 DEBUG localStorage contents:');
+    console.log('=== AUTH KEYS ===');
+    console.log('litlink_token:', localStorage.getItem('litlink_token') ? '✓' : '✗');
+    console.log('litlink_user:', localStorage.getItem('litlink_user') ? '✓' : '✗');
+    console.log('litlink_userId:', localStorage.getItem('litlink_userId') || 'null');
+    console.log('token:', localStorage.getItem('token') ? '✓' : '✗');
+    console.log('user:', localStorage.getItem('user') ? '✓' : '✗');
+    console.log('userId:', localStorage.getItem('userId') || 'null');
+    console.log('authToken:', localStorage.getItem('authToken') ? '✓' : '✗');
+    
+    if (localStorage.getItem('litlink_user')) {
+        try {
+            const user = JSON.parse(localStorage.getItem('litlink_user'));
+            console.log('=== USER DATA ===');
+            console.log('Name:', user.name);
+            console.log('Email:', user.email);
+            console.log('Profile Picture:', user.profilePicture ? '✓' : '✗');
+            console.log('Bio:', user.bio ? '✓' : '✗');
+            console.log('Favorite Books:', user.favoriteBooks?.length || 0);
+        } catch (e) {
+            console.log('Error parsing user:', e);
+        }
     }
 }
 
@@ -477,7 +711,9 @@ function initializeAuthForms() {
 window.handleSignup = handleSignup;
 window.handleLogin = handleLogin;
 window.handleForgotPassword = handleForgotPassword;
+window.handleLogout = handleLogout;
 window.resendVerificationCode = resendVerificationCode;
+window.AuthState = AuthState;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.closeAllModals = closeAllModals;
@@ -487,9 +723,32 @@ window.validateName = validateName;
 window.showError = showError;
 window.showSuccess = showSuccess;
 window.initializeAuthForms = initializeAuthForms;
+window.checkAuthentication = checkAuthentication;
+window.debugLocalStorage = debugLocalStorage;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initializing auth system...');
     initializeAuthForms();
+    fixSafariStorage();
+    checkAuthentication();
+    
+    // Add debug button for testing
+    const debugBtn = document.createElement('button');
+    debugBtn.textContent = '🔍 Debug Storage';
+    debugBtn.style.position = 'fixed';
+    debugBtn.style.bottom = '10px';
+    debugBtn.style.right = '10px';
+    debugBtn.style.zIndex = '9999';
+    debugBtn.style.padding = '5px 10px';
+    debugBtn.style.background = '#333';
+    debugBtn.style.color = 'white';
+    debugBtn.style.border = 'none';
+    debugBtn.style.borderRadius = '5px';
+    debugBtn.style.fontSize = '12px';
+    debugBtn.style.cursor = 'pointer';
+    debugBtn.onclick = debugLocalStorage;
+    document.body.appendChild(debugBtn);
+    
     console.log('✅ Auth functions loaded and initialized!');
 });

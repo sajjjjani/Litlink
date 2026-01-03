@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Litlink - Admin Dashboard</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">L</span>
+                <span class="logo-text">Litlink</span>
+                <span class="admin-label">Admin Panel</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="notification-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 2C6.68629 2 4 4.68629 4 8V11.5858L2.29289 13.2929C1.90237 13.6834 2.17157 14.5 2.70711 14.5H17.2929C17.8284 14.5 18.0976 13.6834 17.7071 13.2929L16 11.5858V8C16 4.68629 13.3137 2 10 2Z" fill="currentColor"/>
+                    <path d="M8 16.5C8 15.6716 8.67157 15 9.5 15H10.5C11.3284 15 12 15.6716 12 16.5C12 17.3284 11.3284 18 10.5 18H9.5C8.67157 18 8 17.3284 8 16.5Z" fill="currentColor"/>
+                </svg>
+                <span class="notification-badge">1</span>
+            </div>
+            <div class="user-menu">
+                <div class="user-avatar">A</div>
+                <span class="user-name">Admin</span>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="dashboard-container">
+            <div class="page-header">
+                <h1>Admin Dashboard</h1>
+                <p class="subtitle">Overview of platform activity and moderation status</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Total Registered Users</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 11C12.7614 11 15 8.76142 15 6C15 3.23858 12.7614 1 10 1C7.23858 1 5 3.23858 5 6C5 8.76142 7.23858 11 10 11Z" stroke="currentColor" stroke-width="1.5"/>
+                            <path d="M3 19C3 15.134 6.13401 12 10 12C13.866 12 17 15.134 17 19" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">12,482</div>
+                    <div class="stat-description">All-time users</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Active Users Today</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7 10L9 12L13 8M19 10C19 14.9706 14.9706 19 10 19C5.02944 19 1 14.9706 1 10C1 5.02944 5.02944 1 10 1C14.9706 1 19 5.02944 19 10Z" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">843</div>
+                    <div class="stat-description">Logged in within 24h</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Active Matches</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M2 10L8 4M8 4L14 10M8 4V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">156</div>
+                    <div class="stat-description">Carries AI matches</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Live Voice Rooms</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 1V5M10 15V19M5 10H1M19 10H15M15.5 4.5L13 7M15.5 15.5L13 13M4.5 15.5L7 13M4.5 4.5L7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">24</div>
+                    <div class="stat-description">Ongoing discussions</div>
+                </div>
+            </div>
+
+            <!-- Moderation Status -->
+            <div class="moderation-section">
+                <div class="section-header">
+                    <h2>Moderation Status</h2>
+                    <button class="btn-view-all">View All Reports</button>
+                </div>
+                <div class="moderation-cards">
+                    <div class="mod-card mod-warning">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 9V13M12 17H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0377 2.66667 10.2679 4L3.33975 16C2.56995 17.3333 3.53223 19 5.07183 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <div class="mod-info">
+                            <div class="mod-label">New Reports</div>
+                            <div class="mod-value">12</div>
+                        </div>
+                    </div>
+                    <div class="mod-card mod-pending">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                            <path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <div class="mod-info">
+                            <div class="mod-label">Pending</div>
+                            <div class="mod-value">5</div>
+                        </div>
+                    </div>
+                    <div class="mod-card mod-resolved">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <div class="mod-info">
+                            <div class="mod-label">Resolved</div>
+                            <div class="mod-value">128</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="reports-note">Reports are automatically reviewed</div>
+            </div>
+
+            <!-- Recent Reports -->
+            <div class="recent-reports">
+                <h2>Recent Reports</h2>
+                <div class="reports-list">
+                    <div class="report-item">
+                        <div class="report-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="report-info">
+                            <div class="report-type">Post <span class="report-time">• 10 mins ago</span></div>
+                            <div class="report-desc">Inappropriate content</div>
+                        </div>
+                        <span class="badge badge-pending">Pending</span>
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+
+                    <div class="report-item">
+                        <div class="report-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <rect x="2" y="6" width="16" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M6 9H10M6 12H12" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="report-info">
+                            <div class="report-type">Chat <span class="report-time">• 43 mins ago</span></div>
+                            <div class="report-desc">Harassment</div>
+                        </div>
+                        <span class="badge badge-pending">Pending</span>
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+
+                    <div class="report-item">
+                        <div class="report-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <circle cx="10" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M3 18C3 14.134 6.134 11 10 11C13.866 11 17 14.134 17 18" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="report-info">
+                            <div class="report-type">Profile <span class="report-time">• 2 hours ago</span></div>
+                            <div class="report-desc">Fake account</div>
+                        </div>
+                        <span class="badge badge-reviewed">Reviewed</span>
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+
+                    <div class="report-item">
+                        <div class="report-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="report-info">
+                            <div class="report-type">Post <span class="report-time">• 3 hours ago</span></div>
+                            <div class="report-desc">Spam</div>
+                        </div>
+                        <span class="badge badge-reviewed">Reviewed</span>
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+
+                    <div class="report-item">
+                        <div class="report-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <rect x="2" y="6" width="16" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M6 9H10M6 12H12" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="report-info">
+                            <div class="report-type">Chat <span class="report-time">• 5 hours ago</span></div>
+                            <div class="report-desc">Hate speech</div>
+                        </div>
+                        <span class="badge badge-reviewed">Reviewed</span>
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Grid -->
+            <div class="bottom-grid">
+                <div class="info-card">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 11C12.7614 11 15 8.76142 15 6C15 3.23858 12.7614 1 10 1C7.23858 1 5 3.23858 5 6C5 8.76142 7.23858 11 10 11Z" stroke="currentColor" stroke-width="1.5"/>
+                            <path d="M3 19C3 15.134 6.13401 12 10 12C13.866 12 17 15.134 17 19" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                        New Users
+                    </h3>
+                    <div class="info-row">
+                        <span>Joined Today</span>
+                        <span class="info-value">42</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Joined This Week</span>
+                        <span class="info-value">315</span>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 1V5M5 10H1M19 10H15M15.5 4.5L13 7M15.5 15.5L13 13M4.5 15.5L7 13M4.5 4.5L7 7" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                        Account Actions
+                    </h3>
+                    <div class="info-row">
+                        <span>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 1V15M1 8H15" stroke="#dc2626" stroke-width="1.5"/>
+                            </svg>
+                            Banned Today
+                        </span>
+                        <span class="info-value">2</span>
+                    </div>
+                    <div class="info-row">
+                        <span>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <circle cx="8" cy="8" r="7" stroke="#eab308" stroke-width="1.5"/>
+                            </svg>
+                            Suspended
+                        </span>
+                        <span class="info-value">5</span>
+                    </div>
+                    <div class="info-row">
+                        <span>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 1V5M5 8H1M15 8H11M11.5 3.5L9 6M11.5 12.5L9 10M4.5 12.5L7 10M4.5 3.5L7 6" stroke="#eab308" stroke-width="1.5"/>
+                            </svg>
+                            Warnings Issued
+                        </span>
+                        <span class="info-value">18</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn" data-action="manage-users">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 11C12.7614 11 15 8.76142 15 6C15 3.23858 12.7614 1 10 1C7.23858 1 5 3.23858 5 6C5 8.76142 7.23858 11 10 11Z" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M3 19C3 15.134 6.13401 12 10 12C13.866 12 17 15.134 17 19" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Manage Users
+                </button>
+                <button class="action-btn" data-action="review-reports">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Review Reports
+                </button>
+                <button class="action-btn" data-action="monitor-voice">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 1C5.02944 1 1 5.02944 1 10C1 14.9706 5.02944 19 10 19C14.9706 19 19 14.9706 19 10" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 5V10L13 12" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Monitor Voice
+                </button>
+                <button class="action-btn" data-action="edit-filters">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 1V4M10 16V19M1 10H4M16 10H19M15.5 4.5L13.5 6.5M6.5 13.5L4.5 15.5M4.5 4.5L6.5 6.5M13.5 13.5L15.5 15.5" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Edit Filters
+                </button>
+            </div>
+
+            <!-- Community Engagement -->
+            <div class="engagement-section">
+                <h2>
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M2 10L8 4M8 4L14 10M8 4V16" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Community Engagement
+                </h2>
+                <div class="engagement-content">
+                    <div class="engagement-item">
+                        <div class="engagement-label">Most Active Board</div>
+                        <div class="engagement-title">Literary Analysis</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" data-width="87"></div>
+                        </div>
+                        <div class="engagement-stats">
+                            <span class="engagement-growth">+13%</span>
+                        </div>
+                    </div>
+                    <div class="engagement-item">
+                        <div class="engagement-label">Top Genre</div>
+                        <div class="engagement-title">Science Fiction</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" data-width="68"></div>
+                        </div>
+                        <div class="engagement-stats">
+                            <span class="engagement-count">843 posts</span>
+                        </div>
+                    </div>
+                    <div class="engagement-item">
+                        <div class="engagement-label">Peak Activity Time</div>
+                        <div class="engagement-time">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M8 4V8L11 10" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                            8:00 PM - 10:00 PM
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Automated Safeguards -->
+            <div class="safeguards-section">
+                <h3>Automated Safeguards</h3>
+                <div class="safeguard-alert alert-warning">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 6V10M10 14H10.01" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <div>
+                        <div class="alert-title">Excluded word filter triggered</div>
+                        <div class="alert-desc">12 times today</div>
+                    </div>
+                </div>
+                <div class="safeguard-alert alert-action">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 1C5.02944 1 1 5.02944 1 10C1 14.9706 5.02944 19 10 19C14.9706 19 19 14.9706 19 10" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    <div>
+                        <div class="alert-title">Voice room moderation action</div>
+                        <div class="alert-desc">Room #4321: auto-flagged</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-left">
+            Litlink Admin v2.4.0
+        </div>
+        <div class="footer-right">
+            <span class="status-indicator"></span>
+            <span>System Operational</span>
+            <a href="#" class="footer-link">Support</a>
+        </div>
+    </footer>
+
+    <script src="admin.js"></script>
+</body>
+</html>

@@ -13,10 +13,55 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
+  username: {
+    type: String,
+    trim: true,
+    sparse: true
+  },
   password: {
     type: String,
     required: true
   },
+  // ===== ADMIN FIELDS =====
+  isAdmin: {
+    type: Boolean,
+    default: false
+  },
+  adminLevel: {
+    type: String,
+    enum: ['none', 'moderator', 'super_admin'],
+    default: 'none'
+  },
+  adminPermissions: [{
+    type: String,
+    enum: ['manage_users', 'manage_posts', 'manage_chats', 'view_reports', 'system_settings']
+  }],
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  isSuspended: {
+    type: Boolean,
+    default: false
+  },
+  suspensionEnds: {
+    type: Date,
+    default: null
+  },
+  banReason: {
+    type: String,
+    default: ''
+  },
+  bannedAt: {
+    type: Date,
+    default: null
+  },
+  bannedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  // ===== EXISTING FIELDS =====
   isVerified: {
     type: Boolean,
     default: false
@@ -53,7 +98,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Questionnaire fields
   favoriteGenres: [String],
   favoriteAuthors: [String],
   favoriteBooks: [String],
@@ -65,7 +109,6 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // Bookshelf
   booksRead: [{
     bookId: String,
     title: String,
@@ -89,13 +132,20 @@ const userSchema = new mongoose.Schema({
   following: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }]
+  }],
+  lastLogin: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });
 
-// Add index for faster queries
+// Add indexes
 userSchema.index({ email: 1 });
 userSchema.index({ isVerified: 1 });
+userSchema.index({ isAdmin: 1 });
+userSchema.index({ isBanned: 1 });
+userSchema.index({ lastLogin: 1 });
 
 module.exports = mongoose.model('User', userSchema);

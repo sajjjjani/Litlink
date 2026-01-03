@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Litlink</title>
+    <link rel="stylesheet" href="../Homepage/style.css">
+    <link rel="stylesheet" href="profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span class="brand-name">Litlink</span>
+            </div>
+            <div class="nav-links">
+                <a href="../Dashboard/dashboard.html" class="nav-link" title="Home">
+                    <i class="fas fa-home"></i> 
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="#" class="nav-link" title="Messages" onclick="showComingSoon('Messages')">
+                    <i class="fas fa-envelope"></i> 
+                    <span class="nav-text">Messages</span>
+                </a>
+                <a href="#" class="nav-link" title="Discussions" onclick="showComingSoon('Discussions')">
+                    <i class="fas fa-comments"></i> 
+                    <span class="nav-text">Discussions</span>
+                </a>
+                <a href="#" class="nav-link" title="Voice Rooms" onclick="showComingSoon('Voice Rooms')">
+                    <i class="fas fa-microphone"></i> 
+                    <span class="nav-text">Voice Rooms</span>
+                </a>
+                <a href="profile.html" class="nav-link" title="Profile">
+                    <i class="fas fa-user"></i> 
+                    <span class="nav-text">Profile</span>
+                </a>
+            </div>
+            <div class="nav-actions">
+                <div class="settings-dropdown">
+                    <button class="settings-btn" onclick="toggleSettings()" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="settings-menu" id="settingsMenu">
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-moon"></i> Dark Mode
+                            </span>
+                        </div>
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-bell"></i> Notifications
+                            </span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="window.location.href='settings.html'">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="menu-toggle" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Settings Content -->
+    <div class="profile-container">
+        <div class="settings-header">
+            <h1><i class="fas fa-cog"></i> Settings</h1>
+            <p>Manage your account and preferences</p>
+        </div>
+
+        <div class="settings-sections">
+            <!-- Account Information -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-user-circle"></i> Account Information</h2>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Email Address</label>
+                            <p id="userEmail" class="settings-value">Loading...</p>
+                        </div>
+                        <button class="action-btn edit" onclick="editEmail()">Change Email</button>
+                    </div>
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Password</label>
+                            <p class="settings-value">••••••••</p>
+                        </div>
+                        <button class="action-btn edit" onclick="changePassword()">Change Password</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Privacy Controls -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-shield-alt"></i> Privacy Controls</h2>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Who can message me</label>
+                            <p class="settings-description">Control who can send you messages</p>
+                        </div>
+                        <select id="messagePrivacy" class="settings-select" onchange="updatePrivacySetting('messagePrivacy', this.value)">
+                            <option value="everyone">Everyone</option>
+                            <option value="followers">Followers only</option>
+                            <option value="none">No one</option>
+                        </select>
+                    </div>
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Who can view my profile</label>
+                            <p class="settings-description">Control profile visibility</p>
+                        </div>
+                        <select id="profilePrivacy" class="settings-select" onchange="updatePrivacySetting('profilePrivacy', this.value)">
+                            <option value="everyone">Everyone</option>
+                            <option value="followers">Followers only</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notification Preferences -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-bell"></i> Notification Preferences</h2>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Email Notifications</label>
+                            <p class="settings-description">Receive email updates about your account</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="emailNotifications" checked onchange="updateNotificationSetting('emailNotifications', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>New Matches</label>
+                            <p class="settings-description">Get notified when you have new reader matches</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="matchNotifications" checked onchange="updateNotificationSetting('matchNotifications', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Messages</label>
+                            <p class="settings-description">Get notified about new messages</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="messageNotifications" checked onchange="updateNotificationSetting('messageNotifications', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Discussion Updates</label>
+                            <p class="settings-description">Get notified about discussions you're following</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="discussionNotifications" checked onchange="updateNotificationSetting('discussionNotifications', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Actions -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-exclamation-triangle"></i> Account Actions</h2>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-item-large">
+                        <div class="settings-item-info">
+                            <label>Deactivate Account</label>
+                            <p class="settings-description">Temporarily disable your account. You can reactivate it anytime.</p>
+                        </div>
+                        <button class="action-btn deactivate" onclick="deactivateAccount()">Deactivate Account</button>
+                    </div>
+                    <div class="settings-item-large danger">
+                        <div class="settings-item-info">
+                            <label>Delete Account</label>
+                            <p class="settings-description">Permanently delete your account and all data. This cannot be undone.</p>
+                        </div>
+                        <button class="action-btn delete" onclick="showDeleteAccountModal()">Delete Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Modal -->
+    <div class="modal-overlay" id="deleteAccountModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Delete Account</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="warning-message">
+                <p><strong>⚠️ Warning: This action cannot be undone!</strong></p>
+                <p>All your data including:</p>
+                <ul>
+                    <li>Profile information</li>
+                    <li>Reading preferences</li>
+                    <li>Favorite books & authors</li>
+                    <li>Reading history</li>
+                </ul>
+                <p>will be permanently deleted.</p>
+            </div>
+            <div class="form-group">
+                <label for="confirmEmail">Enter your email to confirm:</label>
+                <input type="email" id="confirmEmail" placeholder="your@email.com">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="delete-btn" onclick="deleteAccount()">Delete My Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal-overlay" id="changePasswordModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-key"></i> Change Password</h2>
+                <button class="close-btn" onclick="closePasswordModal()">&times;</button>
+            </div>
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirmNewPassword">Confirm New Password</label>
+                    <input type="password" id="confirmNewPassword" required minlength="8">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closePasswordModal()">Cancel</button>
+                    <button type="submit" class="save-btn">Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Change Email Modal -->
+    <div class="modal-overlay" id="changeEmailModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-envelope"></i> Change Email</h2>
+                <button class="close-btn" onclick="closeEmailModal()">&times;</button>
+            </div>
+            <form id="changeEmailForm">
+                <div class="form-group">
+                    <label for="newEmail">New Email Address</label>
+                    <input type="email" id="newEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="emailPassword">Confirm with Password</label>
+                    <input type="password" id="emailPassword" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeEmailModal()">Cancel</button>
+                    <button type="submit" class="save-btn">Change Email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Load scripts -->
+    <script src="../Homepage/script.js"></script>
+    <script src="profile.js"></script>
+    <script src="settings.js"></script>
+</body>
+</html>
+

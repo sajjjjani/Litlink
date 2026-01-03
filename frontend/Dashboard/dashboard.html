@@ -4,9 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Litlink - Book Community</title>
+    <link rel="stylesheet" href="../Homepage/style.css">
     <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span class="brand-name">Litlink</span>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link active" title="Home">
+                    <i class="fas fa-home"></i> 
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="#" class="nav-link" title="Messages" onclick="showComingSoon('Messages')">
+                    <i class="fas fa-envelope"></i> 
+                    <span class="nav-text">Messages</span>
+                </a>
+                <a href="#" class="nav-link" title="Discussions" onclick="showComingSoon('Discussions')">
+                    <i class="fas fa-comments"></i> 
+                    <span class="nav-text">Discussions</span>
+                </a>
+                <a href="#" class="nav-link" title="Voice Rooms" onclick="showComingSoon('Voice Rooms')">
+                    <i class="fas fa-microphone"></i> 
+                    <span class="nav-text">Voice Rooms</span>
+                </a>
+                <a href="../Profile/profile.html" class="nav-link" title="Profile">
+                    <i class="fas fa-user"></i> 
+                    <span class="nav-text">Profile</span>
+                </a>
+            </div>
+            <div class="nav-actions">
+                <div class="settings-dropdown">
+                    <button class="settings-btn" onclick="toggleSettings()" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="settings-menu" id="settingsMenu">
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-moon"></i> Dark Mode
+                            </span>
+                        </div>
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-bell"></i> Notifications
+                            </span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="window.location.href='../Profile/settings.html'">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="menu-toggle" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <!-- Header Welcome Card -->
         <div class="welcome-card">

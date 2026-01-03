@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - Litlink</title>
+    <link rel="stylesheet" href="../Homepage/style.css">
+    <link rel="stylesheet" href="profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span class="brand-name">Litlink</span>
+            </div>
+            <div class="nav-links">
+                    <a href="../Dashboard/dashboard.html" class="nav-link" title="Home">
+                    <i class="fas fa-home"></i> 
+
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="#" class="nav-link" title="Messages">
+                    <i class="fas fa-envelope"></i> 
+                    <span class="nav-text">Messages</span>
+                </a>
+                <a href="#" class="nav-link" title="Discussions">
+                    <i class="fas fa-comments"></i> 
+                    <span class="nav-text">Discussions</span>
+                </a>
+                <a href="#" class="nav-link" title="Voice Rooms">
+                    <i class="fas fa-microphone"></i> 
+                    <span class="nav-text">Voice Rooms</span>
+                </a>
+                <a href="#" class="nav-link active" title="Profile">
+                    <i class="fas fa-user"></i> 
+                    <span class="nav-text">Profile</span>
+                </a>
+            </div>
+            <div class="nav-actions">
+                <div class="settings-dropdown">
+                    <button class="settings-btn" onclick="toggleSettings()" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="settings-menu" id="settingsMenu">
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-moon"></i> Dark Mode
+                            </span>
+                        </div>
+                        <div class="settings-item">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="settings-label">
+                                <i class="fas fa-bell"></i> Notifications
+                            </span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="window.location.href='settings.html'">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item clickable" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </div>
+                        <div class="settings-item clickable danger" onclick="showDeleteAccountModal()">
+                            <i class="fas fa-trash-alt"></i>
+                            <span>Delete Account</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="menu-toggle" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Content -->
+    <div class="profile-container">
+        <!-- Profile Header -->
+        <div class="profile-header animate-fade-in-up">
+            <div class="profile-pic-container">
+                <img src="https://via.placeholder.com/150" alt="Profile Picture" class="profile-pic" id="profilePicture">
+                <input type="file" id="profilePictureInput" accept="image/*" style="display: none;" onchange="handleProfilePictureUpload(event)">
+                <button class="edit-pic-btn" onclick="document.getElementById('profilePictureInput').click()">
+                    <i class="fas fa-camera"></i> Edit
+                </button>
+            </div>
+            <div class="profile-info">
+                <!-- View Mode -->
+                <div class="profile-view-mode" id="profileViewMode">
+                    <h1 id="profileName">Loading...</h1>
+                    <div class="username" id="profileUsername">@username</div>
+                    <div class="location-pronouns">
+                        <span class="location">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            <span id="locationText">Not set</span>
+                        </span>
+                        <span class="pronouns">
+                            <i class="fas fa-user"></i> 
+                            <span id="pronounsText">Not set</span>
+                        </span>
+                    </div>
+                    <div class="bio">
+                        <i class="fas fa-quote-left" style="opacity: 0.5; margin-right: 8px;"></i>
+                        <span id="bioText">No bio yet. Click Edit Profile to add one!</span>
+                    </div>
+                </div>
+                
+                <!-- Edit Mode (Inline) -->
+                <div class="profile-edit-mode" id="profileEditMode" style="display: none;">
+                    <input type="text" id="editNameInput" class="edit-input" placeholder="Full Name" required>
+                    <input type="text" id="editUsernameInput" class="edit-input" placeholder="Username" required>
+                    <div class="location-pronouns-edit">
+                        <input type="text" id="editLocationInput" class="edit-input-small" placeholder="Location">
+                        <input type="text" id="editPronounsInput" class="edit-input-small" placeholder="Pronouns">
+                    </div>
+                    <textarea id="editBioInput" class="edit-textarea" placeholder="Tell us about yourself and your reading journey..." rows="3"></textarea>
+                </div>
+                
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <div class="stat-number" id="statFollowers">0</div>
+                        <div class="stat-label">Followers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statFollowing">0</div>
+                        <div class="stat-label">Following</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statBooks">0</div>
+                        <div class="stat-label">Books Read</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statGoal">0/0</div>
+                        <div class="stat-label">Goal Progress</div>
+                    </div>
+                </div>
+                
+                <div class="profile-actions" id="profileActions">
+                    <!-- FIXED: Added onclick directly -->
+                    <button class="action-btn edit" id="editProfileBtn" onclick="openEditProfileModal()">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </button>
+                    <button class="action-btn share" onclick="shareProfile()">
+                        <i class="fas fa-share-alt"></i> Share
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Sections -->
+        <div class="profile-sections">
+            <!-- Profile Section -->
+            <div class="profile-section" id="profileSection">
+                <!-- Reading Stats -->
+                <div class="section-title">
+                    <span><i class="fas fa-chart-line"></i> Reading Stats</span>
+                    <!-- FIXED: Added onclick directly -->
+                    <button class="action-btn small" onclick="openReadingStatsModal()">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+                <div class="reading-stats animate-fade-in delay-1">
+                    <div class="stat-card editable-field" onclick="openReadingStatsModal()">
+                        <div class="stat-icon">
+                            <i class="fas fa-book-reader"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Reading Habit</div>
+                            <div class="stat-value" id="readingHabit">Not set</div>
+                            <div class="stat-hint">Click to edit</div>
+                        </div>
+                    </div>
+                    <div class="stat-card editable-field" onclick="openReadingStatsModal()">
+                        <div class="stat-icon">
+                            <i class="fas fa-flag-checkered"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Reading Goal</div>
+                            <div class="stat-value" id="readingGoal">0 books/year</div>
+                            <div class="stat-hint">Click to edit</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-title">Member Since</div>
+                            <div class="stat-value" id="memberSince">Loading...</div>
+                            <div class="stat-hint">Auto-filled</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Favorite Genres -->
+                <div class="section-title collapsible-section" onclick="toggleSection('genres')">
+                    <span><i class="fas fa-tags"></i> Favorite Genres</span>
+                    <i class="fas fa-chevron-down section-toggle" id="toggleGenres"></i>
+                </div>
+                <div class="tags-container section-content" id="sectionGenres">
+                    <div class="empty-state" id="emptyGenres">
+                        <i class="fas fa-tags"></i>
+                        <p>No genres selected yet</p>
+                    </div>
+                </div>
+
+                <!-- Favorite Authors -->
+                <div class="section-title collapsible-section" onclick="toggleSection('authors')">
+                    <span><i class="fas fa-pen-nib"></i> Favorite Authors</span>
+                    <i class="fas fa-chevron-down section-toggle" id="toggleAuthors"></i>
+                </div>
+                <div class="tags-container section-content" id="sectionAuthors">
+                    <div class="empty-state" id="emptyAuthors">
+                        <i class="fas fa-user-edit"></i>
+                        <p>No favorite authors yet</p>
+                    </div>
+                </div>
+
+                <!-- Favorite Books -->
+                <div class="section-title collapsible-section" onclick="toggleSection('books')">
+                    <span><i class="fas fa-book"></i> Favorite Books</span>
+                    <i class="fas fa-chevron-down section-toggle" id="toggleBooks"></i>
+                </div>
+                <div class="books-container section-content" id="sectionBooks">
+                    <div class="empty-state" id="emptyBooks">
+                        <i class="fas fa-book-open"></i>
+                        <p>No favorite books yet</p>
+                    </div>
+                </div>
+
+                <!-- Reading Preferences -->
+                <div class="section-title">
+                    <span><i class="fas fa-sliders-h"></i> Reading Preferences</span>
+                    <!-- FIXED: Added onclick directly -->
+                    <button class="action-btn small" onclick="openPreferencesModal()">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+                <div class="preferences-container">
+                    <div class="preference-item">
+                        <span class="preference-label">Preferred Formats:</span>
+                        <div class="tags-container" id="preferredFormats">
+                            <span class="empty-tag">Not set</span>
+                        </div>
+                    </div>
+                    <div class="preference-item">
+                        <span class="preference-label">Discussion Preferences:</span>
+                        <div class="tags-container" id="discussionPreferences">
+                            <span class="empty-tag">Not set</span>
+                        </div>
+                    </div>
+                    <div class="preference-item">
+                        <span class="preference-label">Email Updates:</span>
+                        <span class="preference-value" id="receiveRecommendations">Not set</span>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="section-title">
+                    <span><i class="fas fa-history"></i> Recent Activity</span>
+                </div>
+                <div class="activity-container" id="recentActivity">
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="activity-content">
+                            <p>Joined Litlink!</p>
+                            <span class="activity-time" id="joinDate">Just now</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Completeness Section -->
+        <div class="profile-completeness animate-fade-in-up">
+            <div class="completeness-header">
+                <h3><i class="fas fa-check-circle"></i> Profile Completeness</h3>
+                <span class="completeness-percentage" id="completenessPercentage">0%</span>
+            </div>
+            <div class="completeness-bar-container">
+                <div class="completeness-bar" id="completenessBar">
+                    <div class="completeness-fill" id="completenessFill"></div>
+                </div>
+            </div>
+            <div class="completeness-tips" id="completenessTips">
+                <p>Complete your profile to connect with more readers!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal-overlay" id="editProfileModal">
+        <div class="signup-modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Edit Profile</h2>
+                <button class="close-btn" onclick="closeModal('editProfileModal')">&times;</button>
+            </div>
+            <!-- FIXED: Added onsubmit directly -->
+            <form id="editProfileForm" onsubmit="saveProfileChanges(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editName">Full Name *</label>
+                        <input type="text" id="editName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editUsername">Username *</label>
+                        <input type="text" id="editUsername" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editEmail">Email Address *</label>
+                        <input type="email" id="editEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPhone">Phone Number</label>
+                        <input type="tel" id="editPhone">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editLocation">Location</label>
+                        <input type="text" id="editLocation" placeholder="City, Country">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPronouns">Pronouns</label>
+                        <input type="text" id="editPronouns" placeholder="e.g., they/them, she/her, he/him">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editBio">Bio</label>
+                    <textarea id="editBio" rows="4" placeholder="Tell us about yourself and your reading journey..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeModal('editProfileModal')">Cancel</button>
+                    <button type="submit" class="save-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Reading Stats Modal -->
+    <div class="modal-overlay" id="editReadingStatsModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-line"></i> Edit Reading Stats</h2>
+                <button class="close-btn" onclick="closeModal('editReadingStatsModal')">&times;</button>
+            </div>
+            <!-- FIXED: Added onsubmit directly -->
+            <form id="editReadingStatsForm" onsubmit="saveReadingStats(event)">
+                <div class="form-group">
+                    <label for="editReadingHabit">Reading Habit</label>
+                    <select id="editReadingHabit" class="settings-select">
+                        <option value="">Select your reading habit</option>
+                        <option value="Daily Reader">Daily Reader</option>
+                        <option value="Weekly Reader">Weekly Reader</option>
+                        <option value="Monthly Reader">Monthly Reader</option>
+                        <option value="Weekend Reader">Weekend Reader</option>
+                        <option value="Binge Reader">Binge Reader</option>
+                        <option value="Seasonal Reader">Seasonal Reader</option>
+                        <option value="Slow and Steady">Slow and Steady</option>
+                        <option value="Avid Reader">Avid Reader</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editReadingGoal">Reading Goal (books per year)</label>
+                    <input type="number" id="editReadingGoal" min="1" max="500" value="12">
+                    <small>Set how many books you aim to read this year</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeModal('editReadingStatsModal')">Cancel</button>
+                    <button type="submit" class="save-btn">Save Reading Stats</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Preferences Modal -->
+    <div class="modal-overlay" id="editPreferencesModal">
+        <div class="signup-modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-sliders-h"></i> Edit Reading Preferences</h2>
+                <button class="close-btn" onclick="closeModal('editPreferencesModal')">&times;</button>
+            </div>
+            <!-- FIXED: Added onsubmit directly -->
+            <form id="editPreferencesForm" onsubmit="savePreferences(event)">
+                <div class="form-group">
+                    <label>Preferred Formats (select all that apply)</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="format" value="Paperback">
+                            <span class="checkbox-text">Paperback</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="format" value="Hardcover">
+                            <span class="checkbox-text">Hardcover</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="format" value="E-book">
+                            <span class="checkbox-text">E-book</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="format" value="Audiobook">
+                            <span class="checkbox-text">Audiobook</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="format" value="Digital">
+                            <span class="checkbox-text">Digital</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Discussion Preferences</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="discussion" value="Online Forums">
+                            <span class="checkbox-text">Online Forums</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="discussion" value="Book Clubs">
+                            <span class="checkbox-text">Book Clubs</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="discussion" value="One-on-One">
+                            <span class="checkbox-text">One-on-One Chats</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="discussion" value="Group Discussions">
+                            <span class="checkbox-text">Group Discussions</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="discussion" value="Reviews">
+                            <span class="checkbox-text">Writing Reviews</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editRecommendations">Email Updates for Recommendations</label>
+                    <select id="editRecommendations" class="settings-select">
+                        <option value="true">Enabled - Receive regular recommendations</option>
+                        <option value="false">Disabled - No email recommendations</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeModal('editPreferencesModal')">Cancel</button>
+                    <button type="submit" class="save-btn">Save Preferences</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Account Modal -->
+    <div class="modal-overlay" id="deleteAccountModal">
+        <div class="signup-modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Delete Account</h2>
+                <button class="close-btn" onclick="closeModal('deleteAccountModal')">&times;</button>
+            </div>
+            <div class="warning-message">
+                <p><strong>⚠️ Warning: This action cannot be undone!</strong></p>
+                <p>All your data including:</p>
+                <ul>
+                    <li>Profile information</li>
+                    <li>Reading preferences</li>
+                    <li>Favorite books & authors</li>
+                    <li>Reading history</li>
+                </ul>
+                <p>will be permanently deleted.</p>
+            </div>
+            <div class="form-group">
+                <label for="confirmEmail">Enter your email to confirm:</label>
+                <input type="email" id="confirmEmail" placeholder="your@email.com">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="cancel-btn" onclick="closeModal('deleteAccountModal')">Cancel</button>
+                <button type="button" class="delete-btn" onclick="deleteAccount()">Delete My Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Loading profile...</p>
+    </div>
+
+    <!-- Load scripts -->
+    <script src="../Homepage/script.js"></script>
+    <script src="profile.js"></script>
+    
+    <!-- Direct function test -->
+    <script>
+    // Direct function definitions that WILL work
+    console.log('Direct functions loaded');
+    
+    // Test if functions are available
+    window.testFunction = function() {
+        console.log('Test function works!');
+        document.getElementById('editProfileModal').style.display = 'flex';
+    };
+    </script>
+</body>
+</html>

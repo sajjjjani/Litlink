@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Profile - Litlink</title>
+    <style>
+        /* ===== RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a0f0a 0%, #2c1810 100%);
+            color: #e8d4c9;
+            min-height: 100vh;
+        }
+
+        /* ===== NAVBAR STYLES ===== */
+        .nav-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(44, 24, 16, 0.9);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 999;
+            border: 1px solid rgba(232, 212, 201, 0.2);
+            color: #e8d4c9;
+        }
+
+        .admin-navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(44, 24, 16, 0.98);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(232, 212, 201, 0.1);
+            padding: 30px 20px;
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .admin-navbar.active {
+            transform: translateX(0);
+        }
+
+        .nav-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(232, 212, 201, 0.1);
+        }
+
+        .nav-logo {
+            width: 40px;
+            height: 40px;
+            background: #d97706;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .nav-logo-text {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 14px 18px;
+            color: #e8d4c9;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: rgba(212, 165, 116, 0.15);
+            transform: translateX(5px);
+        }
+
+        .nav-item.active {
+            background: rgba(212, 165, 116, 0.25);
+            color: #d4a574;
+            border-left: 4px solid #d4a574;
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            opacity: 0.9;
+        }
+
+        .nav-divider {
+            height: 1px;
+            background: rgba(232, 212, 201, 0.1);
+            margin: 25px 0;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .container.with-navbar {
+            margin-left: 280px;
+            max-width: calc(100vw - 280px);
+            padding: 40px 60px;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        @media (max-width: 1024px) {
+            .admin-navbar {
+                width: 100%;
+            }
+            
+            .container.with-navbar {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 100px 20px 40px;
+            }
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 42px;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: rgba(232, 212, 201, 0.7);
+            line-height: 1.5;
+        }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: rgba(92, 51, 40, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(232, 212, 201, 0.15);
+            border-radius: 20px;
+            padding: 35px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(212, 165, 116, 0.3);
+        }
+
+        /* ===== PROFILE CARD ===== */
+        .profile-card {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .profile-left {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            flex: 1;
+        }
+
+        .avatar {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d4a574 0%, #d97706 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 10px 30px rgba(212, 165, 116, 0.3);
+        }
+
+        .avatar-text {
+            font-size: 36px;
+        }
+
+        .verified-badge {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 28px;
+            height: 28px;
+            background: #16a34a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border: 3px solid rgba(92, 51, 40, 0.85);
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .name-badge {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .name-badge h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .badge {
+            background: rgba(212, 165, 116, 0.2);
+            color: #d4a574;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid rgba(212, 165, 116, 0.3);
+        }
+
+        .meta-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            color: rgba(232, 212, 201, 0.9);
+        }
+
+        .meta-item svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+        }
+
+        .profile-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-edit, .btn-settings, .btn-logout {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-edit {
+            background: rgba(212, 165, 116, 0.2);
+            color: #d4a574;
+            border: 1px solid rgba(212, 165, 116, 0.3);
+        }
+
+        .btn-edit:hover {
+            background: rgba(212, 165, 116, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(212, 165, 116, 0.2);
+        }
+
+        .btn-settings {
+            background: rgba(232, 212, 201, 0.1);
+            color: #e8d4c9;
+            padding: 12px;
+            border: 1px solid rgba(232, 212, 201, 0.2);
+        }
+
+        .btn-settings:hover {
+            background: rgba(232, 212, 201, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-logout {
+            background: rgba(180, 80, 80, 0.2);
+            color: #e89090;
+            border: 1px solid rgba(180, 80, 80, 0.3);
+        }
+
+        .btn-logout:hover {
+            background: rgba(180, 80, 80, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* ===== INFO CARD ===== */
+        .info-card h3, .security-card h3, .permissions-card h3, .activity-card h3 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 25px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 0;
+            border-bottom: 1px solid rgba(232, 212, 201, 0.1);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-size: 15px;
+            color: rgba(232, 212, 201, 0.7);
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        /* ===== SECURITY CARD ===== */
+        .session-info {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .session-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            border: 1px solid rgba(232, 212, 201, 0.1);
+        }
+
+        .session-item svg {
+            width: 24px;
+            height: 24px;
+            color: #d4a574;
+        }
+
+        .session-details {
+            flex: 1;
+        }
+
+        .session-details h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .session-details p {
+            font-size: 14px;
+            color: rgba(232, 212, 201, 0.7);
+            margin-bottom: 8px;
+        }
+
+        .status-active, .time-ago {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .status-active {
+            background: rgba(22, 163, 74, 0.2);
+            color: #16a34a;
+        }
+
+        .time-ago {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+
+        /* ===== PERMISSIONS CARD ===== */
+        .permissions-subtitle {
+            font-size: 15px;
+            color: rgba(232, 212, 201, 0.7);
+            margin-bottom: 25px;
+        }
+
+        .permissions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border: 1px solid rgba(232, 212, 201, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .permission-item.active {
+            background: rgba(212, 165, 116, 0.1);
+            border-color: rgba(212, 165, 116, 0.3);
+        }
+
+        .permission-item svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .permission-item.active svg {
+            color: #16a34a;
+        }
+
+        .permission-item:not(.active) svg {
+            color: #dc2626;
+        }
+
+        /* ===== ACTIVITY CARD ===== */
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .view-all {
+            color: #d4a574;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .view-all:hover {
+            color: #d97706;
+        }
+
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            border: 1px solid rgba(232, 212, 201, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .activity-item:hover {
+            transform: translateX(5px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .activity-icon.user-suspended {
+            background: rgba(220, 38, 38, 0.2);
+            color: #dc2626;
+        }
+
+        .activity-icon.post-removed {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+
+        .activity-icon.chat-filter {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .activity-icon.report-resolved {
+            background: rgba(22, 163, 74, 0.2);
+            color: #16a34a;
+        }
+
+        .activity-details {
+            flex: 1;
+        }
+
+        .activity-details h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .activity-details p {
+            font-size: 14px;
+            color: rgba(232, 212, 201, 0.7);
+        }
+
+        .activity-time {
+            font-size: 13px;
+            color: rgba(232, 212, 201, 0.6);
+            font-weight: 500;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            margin-top: 50px;
+            padding-top: 25px;
+            border-top: 1px solid rgba(232, 212, 201, 0.1);
+            text-align: center;
+            color: rgba(232, 212, 201, 0.6);
+            font-size: 14px;
+        }
+
+        /* ===== MODAL STYLES ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(92, 51, 40, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(232, 212, 201, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 500px;
+            z-index: 2001;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .modal.active {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .modal-header h3 {
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #e8d4c9;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(232, 212, 201, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: #e8d4c9;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(232, 212, 201, 0.2);
+            border-radius: 12px;
+            color: #e8d4c9;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #d4a574;
+            box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.1);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 40px;
+        }
+
+        .btn-save, .btn-cancel {
+            padding: 12px 28px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save {
+            background: rgba(212, 165, 116, 0.25);
+            color: #d4a574;
+            border: 1px solid rgba(212, 165, 116, 0.3);
+        }
+
+        .btn-save:hover {
+            background: rgba(212, 165, 116, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(212, 165, 116, 0.2);
+        }
+
+        .btn-cancel {
+            background: rgba(180, 80, 80, 0.25);
+            color: #e89090;
+            border: 1px solid rgba(180, 80, 80, 0.3);
+        }
+
+        .btn-cancel:hover {
+            background: rgba(180, 80, 80, 0.35);
+            transform: translateY(-2px);
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 768px) {
+            .container.with-navbar {
+                padding: 100px 20px 40px;
+            }
+            
+            .header h1 {
+                font-size: 32px;
+            }
+            
+            .profile-header {
+                flex-direction: column;
+                gap: 25px;
+            }
+            
+            .profile-left {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .meta-info {
+                align-items: center;
+            }
+            
+            .profile-actions {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card {
+                padding: 25px;
+            }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(0);
+            animation: ripple 0.6s ease-out;
+        }
+
+        /* ===== LOADING STATES ===== */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(232, 212, 201, 0.3);
+            border-top-color: #d4a574;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar Toggle Button -->
+    <div class="nav-toggle" id="navToggle">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </div>
+
+    <!-- Admin Navbar -->
+    <nav class="admin-navbar" id="adminNavbar">
+        <div class="nav-header">
+            <div class="nav-logo">L</div>
+            <div class="nav-logo-text">Litlink Admin</div>
+        </div>
+
+        <div class="nav-items">
+            <a href="../Admin%20Dashboard/admin.html" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="9"></rect>
+                    <rect x="14" y="3" width="7" height="5"></rect>
+                    <rect x="14" y="12" width="7" height="9"></rect>
+                    <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+                Dashboard
+            </a>
+            
+            <a href="adprofile.html" class="nav-item active">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                My Profile
+            </a>
+            
+            <a href="#" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                User Management
+            </a>
+            
+            <a href="#" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                Reports
+            </a>
+            
+            <a href="#" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                </svg>
+                Analytics
+            </a>
+            
+            <div class="nav-divider"></div>
+            
+            <a href="#" class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                Settings
+            </a>
+            
+            <a href="#" class="nav-item" id="logoutBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Logout
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container with-navbar" id="mainContainer">
+        <!-- Header -->
+        <header class="header">
+            <h1>Admin Profile</h1>
+            <p class="subtitle">Administrator account details and permissions</p>
+        </header>
+
+        <!-- Profile Card -->
+        <div class="profile-card card">
+            <div class="profile-header">
+                <div class="profile-left">
+                    <div class="avatar">
+                        <span class="avatar-text" id="adminAvatar">A</span>
+                        <div class="verified-badge">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="profile-info">
+                        <div class="name-badge">
+                            <h2 id="adminName">Loading...</h2>
+                            <span class="badge" id="adminLevel">Admin</span>
+                        </div>
+                        <div class="meta-info">
+                            <span class="meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                                <span id="adminUsername">admin</span>
+                            </span>
+                            <span class="meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                <span id="adminEmail">Loading...</span>
+                            </span>
+                            <span class="meta-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                </svg>
+                                <span id="adminAccess">Access Level: Loading...</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    <button class="btn-edit" id="editProfileBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Edit Profile
+                    </button>
+                    <button class="btn-settings">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Basic Information -->
+        <div class="info-card card">
+            <h3>Basic Information</h3>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Full Name</span>
+                    <span class="info-value" id="basicName">Loading...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email Address</span>
+                    <span class="info-value" id="basicEmail">Loading...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Contact Number</span>
+                    <span class="info-value" id="basicPhone">+1 (555) 123-4567</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Assigned Role</span>
+                    <span class="info-value" id="basicRole">Administrator</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Account Created</span>
+                    <span class="info-value" id="basicCreated">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security & Login Activity -->
+        <div class="security-card card">
+            <h3>Security & Login Activity</h3>
+            <div class="session-info">
+                <div class="session-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <div class="session-details">
+                        <h4>Current Session</h4>
+                        <p id="currentSessionInfo">Loading...</p>
+                        <span class="status-active">Active now</span>
+                    </div>
+                </div>
+                <div class="session-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="2" width="18" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                    <div class="session-details">
+                        <h4>Last Login</h4>
+                        <p id="lastLoginInfo">Loading...</p>
+                        <span class="time-ago">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-logout" id="logoutAllSessions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Log out of all other sessions
+            </button>
+        </div>
+
+        <!-- Permissions & Authority -->
+        <div class="permissions-card card">
+            <h3>Permissions & Authority</h3>
+            <p class="permissions-subtitle">Current scope of administrative access</p>
+            <div class="permissions-grid">
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>User Management Access</span>
+                </div>
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Content Moderation</span>
+                </div>
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Chat Moderation</span>
+                </div>
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Voice Room Monitoring</span>
+                </div>
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Advanced Analytics View</span>
+                </div>
+                <div class="permission-item active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>System Settings Configuration</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Log -->
+        <div class="activity-card card">
+            <div class="activity-header">
+                <h3>Recent Activity Log</h3>
+                <a href="#" class="view-all">View All</a>
+            </div>
+            <div class="activity-list">
+                <div class="activity-item">
+                    <div class="activity-icon user-suspended">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <line x1="23" y1="21" x2="17" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div class="activity-details">
+                        <h4>User Suspended</h4>
+                        <p>@jasonhill_69</p>
+                    </div>
+                    <span class="activity-time">18 min. ago</span>
+                </div>
+                <div class="activity-item">
+                    <div class="activity-icon post-removed">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div class="activity-details">
+                        <h4>Post Removed</h4>
+                        <p>Report #4421 - Violation of ToS</p>
+                    </div>
+                    <span class="activity-time">41 min. ago</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>LitLink Admin Panel • Logged in as: <span id="footerAdminName">Admin</span></p>
+        </footer>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Profile</h3>
+                <button class="modal-close" id="closeModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label for="editName">Full Name</label>
+                    <input type="text" id="editName" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editEmail">Email Address</label>
+                    <input type="email" id="editEmail" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editPhone">Contact Number</label>
+                    <input type="tel" id="editPhone" name="phone">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="cancelEdit">Cancel</button>
+                    <button type="submit" class="btn-save">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ===== AUTHENTICATION CHECK =====
+        function checkAdminAuth() {
+            const token = localStorage.getItem('authToken');
+            const userStr = localStorage.getItem('user');
+            
+            console.log('🔐 Checking admin authentication...');
+            
+            if (!token || !userStr) {
+                console.log('❌ No authentication found');
+                redirectToLogin();
+                return null;
+            }
+            
+            try {
+                const user = JSON.parse(userStr);
+                
+                if (!user.isAdmin) {
+                    console.log('❌ User is not an admin');
+                    redirectToLogin();
+                    return null;
+                }
+                
+                console.log('✅ Admin authenticated:', user.name);
+                return { token, user };
+            } catch (error) {
+                console.error('❌ Error parsing user data:', error);
+                redirectToLogin();
+                return null;
+            }
+        }
+        
+        function redirectToLogin() {
+            alert('Admin access required. Please login as administrator.');
+            localStorage.clear();
+            setTimeout(() => {
+                window.location.href = '../Homepage/index.html';
+            }, 1500);
+        }
+        
+        // ===== NAVBAR FUNCTIONALITY =====
+        function initNavbar() {
+            const navToggle = document.getElementById('navToggle');
+            const navbar = document.getElementById('adminNavbar');
+            
+            if (navToggle && navbar) {
+                navToggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    navbar.classList.toggle('active');
+                });
+                
+                // Close navbar when clicking outside on mobile
+                document.addEventListener('click', function(event) {
+                    if (window.innerWidth <= 768) {
+                        if (!navbar.contains(event.target) && !navToggle.contains(event.target)) {
+                            navbar.classList.remove('active');
+                        }
+                    }
+                });
+                
+                // Close navbar when clicking on a link
+                navbar.querySelectorAll('.nav-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        if (window.innerWidth <= 768) {
+                            navbar.classList.remove('active');
+                        }
+                    });
+                });
+            }
+            
+            // Setup logout button
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (confirm('Are you sure you want to logout?')) {
+                        localStorage.clear();
+                        window.location.href = '../Homepage/index.html';
+                    }
+                });
+            }
+        }
+        
+        // ===== LOAD ADMIN DATA =====
+        async function loadAdminData() {
+            const auth = checkAdminAuth();
+            if (!auth) return;
+            
+            const { token, user } = auth;
+            
+            try {
+                // Try to get fresh data from API
+                const response = await fetch('http://localhost:5002/api/admin/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                let adminData = user; // Use stored data as fallback
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        adminData = data.user;
+                        // Update localStorage with fresh data
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                    }
+                }
+                
+                updateAdminUI(adminData);
+                
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                // Use stored data as fallback
+                updateAdminUI(user);
+            }
+        }
+        
+        function updateAdminUI(user) {
+            console.log('Updating UI with:', user);
+            
+            // Update header info
+            if (user.name) {
+                document.getElementById('adminName').textContent = user.name;
+                document.getElementById('basicName').textContent = user.name;
+                document.getElementById('footerAdminName').textContent = user.name;
+            }
+            
+            if (user.email) {
+                document.getElementById('adminEmail').textContent = user.email;
+                document.getElementById('basicEmail').textContent = user.email;
+                document.getElementById('adminUsername').textContent = user.email.split('@')[0];
+            }
+            
+            // Update avatar initials
+            if (user.name) {
+                const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'A';
+                document.getElementById('adminAvatar').textContent = initials;
+            }
+            
+            // Update admin level
+            if (user.adminLevel) {
+                const levelText = user.adminLevel.replace('_', ' ').toUpperCase();
+                document.getElementById('adminLevel').textContent = levelText;
+                document.getElementById('basicRole').textContent = levelText;
+            }
+            
+            // Update creation date
+            if (user.createdAt) {
+                const date = new Date(user.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                document.getElementById('basicCreated').textContent = date;
+            }
+            
+            // Update last login
+            if (user.lastLogin) {
+                const lastLogin = new Date(user.lastLogin);
+                const now = new Date();
+                const diffHours = Math.floor((now - lastLogin) / (1000 * 60 * 60));
+                
+                let timeText;
+                if (diffHours < 1) {
+                    timeText = 'Just now';
+                } else if (diffHours < 24) {
+                    timeText = `${diffHours} hours ago`;
+                } else {
+                    const days = Math.floor(diffHours / 24);
+                    timeText = `${days} days ago`;
+                }
+                
+                document.getElementById('lastLoginInfo').textContent = 
+                    `${lastLogin.toLocaleDateString()} • ${lastLogin.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                document.querySelector('.time-ago').textContent = timeText;
+            }
+            
+            // Update current session info
+            document.getElementById('currentSessionInfo').textContent = 
+                `IP: 192.168.1.1 • ${navigator.userAgent.split(') ')[0].split('(')[1]}`;
+        }
+        
+        // ===== EDIT PROFILE MODAL =====
+        function initEditProfileModal() {
+            const editProfileBtn = document.getElementById('editProfileBtn');
+            const editModal = document.getElementById('editModal');
+            const closeModal = document.getElementById('closeModal');
+            const cancelEdit = document.getElementById('cancelEdit');
+            const editProfileForm = document.getElementById('editProfileForm');
+            
+            if (!editProfileBtn) return;
+            
+            // Add ripple effect to edit button
+            editProfileBtn.addEventListener('click', function(e) {
+                createRipple(e);
+                
+                // Load current data into form
+                const user = JSON.parse(localStorage.getItem('user')) || {};
+                document.getElementById('editName').value = user.name || '';
+                document.getElementById('editEmail').value = user.email || '';
+                document.getElementById('editPhone').value = document.getElementById('basicPhone').textContent || '+1 (555) 123-4567';
+                
+                // Show modal
+                editModal.classList.add('active');
+                setTimeout(() => {
+                    document.querySelector('.modal').classList.add('active');
+                }, 10);
+            });
+            
+            // Close modal functions
+            function closeEditModal() {
+                document.querySelector('.modal').classList.remove('active');
+                setTimeout(() => {
+                    editModal.classList.remove('active');
+                }, 300);
+            }
+            
+            if (closeModal) closeModal.addEventListener('click', closeEditModal);
+            if (cancelEdit) cancelEdit.addEventListener('click', closeEditModal);
+            
+            // Close modal when clicking outside
+            editModal.addEventListener('click', function(e) {
+                if (e.target === editModal) {
+                    closeEditModal();
+                }
+            });
+            
+            // Handle form submission
+            if (editProfileForm) {
+                editProfileForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const auth = checkAdminAuth();
+                    if (!auth) return;
+                    
+                    const { token, user } = auth;
+                    const formData = {
+                        name: document.getElementById('editName').value,
+                        email: document.getElementById('editEmail').value
+                    };
+                    
+                    const phone = document.getElementById('editPhone').value;
+                    if (phone) formData.location = phone;
+                    
+                    try {
+                        // Show loading state
+                        const saveBtn = editProfileForm.querySelector('.btn-save');
+                        const originalText = saveBtn.textContent;
+                        saveBtn.innerHTML = '<span class="loading"></span>';
+                        saveBtn.disabled = true;
+                        
+                        // Update profile via API
+                        const response = await fetch(`http://localhost:5002/api/auth/user/${user.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        // Reset button state
+                        saveBtn.textContent = originalText;
+                        saveBtn.disabled = false;
+                        
+                        if (data.success) {
+                            // Update UI
+                            updateAdminUI(data.user);
+                            
+                            // Update localStorage
+                            localStorage.setItem('user', JSON.stringify(data.user));
+                            
+                            // Show success message
+                            alert('✅ Profile updated successfully!');
+                            closeEditModal();
+                            
+                            // Reload to show updated data
+                            setTimeout(() => {
+                                loadAdminData();
+                            }, 500);
+                        } else {
+                            throw new Error(data.message || 'Failed to update profile');
+                        }
+                    } catch (error) {
+                        console.error('Error updating profile:', error);
+                        alert('❌ Failed to update profile: ' + error.message);
+                        
+                        // Reset button state
+                        const saveBtn = editProfileForm.querySelector('.btn-save');
+                        saveBtn.textContent = 'Save Changes';
+                        saveBtn.disabled = false;
+                    }
+                });
+            }
+        }
+        
+        // ===== BUTTON FUNCTIONALITY =====
+        function initButtons() {
+            // Settings button
+            const settingsBtn = document.querySelector('.btn-settings');
+            if (settingsBtn) {
+                settingsBtn.addEventListener('click', function(e) {
+                    createRipple(e);
+                    alert('Settings functionality coming soon!');
+                });
+            }
+            
+            // Logout all sessions button
+            const logoutAllBtn = document.getElementById('logoutAllSessions');
+            if (logoutAllBtn) {
+                logoutAllBtn.addEventListener('click', function(e) {
+                    createRipple(e);
+                    if (confirm('Are you sure you want to log out of all other sessions?')) {
+                        alert('All other sessions have been logged out.');
+                        // In a real app, call API endpoint here
+                    }
+                });
+            }
+            
+            // View all link
+            const viewAllLink = document.querySelector('.view-all');
+            if (viewAllLink) {
+                viewAllLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    createRipple(e);
+                    alert('Viewing all activity logs...');
+                });
+            }
+            
+            // Add ripple effect to all buttons
+            document.querySelectorAll('button, .nav-item, .view-all').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    createRipple(e);
+                });
+            });
+        }
+        
+        // ===== UTILITY FUNCTIONS =====
+        function createRipple(event) {
+            const button = event.currentTarget;
+            const rect = button.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = event.clientX - rect.left - size / 2;
+            const y = event.clientY - rect.top - size / 2;
+            
+            const ripple = document.createElement('span');
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            ripple.classList.add('ripple');
+            
+            const existingRipple = button.querySelector('.ripple');
+            if (existingRipple) {
+                existingRipple.remove();
+            }
+            
+            button.style.position = 'relative';
+            button.style.overflow = 'hidden';
+            button.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        }
+        
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Admin Profile Initializing...');
+            
+            // Check authentication first
+            if (!checkAdminAuth()) {
+                return;
+            }
+            
+            // Initialize all components
+            initNavbar();
+            loadAdminData();
+            initEditProfileModal();
+            initButtons();
+            
+            console.log('✅ Admin Profile Initialized');
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const navbar = document.getElementById('adminNavbar');
+            if (window.innerWidth > 1024 && navbar) {
+                navbar.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

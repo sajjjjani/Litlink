@@ -3,22 +3,33 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('%c Litlink Admin Dashboard v2.4.0 (Real-time)', 
         'font-size: 16px; font-weight: bold; color: #d97706; background: #1a0f0a; padding: 8px 12px; border-radius: 4px;');
     
-    // Check authentication
+    // Check authentication and initialize
     checkAuthAndInitialize();
 });
 
 async function checkAuthAndInitialize() {
+    // Get auth data
     const token = localStorage.getItem('authToken');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     
-    if (!token || !user.isAdmin) {
-        console.log('❌ Not authenticated as admin, redirecting to login...');
-        alert('Admin access required. Please login as administrator.');
-        window.location.href = '../login.html';
+    console.log('🔐 Checking authentication...', { 
+        hasToken: !!token, 
+        isAdmin: user.isAdmin,
+        user: user 
+    });
+    
+    // Redirect if not admin
+    if (!token || user.isAdmin !== true) {
+        console.log('❌ Not authenticated as admin, redirecting...');
+        showToast('Admin access required. Please login as administrator.', 'warning');
+        
+        setTimeout(() => {
+            window.location.href = '../login.html';
+        }, 1500);
         return;
     }
     
-    // Verify token is still valid
+    // Verify admin status with API
     try {
         const response = await fetch('http://localhost:5002/api/admin/me', {
             headers: {
@@ -27,16 +38,62 @@ async function checkAuthAndInitialize() {
         });
         
         if (!response.ok) {
-            throw new Error('Invalid admin token');
+            throw new Error('Invalid admin credentials');
         }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.user.isAdmin) {
+            throw new Error('User is not an administrator');
+        }
+        
+        console.log('✅ Admin authenticated:', data.user.name);
+        
+        // Update UI with admin info
+        updateAdminUI(data.user);
         
         // Initialize dashboard
         initDashboard();
         
     } catch (error) {
-        console.error('Authentication error:', error);
+        console.error('❌ Admin authentication failed:', error);
         localStorage.clear();
-        window.location.href = '../login.html';
+        
+        showToast('Admin authentication failed. Please login again.', 'warning');
+        
+        setTimeout(() => {
+            window.location.href = '../login.html';
+        }, 2000);
+    }
+}
+
+function updateAdminUI(user) {
+    // Update admin name in header
+    const adminName = document.querySelector('.user-name');
+    const adminAvatar = document.querySelector('.user-avatar');
+    const adminLabel = document.querySelector('.admin-label');
+    
+    if (adminName && user.name) {
+        adminName.textContent = user.name;
+    }
+    
+    if (adminAvatar && user.name) {
+        const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'A';
+        adminAvatar.textContent = initials;
+        
+        // Add avatar hover effect
+        adminAvatar.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.1) rotate(5deg)';
+            this.style.transition = 'all 0.3s ease';
+        });
+        
+        adminAvatar.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1) rotate(0deg)';
+        });
+    }
+    
+    if (adminLabel && user.adminLevel) {
+        adminLabel.textContent = `${user.adminLevel.replace('_', ' ').toUpperCase()} Panel`;
     }
 }
 
@@ -44,9 +101,6 @@ function initDashboard() {
     // API Base URL
     const API_BASE = 'http://localhost:5002/api';
     const token = localStorage.getItem('authToken');
-    
-    // Load admin data
-    loadAdminData();
     
     // Initialize animations and interactions
     initAnimations();
@@ -59,63 +113,6 @@ function initDashboard() {
     fetchDashboardStats();
     
     // ===== DATA LOADING FUNCTIONS =====
-    async function loadAdminData() {
-        try {
-            const response = await fetch(`${API_BASE}/admin/me`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to load admin data');
-            }
-            
-            const data = await response.json();
-            
-            if (data.success && data.user) {
-                // Update admin info in UI
-                updateAdminUI(data.user);
-            }
-            
-        } catch (error) {
-            console.error('Error loading admin data:', error);
-        }
-    }
-    
-    function updateAdminUI(user) {
-        // Update admin name
-        const adminName = document.querySelector('.user-name');
-        const adminAvatar = document.querySelector('.user-avatar');
-        const headerAdminLabel = document.querySelector('.admin-label');
-        
-        if (adminName) {
-            adminName.textContent = user.name || 'Admin';
-        }
-        
-        if (adminAvatar) {
-            const initials = user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'A';
-            adminAvatar.textContent = initials;
-            
-            // Add avatar hover effect
-            adminAvatar.addEventListener('mouseenter', function() {
-                this.style.transform = 'scale(1.1) rotate(5deg)';
-                this.style.transition = 'all 0.3s ease';
-            });
-            
-            adminAvatar.addEventListener('mouseleave', function() {
-                this.style.transform = 'scale(1) rotate(0deg)';
-            });
-        }
-        
-        if (headerAdminLabel && user.adminLevel) {
-            headerAdminLabel.textContent = `${user.adminLevel.replace('_', ' ').toUpperCase()} Panel`;
-        }
-        
-        // Update console info
-        console.log(`👑 Logged in as: ${user.name} (${user.adminLevel})`);
-    }
-    
     async function fetchDashboardStats() {
         try {
             showLoadingState(true);
@@ -347,7 +344,7 @@ function initDashboard() {
                     const dropdown = document.createElement('div');
                     dropdown.className = 'user-dropdown';
                     dropdown.innerHTML = `
-                        <a href="adprofile.html" class="dropdown-item">
+                        <a href="../Admin%20Profile/adprofile.html" class="dropdown-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="12" cy="7" r="4"></circle>
