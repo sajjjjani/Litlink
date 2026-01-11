@@ -282,25 +282,25 @@ async function handleSignup(formData) {
         
         // Additional client-side validation
         if (formData.password !== formData.confirmPassword) {
-            alert('Passwords do not match');
+            showMessageModal('Validation Error', 'Passwords do not match', 'error');
             hideLoading('signupSubmit', 'Create Account');
             return;
         }
         
         if (!validateName(formData.name)) {
-            alert('Name must be at least 2 characters');
+            showMessageModal('Validation Error', 'Name must be at least 2 characters', 'warning');
             hideLoading('signupSubmit', 'Create Account');
             return;
         }
         
         if (!validateEmail(formData.email)) {
-            alert('Please enter a valid email address');
+            showMessageModal('Validation Error', 'Please enter a valid email address', 'warning');
             hideLoading('signupSubmit', 'Create Account');
             return;
         }
         
         if (!validatePassword(formData.password)) {
-            alert('Password must be at least 8 characters with uppercase, number, and special character');
+            showMessageModal('Validation Error', 'Password must be at least 8 characters with uppercase, number, and special character', 'warning');
             hideLoading('signupSubmit', 'Create Account');
             return;
         }
@@ -326,7 +326,7 @@ async function handleSignup(formData) {
             sessionStorage.setItem('verificationCode', data.verificationCode);
             
             // Show success message
-            alert('Account created successfully! Please check your email for verification instructions.');
+            showMessageModal('Success', 'Account created successfully! Please check your email for verification instructions.', 'success');
             
             // Close modal and redirect to verify-email.html
             closeAllModals();
@@ -337,11 +337,11 @@ async function handleSignup(formData) {
             }, 1000);
             
         } else {
-            alert('Signup failed: ' + data.message);
+            showMessageModal('Signup Failed', 'Signup failed: ' + data.message, 'error');
         }
     } catch (error) {
         console.error('Signup error:', error);
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+        showMessageModal('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.', 'error');
     } finally {
         hideLoading('signupSubmit', 'Create Account');
     }
@@ -364,13 +364,13 @@ async function handleLogin(formData) {
         
         // Client-side validation
         if (!validateEmail(formData.email)) {
-            alert('Please enter a valid email address');
+            showMessageModal('Validation Error', 'Please enter a valid email address', 'warning');
             hideLoading('loginSubmit', 'Login');
             return;
         }
         
         if (!formData.password || formData.password.length < 1) {
-            alert('Please enter your password');
+            showMessageModal('Validation Error', 'Please enter your password', 'warning');
             hideLoading('loginSubmit', 'Login');
             return;
         }
@@ -393,7 +393,7 @@ async function handleLogin(formData) {
             console.log('✅ Auth data saved to localStorage');
             
             // Show success message
-            alert('Login successful! Redirecting...');
+            showMessageModal('Success', 'Login successful! Redirecting...', 'success');
             closeAllModals();
             
             // FIXED: Reliable redirect logic
@@ -421,7 +421,7 @@ async function handleLogin(formData) {
             
         } else if (data.requiresVerification) {
             // User needs to verify email
-            alert('Please verify your email first. Check your inbox for the verification link.');
+            showMessageModal('Verification Required', 'Please verify your email first. Check your inbox for the verification link.', 'warning');
             
             // Store email for verification
             sessionStorage.setItem('pendingVerificationEmail', formData.email);
@@ -435,11 +435,11 @@ async function handleLogin(formData) {
             }, 1000);
             
         } else {
-            alert('Login failed: ' + data.message);
+            showMessageModal('Login Failed', 'Login failed: ' + data.message, 'error');
         }
     } catch (error) {
         console.error('Login error:', error);
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+        showMessageModal('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.', 'error');
     } finally {
         hideLoading('loginSubmit', 'Login');
     }
@@ -470,7 +470,7 @@ async function handleForgotPassword(email) {
         console.log('Forgot password response:', data);
         
         if (data.success) {
-            alert('Password reset email sent successfully! Please check your inbox.');
+            showMessageModal('Success', 'Password reset email sent successfully! Please check your inbox.', 'success');
             
             // Store email for OTP verification
             sessionStorage.setItem('resetEmail', email);
@@ -484,11 +484,11 @@ async function handleForgotPassword(email) {
             }, 1000);
             
         } else {
-            alert('Failed: ' + data.message);
+            showMessageModal('Failed', 'Failed: ' + data.message, 'error');
         }
     } catch (error) {
         console.error('Forgot password error:', error);
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+        showMessageModal('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.', 'error');
     } finally {
         hideLoading('forgotPasswordSubmit', 'Send Reset Link');
     }
@@ -498,7 +498,7 @@ async function handleForgotPassword(email) {
 async function resendVerificationCode() {
     const email = sessionStorage.getItem('pendingVerificationEmail');
     if (!email) {
-        alert('No email found. Please sign up again.');
+        showMessageModal('Error', 'No email found. Please sign up again.', 'error');
         return;
     }
     
@@ -517,21 +517,21 @@ async function resendVerificationCode() {
         console.log('Resend verification response:', data);
         
         if (data.success) {
-            alert('New verification email sent successfully!');
+            showMessageModal('Success', 'New verification email sent successfully!', 'success');
             sessionStorage.setItem('verificationCode', data.verificationCode);
         } else {
-            alert('Failed to resend code: ' + data.message);
+            showMessageModal('Failed', 'Failed to resend code: ' + data.message, 'error');
         }
     } catch (error) {
         console.error('Resend verification error:', error);
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+        showMessageModal('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.', 'error');
     }
 }
 
 // ===== LOGOUT =====
 function handleLogout() {
     AuthState.clearAuth();
-    alert('Logged out successfully');
+    showMessageModal('Success', 'Logged out successfully', 'success');
     
     setTimeout(() => {
         // If we're in homepage already, just reload
@@ -571,7 +571,7 @@ function checkAuthentication() {
     // Redirect ONLY if trying to access protected page without auth
     if (isProtectedPage && !token) {
         console.log('❌ Protected page requires authentication, redirecting...');
-        alert('Please login first');
+        showMessageModal('Login Required', 'Please login first', 'warning');
         setTimeout(() => {
             window.location.href = '../Homepage/index.html';
         }, 1500);
@@ -581,7 +581,7 @@ function checkAuthentication() {
     // Redirect ONLY if trying to access admin page without admin privileges
     if (isAdminPage && (!token || !user?.isAdmin)) {
         console.log('❌ Admin page requires admin authentication, redirecting...');
-        alert('Admin access required. Redirecting to homepage...');
+        showMessageModal('Admin Access Required', 'Admin access required. Redirecting to homepage...', 'warning');
         setTimeout(() => {
             window.location.href = '../Homepage/index.html';
         }, 1500);
@@ -655,7 +655,7 @@ function initializeAuthForms() {
             const password = document.getElementById('loginPassword')?.value;
             
             if (!email || !password) {
-                alert('Please fill in all fields');
+                showMessageModal('Validation Error', 'Please fill in all fields', 'warning');
                 return;
             }
             
@@ -676,12 +676,12 @@ function initializeAuthForms() {
             
             // Basic validation
             if (!name || !email || !password || !confirmPassword) {
-                alert('Please fill in all fields');
+                showMessageModal('Validation Error', 'Please fill in all fields', 'warning');
                 return;
             }
             
             if (password !== confirmPassword) {
-                alert('Passwords do not match');
+                showMessageModal('Validation Error', 'Passwords do not match', 'error');
                 return;
             }
             
@@ -698,7 +698,7 @@ function initializeAuthForms() {
             const email = document.getElementById('forgotEmail')?.value.trim();
             
             if (!email) {
-                alert('Please enter your email');
+                showMessageModal('Validation Error', 'Please enter your email', 'warning');
                 return;
             }
             

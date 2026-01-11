@@ -21,8 +21,9 @@
                     <i class="fas fa-home"></i> 
                     <span class="nav-text">Home</span>
                 </a>
-                <a href="#" class="nav-link" title="Messages" onclick="showComingSoon('Messages')">
-                    <i class="fas fa-envelope"></i> 
+                <!-- FIXED: Direct link to chat.html -->
+                <a href="../Chat/chat.html" class="nav-link" title="Messages">
+                    <i class="fas fa-envelope"></i>
                     <span class="nav-text">Messages</span>
                 </a>
                 <a href="#" class="nav-link" title="Discussions" onclick="showComingSoon('Discussions')">
@@ -39,6 +40,27 @@
                 </a>
             </div>
             <div class="nav-actions">
+                <!-- Notification button - FIXED: Moved inside nav-actions -->
+                <div class="notifications-dropdown">
+                    <button class="notifications-btn" onclick="toggleNotificationsDropdown()" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">2</span>
+                    </button>
+                    <div class="notifications-menu" id="notificationsMenu">
+                        <div class="notifications-header">
+                            <h3>Notifications</h3>
+                            <button class="mark-all-read" onclick="markAllAsRead()">Mark all read</button>
+                        </div>
+                        <div class="notifications-list" id="notificationsList">
+                            <!-- Notifications will load here -->
+                        </div>
+                        <div class="notifications-footer">
+                            <a href="#" onclick="viewAllNotifications()">View all notifications</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings dropdown -->
                 <div class="settings-dropdown">
                     <button class="settings-btn" onclick="toggleSettings()" title="Settings">
                         <i class="fas fa-cog"></i>
@@ -63,7 +85,7 @@
                             </span>
                         </div>
                         <div class="settings-divider"></div>
-                        <div class="settings-item clickable" onclick="window.location.href='../Profile/settings.html'">
+                        <div class="settings-item clickable" onclick="window.location.href='../Profile/profile.html#settings'">
                             <i class="fas fa-cog"></i>
                             <span>Settings</span>
                         </div>
@@ -87,15 +109,15 @@
             <div class="welcome-header">
                 <div>
                     <div class="logo">📚 Litlink</div>
-                    <h1>Welcome back, Sajani 👋</h1>
-                    <p class="welcome-text">Explore discussions, find new matches, and connect with readers who share your love for <strong>Magical Realism</strong></p>
+                    <h1>Welcome back, <span id="userName">User</span> 👋</h1>
+                    <p class="welcome-text">Explore discussions, find new matches, and connect with readers who share your love for <strong id="userGenre">Reading</strong></p>
                 </div>
                 <div class="header-right">
                     <div class="notification-badge">
-                        <img src="https://i.pravatar.cc/80?img=1" alt="Profile" class="profile-img">
-                        <span class="badge">New matches available</span>
+                        <img src="" alt="Profile" class="profile-img" id="userAvatar">
+                        <span class="badge" id="matchCount">New matches available</span>
                     </div>
-                    <button class="explore-btn">
+                    <button class="explore-btn" onclick="window.location.href='dashexplore.html'">
                         Explore Community →
                     </button>
                 </div>
@@ -108,47 +130,8 @@
                 <h2>📖 Your Top Matches</h2>
                 <a href="#" class="view-all">View all</a>
             </div>
-            <div class="matches-grid">
-                <div class="match-card">
-                    <img src="https://i.pravatar.cc/150?img=5" alt="Elena R." class="match-avatar">
-                    <h3>Elena R.</h3>
-                    <div class="tags">
-                        <span class="tag">Fantasy</span>
-                        <span class="tag">Sci-Fi</span>
-                    </div>
-                    <p class="match-stat">📚 32 shared books</p>
-                    <button class="connect-btn">🔗 Connect</button>
-                </div>
-                <div class="match-card">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Marcus Chen" class="match-avatar">
-                    <h3>Marcus Chen</h3>
-                    <div class="tags">
-                        <span class="tag">Mystery</span>
-                        <span class="tag">Thriller</span>
-                    </div>
-                    <p class="match-stat">📚 28 shared books</p>
-                    <button class="connect-btn">🔗 Connect</button>
-                </div>
-                <div class="match-card">
-                    <img src="https://i.pravatar.cc/150?img=9" alt="Sarah J." class="match-avatar">
-                    <h3>Sarah J.</h3>
-                    <div class="tags">
-                        <span class="tag">Romance</span>
-                        <span class="tag">YA</span>
-                    </div>
-                    <p class="match-stat">📚 25 shared books</p>
-                    <button class="connect-btn">🔗 Connect</button>
-                </div>
-                <div class="match-card">
-                    <img src="https://i.pravatar.cc/150?img=14" alt="David K." class="match-avatar">
-                    <h3>David K.</h3>
-                    <div class="tags">
-                        <span class="tag">History</span>
-                        <span class="tag">Biographies</span>
-                    </div>
-                    <p class="match-stat">📚 21 shared books</p>
-                    <button class="connect-btn">🔗 Connect</button>
-                </div>
+            <div class="matches-grid" id="matchesGrid">
+                <!-- Matches will be loaded dynamically -->
             </div>
         </section>
 
@@ -158,43 +141,8 @@
                 <h2>📌 Trending Boards</h2>
                 <a href="#" class="view-all">Browse all</a>
             </div>
-            <div class="boards-grid">
-                <div class="board-card">
-                    <div class="board-icon purple">✨</div>
-                    <h3>Fantasy Worlds</h3>
-                    <p class="board-active">🟢 15k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
-                <div class="board-card">
-                    <div class="board-icon pink">💕</div>
-                    <h3>Modern Romance</h3>
-                    <p class="board-active">🟢 9k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
-                <div class="board-card">
-                    <div class="board-icon blue">👑</div>
-                    <h3>Mystery & Thriller</h3>
-                    <p class="board-active">🟢 21k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
-                <div class="board-card">
-                    <div class="board-icon brown">✒️</div>
-                    <h3>Literary Fiction</h3>
-                    <p class="board-active">🟢 6k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
-                <div class="board-card">
-                    <div class="board-icon teal">🌹</div>
-                    <h3>Young Adult</h3>
-                    <p class="board-active">🟢 12k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
-                <div class="board-card">
-                    <div class="board-icon indigo">🚀</div>
-                    <h3>Sci-Fi Classics</h3>
-                    <p class="board-active">🟢 8k active</p>
-                    <button class="join-btn">Join Board →</button>
-                </div>
+            <div class="boards-grid" id="boardsGrid">
+                <!-- Boards will be loaded dynamically -->
             </div>
         </section>
 
@@ -206,34 +154,8 @@
                     <h2>💬 Active Chats</h2>
                     <button class="more-btn">•••</button>
                 </div>
-                <div class="chat-list">
-                    <div class="chat-item">
-                        <img src="https://i.pravatar.cc/60?img=20" alt="Chat" class="chat-avatar">
-                        <div class="chat-content">
-                            <h4>The Midnight Library Club</h4>
-                            <p>Has anyone finished chapter 5 yet? That twist!</p>
-                        </div>
-                        <span class="chat-time">2m ago</span>
-                        <span class="chat-icon">💬</span>
-                    </div>
-                    <div class="chat-item">
-                        <img src="https://i.pravatar.cc/60?img=33" alt="Chat" class="chat-avatar">
-                        <div class="chat-content">
-                            <h4>James Wilson</h4>
-                            <p>I think you'd love 'Project Hail Mary'!</p>
-                        </div>
-                        <span class="chat-time">1h ago</span>
-                        <span class="chat-icon">💬</span>
-                    </div>
-                    <div class="chat-item">
-                        <img src="https://i.pravatar.cc/60?img=47" alt="Chat" class="chat-avatar">
-                        <div class="chat-content">
-                            <h4>Sci-Fi Enthusiasts</h4>
-                            <p>Meeting is scheduled for Friday at 8pm 📚</p>
-                        </div>
-                        <span class="chat-time">yesterday</span>
-                        <span class="chat-icon">💬</span>
-                    </div>
+                <div class="chat-list" id="chatList">
+                    <!-- Chats will be loaded dynamically -->
                 </div>
                 <button class="view-messages-btn">View All Messages</button>
             </div>
@@ -242,19 +164,19 @@
             <div class="right-column">
                 <!-- Action Buttons -->
                 <div class="action-grid">
-                    <button class="action-card">
+                    <button class="action-card" onclick="startDiscussion()">
                         <span class="action-icon">😊</span>
                         <span>Start Discussion</span>
                     </button>
-                    <button class="action-card">
+                    <button class="action-card" onclick="browseBooks()">
                         <span class="action-icon">🔍</span>
                         <span>Browse Books</span>
                     </button>
-                    <button class="action-card">
+                    <button class="action-card" onclick="joinVoiceRoom()">
                         <span class="action-icon">🎙️</span>
                         <span>Join Room</span>
                     </button>
-                    <button class="action-card">
+                    <button class="action-card" onclick="editProfile()">
                         <span class="action-icon">✏️</span>
                         <span>Edit Profile</span>
                     </button>
@@ -263,28 +185,8 @@
                 <!-- Recent Activity -->
                 <div class="activity-section">
                     <h3>Recent Activity</h3>
-                    <div class="activity-list">
-                        <div class="activity-item">
-                            <span>📚</span>
-                            <div>
-                                <p>Sarah posted in Fantasy Board</p>
-                                <span class="time">3h ago</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <span>📖</span>
-                            <div>
-                                <p>New Voice Room "Sci-Fi Talk"</p>
-                                <span class="time">5h ago</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <span>🔗</span>
-                            <div>
-                                <p>3 readers matched with you</p>
-                                <span class="time">8h ago</span>
-                            </div>
-                        </div>
+                    <div class="activity-list" id="activityList">
+                        <!-- Activity will be loaded dynamically -->
                     </div>
                 </div>
             </div>
@@ -296,84 +198,17 @@
                 <h2>🎙️ Live Voice Rooms</h2>
                 <span class="live-badge">🔴 LIVE</span>
             </div>
-            <div class="voice-rooms">
-                <div class="voice-room">
-                    <div class="room-header">
-                        <h3>Romance Readers Hangout</h3>
-                        <span class="participant-count">👥 12</span>
-                    </div>
-                    <div class="room-host">
-                        <img src="https://i.pravatar.cc/40?img=25" alt="Host">
-                        <span>Hosted by Bella S.</span>
-                    </div>
-                    <div class="room-tags">
-                        <span class="room-tag">💕 Hot</span>
-                        <span class="room-tag">Discussion</span>
-                    </div>
-                    <button class="join-room-btn">Join</button>
-                </div>
-                <div class="voice-room">
-                    <div class="room-header">
-                        <h3>Mystery Ch. 4 Deep Dive</h3>
-                        <span class="participant-count">👥 8</span>
-                    </div>
-                    <div class="room-host">
-                        <img src="https://i.pravatar.cc/40?img=32" alt="Host">
-                        <span>Hosted by The Book Detectives</span>
-                    </div>
-                    <div class="room-tags">
-                        <span class="room-tag">🔍 Mystery</span>
-                        <span class="room-tag">Deep</span>
-                    </div>
-                    <button class="join-room-btn">Join</button>
-                </div>
-                <div class="voice-room">
-                    <div class="room-header">
-                        <h3>Writing Sprint: 25min</h3>
-                        <span class="participant-count">👥 15</span>
-                    </div>
-                    <div class="room-host">
-                        <img src="https://i.pravatar.cc/40?img=41" alt="Host">
-                        <span>Hosted by Author Circle</span>
-                    </div>
-                    <div class="room-tags">
-                        <span class="room-tag">Creative</span>
-                        <span class="room-tag">Write</span>
-                    </div>
-                    <button class="join-room-btn">Join</button>
-                </div>
+            <div class="voice-rooms" id="voiceRooms">
+                <!-- Voice rooms will be loaded dynamically -->
             </div>
-            <button class="view-more">View all 12 active rooms</button>
+            <button class="view-more">View all active rooms</button>
         </section>
 
         <!-- Suggested Readers -->
         <section class="section">
             <h2>Suggested Readers</h2>
-            <div class="suggested-list">
-                <div class="suggested-item">
-                    <img src="https://i.pravatar.cc/50?img=16" alt="Alex M.">
-                    <div>
-                        <h4>Alex M.</h4>
-                        <p>Likes: Fantasy</p>
-                    </div>
-                    <button class="star-btn">⭐</button>
-                </div>
-                <div class="suggested-item">
-                    <img src="https://i.pravatar.cc/50?img=28" alt="Jordan T.">
-                    <div>
-                        <h4>Jordan T.</h4>
-                        <p>Likes: Sci-Fi</p>
-                    </div>
-                    <button class="star-btn">⭐</button>
-                </div>
-                <div class="suggested-item">
-                    <img src="https://i.pravatar.cc/50?img=35" alt="Casey L.">
-                    <div>
-                        <h4>Casey L.</h4>
-                        <p>Likes: Mystery</p>
-                    </div>
-                    <button class="star-btn">⭐</button>
-                </div>
+            <div class="suggested-list" id="suggestedList">
+                <!-- Suggested readers will be loaded dynamically -->
             </div>
         </section>
 
@@ -390,5 +225,30 @@
     </div>
 
     <script src="dashboard.js"></script>
+    
+    <!-- Add this script to ensure navigation works -->
+    <script>
+    // Ensure navigation links work properly
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Dashboard page loaded');
+        
+        // Make sure the Messages link works
+        const messagesLink = document.querySelector('a[href="../Chat/chat.html"]');
+        if (messagesLink) {
+            messagesLink.addEventListener('click', function(e) {
+                console.log('Navigating to chat...');
+                // Let the href work naturally
+            });
+        }
+        
+        // Add showComingSoon function if not defined
+        if (typeof window.showComingSoon === 'undefined') {
+            window.showComingSoon = function(feature) {
+                showMessageModal('Coming Soon', feature + ' feature is coming soon!', 'info');
+            };
+        }
+    });
+    </script>
+    <script src="../utils/modal.js"></script>
 </body>
 </html>

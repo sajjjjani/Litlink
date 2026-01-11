@@ -263,7 +263,7 @@ function checkAuthAndOpenModal(modalId) {
     // Check if user is already logged in
     const authToken = localStorage.getItem('authToken');
     if (authToken) {
-        alert('✅ You are already logged in! Redirecting to profile...');
+        showMessageModal('Already Logged In', 'You are already logged in! Redirecting to profile...', 'info');
         window.location.href = 'profile.html';
         return;
     }
@@ -402,7 +402,7 @@ function setupFormSubmissions() {
             const password = document.getElementById('loginPassword')?.value;
             
             if (!email || !password) {
-                alert('Please fill in all fields');
+                showMessageModal('Validation Error', 'Please fill in all fields', 'warning');
                 return;
             }
             
@@ -411,7 +411,7 @@ function setupFormSubmissions() {
                 await handleLogin({ email, password });
             } else {
                 console.error('handleLogin function not found');
-                alert('Authentication functions not loaded. Please refresh the page.');
+                showMessageModal('Error', 'Authentication functions not loaded. Please refresh the page.', 'error');
             }
         });
     }
@@ -431,18 +431,18 @@ function setupFormSubmissions() {
             // Check for terms checkbox on explore page
             const termsCheckbox = document.getElementById('terms');
             if (termsCheckbox && !termsCheckbox.checked) {
-                alert('Please agree to the Terms of Service and Privacy Policy');
+                showMessageModal('Terms Required', 'Please agree to the Terms of Service and Privacy Policy', 'warning');
                 return;
             }
             
             // Basic validation
             if (!name || !email || !password || !confirmPassword) {
-                alert('Please fill in all fields');
+                showMessageModal('Validation Error', 'Please fill in all fields', 'warning');
                 return;
             }
             
             if (password !== confirmPassword) {
-                alert('Passwords do not match');
+                showMessageModal('Validation Error', 'Passwords do not match', 'error');
                 return;
             }
             
@@ -451,7 +451,7 @@ function setupFormSubmissions() {
                 await handleSignup({ name, email, password, confirmPassword });
             } else {
                 console.error('handleSignup function not found');
-                alert('Authentication functions not loaded. Please refresh the page.');
+                showMessageModal('Error', 'Authentication functions not loaded. Please refresh the page.', 'error');
             }
         });
     }
@@ -466,7 +466,7 @@ function setupFormSubmissions() {
             const email = document.getElementById('forgotEmail')?.value.trim();
             
             if (!email) {
-                alert('Please enter your email');
+                showMessageModal('Validation Error', 'Please enter your email', 'warning');
                 return;
             }
             
@@ -474,7 +474,7 @@ function setupFormSubmissions() {
             if (typeof handleForgotPassword === 'function') {
                 await handleForgotPassword(email);
             } else {
-                alert('Authentication functions not loaded. Please refresh the page.');
+                showMessageModal('Error', 'Authentication functions not loaded. Please refresh the page.', 'error');
             }
         });
     }

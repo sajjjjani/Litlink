@@ -34,11 +34,55 @@ function toggleDarkMode() {
     }
 }
 
+// Toggle notifications on/off
 function toggleNotifications() {
     const toggle = document.getElementById('notificationsToggle');
     if (toggle) {
-        localStorage.setItem('notificationsEnabled', toggle.checked);
-        console.log('Notifications:', toggle.checked ? 'enabled' : 'disabled');
+        const isEnabled = toggle.checked;
+        localStorage.setItem('notificationsEnabled', isEnabled);
+        applyNotificationSetting(isEnabled);
+        showNotification(`Notifications ${isEnabled ? 'enabled' : 'disabled'}`, isEnabled ? 'success' : 'info');
+    }
+}
+
+// Apply notification setting
+function applyNotificationSetting(isEnabled) {
+    console.log('🔔 Notifications:', isEnabled ? 'Enabled' : 'Disabled');
+    
+    const notificationBtn = document.querySelector('.notifications-btn');
+    const notificationBadge = document.getElementById('notificationBadge');
+    
+    if (!isEnabled) {
+        // Disable notifications
+        if (notificationBtn) {
+            notificationBtn.style.opacity = '0.5';
+            notificationBtn.style.cursor = 'not-allowed';
+            notificationBtn.onclick = function() {
+                showNotification('Notifications are disabled', 'warning');
+                return false;
+            };
+        }
+        
+        // Hide badge
+        if (notificationBadge) {
+            notificationBadge.style.display = 'none';
+        }
+        
+        // Stop polling
+        stopNotificationPolling();
+    } else {
+        // Enable notifications
+        if (notificationBtn) {
+            notificationBtn.style.opacity = '1';
+            notificationBtn.style.cursor = 'pointer';
+            notificationBtn.onclick = toggleNotificationsDropdown;
+        }
+        
+        // Start polling
+        startNotificationPolling();
+        
+        // Load notifications if they exist
+        loadNotifications();
     }
 }
 
@@ -65,17 +109,446 @@ function showComingSoon(feature) {
     alert(`${feature} feature is coming soon! Stay tuned for updates.`);
 }
 
+// Action button functions
+function startDiscussion() {
+    showNotification('Opening discussion composer...', 'info');
+}
+
+function browseBooks() {
+    showNotification('Loading book library...', 'info');
+}
+
+function joinVoiceRoom() {
+    showNotification('Finding available rooms...', 'info');
+}
+
+function editProfile() {
+    window.location.href = '../Profile/profile.html';
+}
+
 // Close settings menu when clicking outside
 document.addEventListener('click', function(event) {
     const settingsDropdown = document.querySelector('.settings-dropdown');
     const settingsMenu = document.getElementById('settingsMenu');
+    const notificationsDropdown = document.querySelector('.notifications-dropdown');
+    const notificationsMenu = document.getElementById('notificationsMenu');
     
     if (settingsDropdown && !settingsDropdown.contains(event.target)) {
         if (settingsMenu) {
             settingsMenu.classList.remove('active');
         }
     }
+    
+    if (notificationsDropdown && !notificationsDropdown.contains(event.target)) {
+        if (notificationsMenu) {
+            notificationsMenu.classList.remove('active');
+        }
+    }
 });
+
+// ===== NOTIFICATION FUNCTIONS =====
+
+// Initialize notifications
+function initNotifications() {
+    // Create notification container if it doesn't exist
+    if (!document.getElementById('notification-container')) {
+        const notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 350px;
+        `;
+        document.body.appendChild(notificationContainer);
+    }
+    
+    // Load saved notification settings
+    loadNotificationSettings();
+}
+
+// Load notification settings from localStorage
+function loadNotificationSettings() {
+    const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+    const notificationsToggle = document.getElementById('notificationsToggle');
+    
+    if (notificationsToggle) {
+        // Default to true if not set
+        const isEnabled = notificationsEnabled === null ? true : notificationsEnabled === 'true';
+        notificationsToggle.checked = isEnabled;
+        
+        // Apply setting immediately
+        applyNotificationSetting(isEnabled);
+    }
+}
+
+// Toggle notifications dropdown
+function toggleNotificationsDropdown() {
+    const menu = document.getElementById('notificationsMenu');
+    if (menu) {
+        menu.classList.toggle('active');
+        // Close other dropdowns
+        const settingsMenu = document.getElementById('settingsMenu');
+        if (settingsMenu) settingsMenu.classList.remove('active');
+        
+        // Load notifications if dropdown is opened
+        if (menu.classList.contains('active')) {
+            loadNotifications();
+        }
+    }
+}
+
+// Load notifications from backend
+async function loadNotifications() {
+    try {
+        // Check if notifications are enabled
+        const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+        if (notificationsEnabled === 'false') {
+            populateNotifications([], 0);
+            return;
+        }
+        
+        const token = localStorage.getItem('litlink_token');
+        if (!token) return;
+        
+        const response = await fetch('http://localhost:5002/api/notifications', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            populateNotifications(data.notifications, data.unreadCount);
+        } else {
+            console.error('Failed to load notifications:', data.message);
+            // Fallback to mock data
+            populateNotifications(getMockNotifications(), 2);
+        }
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+        // Fallback to mock data
+        populateNotifications(getMockNotifications(), 2);
+    }
+}
+
+// Populate notifications UI
+function populateNotifications(notifications, unreadCount) {
+    const notificationsList = document.getElementById('notificationsList');
+    const notificationBadge = document.getElementById('notificationBadge');
+    
+    if (!notificationsList) return;
+    
+    // Update badge if notifications are enabled
+    const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+    const isEnabled = notificationsEnabled === null ? true : notificationsEnabled === 'true';
+    
+    if (notificationBadge) {
+        if (isEnabled && unreadCount > 0) {
+            notificationBadge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+            notificationBadge.style.display = 'flex';
+        } else {
+            notificationBadge.style.display = 'none';
+        }
+    }
+    
+    // Clear and populate list
+    notificationsList.innerHTML = '';
+    
+    if (notifications && notifications.length > 0) {
+        notifications.forEach(notif => {
+            const notificationItem = document.createElement('div');
+            notificationItem.className = `notification-item ${notif.read ? '' : 'unread'}`;
+            notificationItem.dataset.notificationId = notif.id;
+            notificationItem.dataset.type = notif.type;
+            
+            // Set icon color based on type (matching theme)
+            const iconColors = {
+                'match': 'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
+                'message': 'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
+                'board': 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+                'voice': 'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
+                'achievement': 'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
+                'warning': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                'info': 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
+                'success': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'error': 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                'system': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
+            };
+            
+            const iconColor = iconColors[notif.type] || iconColors.info;
+            
+            notificationItem.innerHTML = `
+                <div class="notification-icon" style="background: ${iconColor}">
+                    ${notif.icon || '🔔'}
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">
+                        <span>${notif.title}</span>
+                        <span class="notification-time">${notif.timestamp}</span>
+                    </div>
+                    <div class="notification-message">${notif.message}</div>
+                </div>
+                ${!notif.read ? '<div class="notification-dot"></div>' : ''}
+            `;
+            
+            // Add click handler
+            notificationItem.addEventListener('click', function() {
+                handleNotificationClick(notif.id, notif.actionUrl, notif.type);
+            });
+            
+            notificationsList.appendChild(notificationItem);
+        });
+    } else {
+        // If no notifications
+        notificationsList.innerHTML = `
+            <div class="notification-item empty">
+                <div style="color: #d4b5a0; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div style="font-size: 2rem; opacity: 0.5;">🔔</div>
+                    <div>No notifications yet</div>
+                    <div style="font-size: 0.8rem; color: #8b6f47;">Stay active to receive notifications</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Handle notification click
+async function handleNotificationClick(notificationId, actionUrl, type) {
+    try {
+        // Mark as read if notifications are enabled
+        const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+        if (notificationsEnabled !== 'false') {
+            const token = localStorage.getItem('litlink_token');
+            const response = await fetch(`http://localhost:5002/api/notifications/read/${notificationId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            // Update UI
+            const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (notificationItem) {
+                notificationItem.classList.remove('unread');
+                const dot = notificationItem.querySelector('.notification-dot');
+                if (dot) dot.remove();
+                
+                // Update badge count
+                updateNotificationBadge(-1);
+            }
+        }
+        
+        // Navigate based on notification type
+        if (actionUrl && actionUrl.startsWith('/')) {
+            // Convert to relative path
+            const path = actionUrl.substring(1);
+            window.location.href = `../${path}`;
+        } else if (actionUrl) {
+            window.location.href = actionUrl;
+        } else {
+            switch(type) {
+                case 'match':
+                    showNotification('Opening matches...', 'info');
+                    // You could scroll to matches section
+                    document.querySelector('.matches-grid')?.scrollIntoView({ behavior: 'smooth' });
+                    break;
+                case 'message':
+                    window.location.href = '../Chat/chat.html';
+                    break;
+                case 'board':
+                    showNotification('Opening board...', 'info');
+                    break;
+                default:
+                    // Do nothing
+            }
+        }
+        
+        // Close dropdown
+        const menu = document.getElementById('notificationsMenu');
+        if (menu) menu.classList.remove('active');
+        
+    } catch (error) {
+        console.error('Error handling notification:', error);
+        showNotification('Error opening notification', 'error');
+    }
+}
+
+// Mark all as read
+async function markAllAsRead() {
+    try {
+        const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+        if (notificationsEnabled === 'false') {
+            showNotification('Notifications are disabled', 'warning');
+            return;
+        }
+        
+        const token = localStorage.getItem('litlink_token');
+        const response = await fetch('http://localhost:5002/api/notifications/read-all', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update all UI notifications
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('unread');
+                const dot = item.querySelector('.notification-dot');
+                if (dot) dot.remove();
+            });
+            
+            // Hide badge
+            updateNotificationBadge(0, true);
+            
+            showNotification('All notifications marked as read', 'success');
+        }
+    } catch (error) {
+        console.error('Error marking all as read:', error);
+        showNotification('Error marking notifications as read', 'error');
+    }
+}
+
+// Update notification badge
+function updateNotificationBadge(change, setToZero = false) {
+    const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+    if (notificationsEnabled === 'false') return;
+    
+    const badge = document.getElementById('notificationBadge');
+    if (badge) {
+        if (setToZero) {
+            badge.style.display = 'none';
+            badge.textContent = '0';
+        } else if (badge.style.display === 'none') {
+            badge.style.display = 'flex';
+            badge.textContent = '1';
+        } else {
+            const currentCount = parseInt(badge.textContent) || 0;
+            const newCount = Math.max(0, currentCount + change);
+            if (newCount > 0) {
+                badge.textContent = newCount > 9 ? '9+' : newCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }
+}
+
+// View all notifications
+function viewAllNotifications() {
+    showNotification('Opening notifications page...', 'info');
+    // Could create a dedicated notifications page
+    const notificationsMenu = document.getElementById('notificationsMenu');
+    if (notificationsMenu) notificationsMenu.classList.remove('active');
+}
+
+// Poll for new notifications
+let pollingInterval = null;
+
+function startNotificationPolling() {
+    // Clear any existing interval
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+    
+    // Check for new notifications every 30 seconds
+    pollingInterval = setInterval(async () => {
+        try {
+            const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+            if (notificationsEnabled === 'false') {
+                clearInterval(pollingInterval);
+                return;
+            }
+            
+            const token = localStorage.getItem('litlink_token');
+            if (!token) return;
+            
+            const response = await fetch('http://localhost:5002/api/notifications/unread-count', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                const badge = document.getElementById('notificationBadge');
+                const currentCount = badge ? parseInt(badge.textContent) || 0 : 0;
+                
+                if (data.unreadCount > currentCount) {
+                    // New notifications!
+                    updateNotificationBadge(data.unreadCount - currentCount);
+                    
+                    // Show subtle notification if user is not in notifications dropdown
+                    const notificationsMenu = document.getElementById('notificationsMenu');
+                    if (!notificationsMenu || !notificationsMenu.classList.contains('active')) {
+                        showNotification('New notification received', 'info');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error polling notifications:', error);
+        }
+    }, 30000); // 30 seconds
+}
+
+function stopNotificationPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+// Get mock notifications for fallback
+function getMockNotifications() {
+    return [
+        { 
+            id: 'notif1',
+            type: 'match',
+            title: 'New Reader Match',
+            message: 'Alex M. shares your interest in Fantasy novels',
+            timestamp: '5m ago',
+            read: false,
+            icon: '🔗',
+            actionUrl: '/chat/chat1'
+        },
+        { 
+            id: 'notif2',
+            type: 'message',
+            title: 'New Message',
+            message: 'Sarah replied to your book suggestion',
+            timestamp: '1h ago',
+            read: false,
+            icon: '💬',
+            actionUrl: '/chat/chat2'
+        },
+        { 
+            id: 'notif3',
+            type: 'board',
+            title: 'Board Update',
+            message: 'New discussion started in Fantasy Worlds',
+            timestamp: '3h ago',
+            read: true,
+            icon: '📌',
+            actionUrl: '/board/board1'
+        }
+    ];
+}
 
 // ===== MAIN DASHBOARD LOADING =====
 
@@ -94,6 +567,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log('✅ Authenticated user:', user.name || user.email);
     console.log('🔑 Token exists:', !!token);
     
+    // Initialize notification system
+    initNotifications();
+    
+    // Update welcome card immediately with user data
+    updateWelcomeCard(user);
+    
     try {
         // Show loading state
         showLoadingState();
@@ -111,11 +590,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             initConnectButtons(token);
             initJoinBoardButtons(token);
             initChatItems();
-            initActionCards();
             initVoiceRooms(token);
             initSuggestedReaders(token);
             initViewAllButtons();
-            initNotifications();
             
             hideLoadingState();
             
@@ -132,11 +609,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         hideLoadingState();
     }
     
-    // Explore Community Button
+    // Explore Community Button - NOW POINTS TO dashexplore.html
     const exploreBtn = document.querySelector('.explore-btn');
     if (exploreBtn) {
-        exploreBtn.addEventListener('click', function() {
-            showNotification('Exploring community features...', 'info');
+        exploreBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🌍 Navigating to Explore Community...');
+            window.location.href = 'dashexplore.html';
         });
     }
     
@@ -202,78 +681,84 @@ async function fetchDashboardData(userId, token) {
     }
 }
 
+function updateWelcomeCard(user) {
+    // Update user name
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement && user.name) {
+        userNameElement.textContent = user.name;
+    }
+    
+    // Update user genre
+    const userGenreElement = document.getElementById('userGenre');
+    if (userGenreElement && user.favoriteGenres && user.favoriteGenres.length > 0) {
+        userGenreElement.textContent = user.favoriteGenres[0];
+    }
+    
+    // Update user avatar
+    const userAvatarElement = document.getElementById('userAvatar');
+    if (userAvatarElement) {
+        if (user.profilePicture) {
+            userAvatarElement.src = user.profilePicture;
+        } else {
+            // Generate avatar based on user initials
+            const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+            userAvatarElement.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=E0B973&color=3B1D14&size=80`;
+        }
+        userAvatarElement.alt = user.name || 'User';
+    }
+}
+
 function populateDashboard(data) {
     if (!data) {
         console.log('⚠️ No dashboard data to populate');
         return;
     }
     
-    const { user, stats, topMatches, trendingBoards, activeChats, voiceRooms, recentActivity, suggestedUsers } = data;
+    const { user, stats, notifications, topMatches, trendingBoards, activeChats, voiceRooms, recentActivity, suggestedUsers } = data;
     
     console.log('🎨 Populating dashboard with data...');
     
-    // 1. Populate Welcome Card
-    if (user) populateWelcomeCard(user, stats);
+    // 1. Update Welcome Card
+    if (user) {
+        updateWelcomeCard(user);
+        
+        // Update match count
+        const matchCountElement = document.getElementById('matchCount');
+        if (matchCountElement && stats) {
+            const matchCount = stats.totalMatches || stats.activeMatches || 4;
+            matchCountElement.textContent = `${matchCount} new matches available`;
+        }
+    }
     
-    // 2. Populate Top Matches
+    // 2. Populate Notifications
+    if (notifications) {
+        const unreadCount = stats?.unreadNotifications || notifications.filter(n => !n.read).length;
+        populateNotifications(notifications, unreadCount);
+    }
+    
+    // 3. Populate Top Matches
     if (topMatches) populateTopMatches(topMatches);
     
-    // 3. Populate Trending Boards
+    // 4. Populate Trending Boards
     if (trendingBoards) populateTrendingBoards(trendingBoards);
     
-    // 4. Populate Active Chats
+    // 5. Populate Active Chats
     if (activeChats) populateActiveChats(activeChats);
     
-    // 5. Populate Recent Activity
+    // 6. Populate Recent Activity
     if (recentActivity) populateRecentActivity(recentActivity);
     
-    // 6. Populate Voice Rooms
+    // 7. Populate Voice Rooms
     if (voiceRooms) populateVoiceRooms(voiceRooms);
     
-    // 7. Populate Suggested Readers
+    // 8. Populate Suggested Readers
     if (suggestedUsers) populateSuggestedReaders(suggestedUsers);
-    
-    // 8. Update profile image in navbar
-    const profileImg = document.querySelector('.profile-img');
-    if (profileImg && user && user.profilePicture) {
-        profileImg.src = user.profilePicture;
-    }
     
     console.log('✅ Dashboard populated successfully');
 }
 
-function populateWelcomeCard(user, stats) {
-    // Update welcome message
-    const welcomeH1 = document.querySelector('.welcome-header h1');
-    if (welcomeH1) {
-        welcomeH1.textContent = `Welcome back, ${user.name} 👋`;
-    }
-    
-    // Update welcome text with user's favorite genre
-    const welcomeText = document.querySelector('.welcome-text');
-    if (welcomeText && user.favoriteGenres && user.favoriteGenres.length > 0) {
-        const favoriteGenre = user.favoriteGenres[0];
-        welcomeText.innerHTML = `Explore discussions, find new matches, and connect with readers who share your love for <strong>${favoriteGenre}</strong>`;
-    }
-    
-    // Update notification badge
-    const badge = document.querySelector('.badge');
-    if (badge && stats) {
-        const matchCount = stats.totalMatches || 4;
-        badge.textContent = `${matchCount} new matches available`;
-    }
-    
-    // Update profile image
-    const profileImg = document.querySelector('.profile-img');
-    if (profileImg && user.profilePicture) {
-        profileImg.src = user.profilePicture;
-    } else if (profileImg && !user.profilePicture) {
-        profileImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0B973&color=3B1D14&size=80`;
-    }
-}
-
 function populateTopMatches(matches) {
-    const matchesGrid = document.querySelector('.matches-grid');
+    const matchesGrid = document.getElementById('matchesGrid');
     if (!matchesGrid || !matches) return;
     
     matchesGrid.innerHTML = '';
@@ -302,7 +787,7 @@ function populateTopMatches(matches) {
 }
 
 function populateTrendingBoards(boards) {
-    const boardsGrid = document.querySelector('.boards-grid');
+    const boardsGrid = document.getElementById('boardsGrid');
     if (!boardsGrid || !boards) return;
     
     boardsGrid.innerHTML = '';
@@ -328,7 +813,7 @@ function populateTrendingBoards(boards) {
 }
 
 function populateActiveChats(chats) {
-    const chatList = document.querySelector('.chat-list');
+    const chatList = document.getElementById('chatList');
     if (!chatList || !chats) return;
     
     chatList.innerHTML = '';
@@ -354,7 +839,7 @@ function populateActiveChats(chats) {
 }
 
 function populateRecentActivity(activities) {
-    const activityList = document.querySelector('.activity-list');
+    const activityList = document.getElementById('activityList');
     if (!activityList || !activities) return;
     
     activityList.innerHTML = '';
@@ -376,7 +861,7 @@ function populateRecentActivity(activities) {
 }
 
 function populateVoiceRooms(rooms) {
-    const voiceRoomsContainer = document.querySelector('.voice-rooms');
+    const voiceRoomsContainer = document.getElementById('voiceRooms');
     if (!voiceRoomsContainer || !rooms) return;
     
     voiceRoomsContainer.innerHTML = '';
@@ -406,7 +891,7 @@ function populateVoiceRooms(rooms) {
 }
 
 function populateSuggestedReaders(users) {
-    const suggestedList = document.querySelector('.suggested-list');
+    const suggestedList = document.getElementById('suggestedList');
     if (!suggestedList || !users) return;
     
     suggestedList.innerHTML = '';
@@ -570,41 +1055,6 @@ function initChatItems() {
     });
 }
 
-// Action Cards Functionality
-function initActionCards() {
-    const actionCards = document.querySelectorAll('.action-card');
-    
-    const actions = {
-        'Start Discussion': () => {
-            showNotification('Opening discussion composer...', 'info');
-        },
-        'Browse Books': () => {
-            showNotification('Loading book library...', 'info');
-        },
-        'Join Room': () => {
-            showNotification('Finding available rooms...', 'info');
-        },
-        'Edit Profile': () => {
-            window.location.href = '../Profile/profile.html';
-        }
-    };
-    
-    actionCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const actionText = this.querySelector('span:last-child').textContent;
-            if (actions[actionText]) {
-                actions[actionText]();
-            }
-            
-            // Click animation
-            this.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                this.style.transform = 'scale(1)';
-            }, 150);
-        });
-    });
-}
-
 // Voice Room Join Functionality
 async function initVoiceRooms(token) {
     const joinRoomButtons = document.querySelectorAll('.join-room-btn');
@@ -710,25 +1160,6 @@ function initViewAllButtons() {
 
 // ===== NOTIFICATION SYSTEM =====
 
-function initNotifications() {
-    // Create notification container if it doesn't exist
-    if (!document.getElementById('notification-container')) {
-        const notificationContainer = document.createElement('div');
-        notificationContainer.id = 'notification-container';
-        notificationContainer.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-width: 350px;
-        `;
-        document.body.appendChild(notificationContainer);
-    }
-}
-
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = 'notification';
@@ -818,22 +1249,58 @@ function showNotification(message, type = 'info') {
 function loadMockData(user) {
     console.log('📦 Loading mock data as fallback for user:', user.name);
     
-    // Use the existing static HTML content as fallback
     // Update welcome card with user's name
-    const welcomeH1 = document.querySelector('.welcome-header h1');
-    if (welcomeH1) {
-        welcomeH1.textContent = `Welcome back, ${user.name || 'Reader'} 👋`;
-    }
+    updateWelcomeCard(user);
     
-    // Update profile image
-    const profileImg = document.querySelector('.profile-img');
-    if (profileImg) {
-        if (user.profilePicture) {
-            profileImg.src = user.profilePicture;
-        } else {
-            profileImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=E0B973&color=3B1D14&size=80`;
-        }
-    }
+    // Use demo data
+    const demoMatches = [
+        { id: '1', name: 'Elena R.', profileImage: 'https://i.pravatar.cc/150?img=5', tags: ['Fantasy', 'Sci-Fi'], sharedBooks: 32, isConnected: false },
+        { id: '2', name: 'Marcus Chen', profileImage: 'https://i.pravatar.cc/150?img=12', tags: ['Mystery', 'Thriller'], sharedBooks: 28, isConnected: false },
+        { id: '3', name: 'Sarah J.', profileImage: 'https://i.pravatar.cc/150?img=9', tags: ['Romance', 'YA'], sharedBooks: 25, isConnected: false },
+        { id: '4', name: 'David K.', profileImage: 'https://i.pravatar.cc/150?img=14', tags: ['History', 'Biographies'], sharedBooks: 21, isConnected: false }
+    ];
+    
+    const demoBoards = [
+        { id: '1', name: 'Fantasy Worlds', icon: '✨', color: 'purple', activeUsers: 15000, isJoined: false },
+        { id: '2', name: 'Modern Romance', icon: '💕', color: 'pink', activeUsers: 9000, isJoined: false },
+        { id: '3', name: 'Mystery & Thriller', icon: '👑', color: 'blue', activeUsers: 21000, isJoined: false },
+        { id: '4', name: 'Literary Fiction', icon: '✒️', color: 'brown', activeUsers: 6000, isJoined: false },
+        { id: '5', name: 'Young Adult', icon: '🌹', color: 'teal', activeUsers: 12000, isJoined: false },
+        { id: '6', name: 'Sci-Fi Classics', icon: '🚀', color: 'indigo', activeUsers: 8000, isJoined: false }
+    ];
+    
+    const demoChats = [
+        { id: '1', name: 'The Midnight Library Club', avatar: 'https://i.pravatar.cc/60?img=20', lastMessage: 'Has anyone finished chapter 5 yet? That twist!', timestamp: '2m ago', unreadCount: 3 },
+        { id: '2', name: 'James Wilson', avatar: 'https://i.pravatar.cc/60?img=33', lastMessage: "I think you'd love 'Project Hail Mary'!", timestamp: '1h ago', unreadCount: 0 },
+        { id: '3', name: 'Sci-Fi Enthusiasts', avatar: 'https://i.pravatar.cc/60?img=47', lastMessage: 'Meeting is scheduled for Friday at 8pm 📚', timestamp: 'yesterday', unreadCount: 0 }
+    ];
+    
+    const demoActivity = [
+        { icon: '📚', description: 'Sarah posted in Fantasy Board', timestamp: '3h ago' },
+        { icon: '📖', description: 'New Voice Room "Sci-Fi Talk"', timestamp: '5h ago' },
+        { icon: '🔗', description: '3 readers matched with you', timestamp: '8h ago' }
+    ];
+    
+    const demoVoiceRooms = [
+        { id: '1', name: 'Romance Readers Hangout', participants: 12, host: { name: 'Bella S.', image: 'https://i.pravatar.cc/40?img=25' }, tags: ['💕 Hot', 'Discussion'] },
+        { id: '2', name: 'Mystery Ch. 4 Deep Dive', participants: 8, host: { name: 'The Book Detectives', image: 'https://i.pravatar.cc/40?img=32' }, tags: ['🔍 Mystery', 'Deep'] },
+        { id: '3', name: 'Writing Sprint: 25min', participants: 15, host: { name: 'Author Circle', image: 'https://i.pravatar.cc/40?img=41' }, tags: ['Creative', 'Write'] }
+    ];
+    
+    const demoSuggested = [
+        { id: '1', name: 'Alex M.', profilePicture: 'https://i.pravatar.cc/50?img=16', tags: ['Fantasy'], isFavorited: false },
+        { id: '2', name: 'Jordan T.', profilePicture: 'https://i.pravatar.cc/50?img=28', tags: ['Sci-Fi'], isFavorited: false },
+        { id: '3', name: 'Casey L.', profilePicture: 'https://i.pravatar.cc/50?img=35', tags: ['Mystery'], isFavorited: false }
+    ];
+    
+    // Populate with demo data
+    populateNotifications(getMockNotifications(), 2);
+    populateTopMatches(demoMatches);
+    populateTrendingBoards(demoBoards);
+    populateActiveChats(demoChats);
+    populateRecentActivity(demoActivity);
+    populateVoiceRooms(demoVoiceRooms);
+    populateSuggestedReaders(demoSuggested);
 }
 
 // Smooth scroll for anchor links

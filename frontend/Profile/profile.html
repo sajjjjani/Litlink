@@ -17,20 +17,23 @@
                 <span class="brand-name">Litlink</span>
             </div>
             <div class="nav-links">
-                    <a href="../Dashboard/dashboard.html" class="nav-link" title="Home">
+                <a href="../Dashboard/dashboard.html" class="nav-link" title="Home">
                     <i class="fas fa-home"></i> 
-
                     <span class="nav-text">Home</span>
                 </a>
-                <a href="#" class="nav-link" title="Messages">
+                <!-- FIXED: Removed onclick, made it a direct link -->
+                <a href="../Chat/chat.html" class="nav-link" title="Messages">
                     <i class="fas fa-envelope"></i> 
                     <span class="nav-text">Messages</span>
                 </a>
-                <a href="#" class="nav-link" title="Discussions">
-                    <i class="fas fa-comments"></i> 
-                    <span class="nav-text">Discussions</span>
+
+                                <a href="../Discussion%20Board/discussion.html" class="nav-link" title="Discussion%20Board">
+                    <i class="fas fa-envelope"></i> 
+                    <span class="nav-text">Discussion Board</span>
                 </a>
-                <a href="#" class="nav-link" title="Voice Rooms">
+
+                </a>
+                <a href="#" class="nav-link" title="Voice Rooms" onclick="showComingSoon('Voice Rooms')">
                     <i class="fas fa-microphone"></i> 
                     <span class="nav-text">Voice Rooms</span>
                 </a>
@@ -149,7 +152,6 @@
                 </div>
                 
                 <div class="profile-actions" id="profileActions">
-                    <!-- FIXED: Added onclick directly -->
                     <button class="action-btn edit" id="editProfileBtn" onclick="openEditProfileModal()">
                         <i class="fas fa-edit"></i> Edit Profile
                     </button>
@@ -167,7 +169,6 @@
                 <!-- Reading Stats -->
                 <div class="section-title">
                     <span><i class="fas fa-chart-line"></i> Reading Stats</span>
-                    <!-- FIXED: Added onclick directly -->
                     <button class="action-btn small" onclick="openReadingStatsModal()">
                         <i class="fas fa-edit"></i> Edit
                     </button>
@@ -244,7 +245,6 @@
                 <!-- Reading Preferences -->
                 <div class="section-title">
                     <span><i class="fas fa-sliders-h"></i> Reading Preferences</span>
-                    <!-- FIXED: Added onclick directly -->
                     <button class="action-btn small" onclick="openPreferencesModal()">
                         <i class="fas fa-edit"></i> Edit
                     </button>
@@ -310,7 +310,6 @@
                 <h2><i class="fas fa-edit"></i> Edit Profile</h2>
                 <button class="close-btn" onclick="closeModal('editProfileModal')">&times;</button>
             </div>
-            <!-- FIXED: Added onsubmit directly -->
             <form id="editProfileForm" onsubmit="saveProfileChanges(event)">
                 <div class="form-row">
                     <div class="form-group">
@@ -365,7 +364,6 @@
                 <h2><i class="fas fa-chart-line"></i> Edit Reading Stats</h2>
                 <button class="close-btn" onclick="closeModal('editReadingStatsModal')">&times;</button>
             </div>
-            <!-- FIXED: Added onsubmit directly -->
             <form id="editReadingStatsForm" onsubmit="saveReadingStats(event)">
                 <div class="form-group">
                     <label for="editReadingHabit">Reading Habit</label>
@@ -403,7 +401,6 @@
                 <h2><i class="fas fa-sliders-h"></i> Edit Reading Preferences</h2>
                 <button class="close-btn" onclick="closeModal('editPreferencesModal')">&times;</button>
             </div>
-            <!-- FIXED: Added onsubmit directly -->
             <form id="editPreferencesForm" onsubmit="savePreferences(event)">
                 <div class="form-group">
                     <label>Preferred Formats (select all that apply)</label>
@@ -509,19 +506,32 @@
     </div>
 
     <!-- Load scripts -->
+    <script src="../utils/modal.js"></script>
     <script src="../Homepage/script.js"></script>
     <script src="profile.js"></script>
     
-    <!-- Direct function test -->
+    <!-- Add this script to prevent navigation issues -->
     <script>
-    // Direct function definitions that WILL work
-    console.log('Direct functions loaded');
-    
-    // Test if functions are available
-    window.testFunction = function() {
-        console.log('Test function works!');
-        document.getElementById('editProfileModal').style.display = 'flex';
-    };
+    // Ensure navigation links work properly
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Profile page loaded');
+        
+        // Make sure the Messages link works
+        const messagesLink = document.querySelector('a[href="../Chat/chat.html"]');
+        if (messagesLink) {
+            messagesLink.addEventListener('click', function(e) {
+                console.log('Navigating to chat...');
+                // Let the href work naturally
+            });
+        }
+        
+        // Add showComingSoon function if not defined
+        if (typeof window.showComingSoon === 'undefined') {
+            window.showComingSoon = function(feature) {
+                showMessageModal('Coming Soon', feature + ' feature is coming soon!', 'info');
+            };
+        }
+    });
     </script>
 </body>
 </html>

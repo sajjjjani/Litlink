@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Litlink - Community Board</title>
+    <link rel="stylesheet" href="discussion.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <a href="../Dashboard/dashboard.html" style="text-decoration: none; color: inherit; display: block;">
+                    <div>
+                        <h1>Litlink</h1>
+                        <p class="tagline">Conversations for Literary Minds</p>
+                    </div>
+                </a>
+            </div>
+            <div class="header-actions">
+                <a href="../Dashboard/dashexplore.html" style="text-decoration: none;">
+                    <button class="btn-text"><i class="fas fa-compass"></i> Explore Community</button>
+                </a>
+                <button class="btn-icon notification-btn"><i class="fas fa-bell"></i></button>
+                <a href="../Profile/profile.html" style="text-decoration: none;">
+                    <button class="btn-icon avatar"><i class="fas fa-user"></i></button>
+                </a>
+            </div>
+        </header>
+
+        <!-- Community Highlights -->
+        <section class="highlights">
+            <div class="section-header">
+                <h2 class="section-title">Community Highlights</h2>
+                <button class="view-all">View All <i class="fas fa-arrow-right"></i></button>
+            </div>
+            
+            <div class="highlight-grid">
+                <div class="highlight-card">
+                    <div class="card-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Most Discussed This Week</h3>
+                        <p>The conversation ending of "Yellowface" has everyone talking</p>
+                        <div class="discussion-stats">
+                            <span><i class="fas fa-message"></i> 342 comments</span>
+                            <span><i class="fas fa-eye"></i> 2.1k views</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-card">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Trending Book Board</h3>
+                        <p>Sci-Fi classics are seeing a major resurgence in queries</p>
+                        <div class="discussion-stats">
+                            <span><i class="fas fa-book"></i> 45 new threads</span>
+                            <span><i class="fas fa-fire"></i> Trending</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-card">
+                    <div class="card-icon">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Active Genre Right Now</h3>
+                        <p>Historical Fiction threads are on fire this weekend</p>
+                        <div class="discussion-stats">
+                            <span><i class="fas fa-users"></i> 189 active users</span>
+                            <span><i class="fas fa-bolt"></i> Very Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Left Column: Search & Filters -->
+            <div class="left-column">
+                <!-- Search Section -->
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-bar" placeholder="Search discussions...">
+                        <button class="search-btn"><i class="fas fa-sliders-h"></i></button>
+                    </div>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="filter-section">
+                    <h3><i class="fas fa-filter"></i> Filter Discussions</h3>
+                    <div class="filter-options">
+                        <label class="filter-option">
+                            <input type="radio" name="filter" checked>
+                            <span class="filter-label">
+                                <i class="far fa-clock"></i>
+                                <span>Recent</span>
+                            </span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="filter">
+                            <span class="filter-label">
+                                <i class="fas fa-comment-dots"></i>
+                                <span>Most Replies</span>
+                            </span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="filter">
+                            <span class="filter-label">
+                                <i class="fas fa-star"></i>
+                                <span>Community Picks</span>
+                            </span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="filter">
+                            <span class="filter-label">
+                                <i class="far fa-user"></i>
+                                <span>My Threads</span>
+                            </span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="filter">
+                            <span class="filter-label">
+                                <i class="far fa-bookmark"></i>
+                                <span>Bookmarked</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Genre Tags -->
+                <div class="genre-section">
+                    <h3><i class="fas fa-tags"></i> Browse by Genre</h3>
+                    <div class="genre-tags">
+                        <button class="genre-tag active">All Genres</button>
+                        <button class="genre-tag">Fantasy</button>
+                        <button class="genre-tag">Mystery</button>
+                        <button class="genre-tag">Romance</button>
+                        <button class="genre-tag">Sci-Fi</button>
+                        <button class="genre-tag">Historical</button>
+                        <button class="genre-tag">Thriller</button>
+                        <button class="genre-tag">Non-Fiction</button>
+                        <button class="genre-tag">Literary</button>
+                        <button class="genre-tag">Poetry</button>
+                    </div>
+                </div>
+
+                <!-- Community Guidelines -->
+                <div class="guidelines-card">
+                    <div class="guidelines-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Community Guidelines</h3>
+                    </div>
+                    <div class="guidelines-content">
+                        <p>Litlink is a research reading community. Please:</p>
+                        <ul>
+                            <li><i class="fas fa-check-circle"></i> Tag spoilers appropriately</li>
+                            <li><i class="fas fa-check-circle"></i> Be kind to fellow readers</li>
+                            <li><i class="fas fa-check-circle"></i> Respect diverse opinions</li>
+                            <li><i class="fas fa-check-circle"></i> Cite sources when discussing</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Discussion Threads -->
+            <div class="right-column">
+                <div class="threads-header">
+                    <h2>Recent Discussions</h2>
+                    <div class="threads-sort">
+                        <span>Sort by:</span>
+                        <select class="sort-select">
+                            <option>Latest Activity</option>
+                            <option>Most Replies</option>
+                            <option>Most Views</option>
+                            <option>Most Likes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Discussion Threads -->
+                <div class="threads-container">
+                    <div class="thread-card featured">
+                        <div class="thread-badge">
+                            <i class="fas fa-crown"></i> Community Pick
+                        </div>
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eleanor" alt="Eleanor P" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>Thoughts on the ambiguous ending of 'The Midnight Library'?</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Eleanor P</span>
+                                    <span class="time"><i class="far fa-clock"></i> 2 hours ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> The Midnight Library</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Ending</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Philosophy</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-excerpt">
+                            <p>Just finished reading and I can't stop thinking about the ending. What did Nora's final choice mean to you? Was it about acceptance or something else entirely?</p>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 45 replies</span>
+                                <span class="stat"><i class="fas fa-eye"></i> 892 views</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 124 likes</span>
+                            </div>
+                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                        </div>
+                    </div>
+
+                    <div class="thread-card">
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anna" alt="Anna W" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>Monthly Challenge: Classics we actually enjoy reading</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Anna W</span>
+                                    <span class="time"><i class="far fa-clock"></i> 5 hours ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Classics</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Book Club</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Challenge</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-excerpt">
+                            <p>This month's community challenge is to read and discuss one classic novel. What classics have surprised you with how enjoyable they are to read?</p>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 113 replies</span>
+                                <span class="stat"><i class="fas fa-eye"></i> 1.2k views</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 267 likes</span>
+                            </div>
+                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                        </div>
+                    </div>
+
+                    <div class="thread-card featured">
+                        <div class="thread-badge">
+                            <i class="fas fa-crown"></i> Community Pick
+                        </div>
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Erin" alt="Erin R" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>The subtle art of describing food in literature</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Erin R</span>
+                                    <span class="time"><i class="far fa-clock"></i> 8 hours ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Crying in H Mart</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Non-fiction</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Food Writing</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-excerpt">
+                            <p>How do authors use food descriptions to convey emotion, culture, and memory? Let's discuss memorable food scenes in literature and their deeper meanings.</p>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 78 replies</span>
+                                <span class="stat"><i class="fas fa-eye"></i> 945 views</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 189 likes</span>
+                            </div>
+                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                        </div>
+                    </div>
+
+                    <div class="thread-card">
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus T" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>Why do we love unreliable narrators so much?</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Marcus T</span>
+                                    <span class="time"><i class="far fa-clock"></i> 1 day ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Literary Analysis</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Narration</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Psychology</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-excerpt">
+                            <p>From 'Gone Girl' to 'The Murder of Roger Ackroyd', unreliable narrators keep us guessing. What makes this literary device so compelling?</p>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 56 replies</span>
+                                <span class="stat"><i class="fas fa-eye"></i> 734 views</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 142 likes</span>
+                            </div>
+                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                        </div>
+                    </div>
+
+                    <div class="thread-card">
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Sarah J" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>Modern retellings of classic mythology: Yay or nay?</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Sarah J</span>
+                                    <span class="time"><i class="far fa-clock"></i> 2 days ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Mythology</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Retellings</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> Contemporary</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="thread-excerpt">
+                            <p>With so many modern adaptations of Greek, Norse, and other mythologies, are we seeing creative innovation or cultural dilution? Let's discuss!</p>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 89 replies</span>
+                                <span class="stat"><i class="fas fa-eye"></i> 1.1k views</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 203 likes</span>
+                            </div>
+                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                        </div>
+                    </div>
+
+                    <button class="load-more">
+                        <i class="fas fa-sync-alt"></i> Load More Discussions
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Thread CTA -->
+        <div class="cta-section">
+            <div class="cta-content">
+                <h2><i class="fas fa-lightbulb"></i> Have something to discuss?</h2>
+                <p>Start a conversation with fellow book lovers. Share your insights, ask questions, or start a book club discussion.</p>
+                <button class="btn-primary start-thread-btn">
+                    <i class="fas fa-plus"></i> Start a New Thread
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="discussion.js"></script>
+</body>
+</html>
