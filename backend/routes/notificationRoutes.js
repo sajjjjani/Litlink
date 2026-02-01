@@ -1,130 +1,179 @@
+// routes/notificationRoutes.js
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
-const Notification = require('../models/Notification'); // You'll need to create this model
+const Notification = require('../models/Notification');
+const AdminNotificationService = require('../services/adminNotificationService');
 
 // GET /api/notifications - Get user's notifications
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.userId;
     
-    // Check if Notification model exists, if not use mock data
-    let notifications;
-    let unreadCount = 0;
+    const {
+      limit = 20,
+      offset = 0,
+      read,
+      type,
+      priority,
+      sort = '-createdAt'
+    } = req.query;
     
-    if (Notification) {
-      // Real database implementation
-      notifications = await Notification.find({ 
-        userId, 
-        archived: false 
-      })
-      .sort({ createdAt: -1 })
-      .limit(50);
-      
-      unreadCount = await Notification.countDocuments({ 
-        userId, 
-        read: false,
-        archived: false 
-      });
-    } else {
-      // Mock data fallback
-      notifications = [
-        { 
-          _id: 'notif1',
-          type: 'match',
-          title: 'New Reader Match',
-          message: 'Alex M. shares your interest in Fantasy novels',
-          timestamp: '5m ago',
-          read: false,
-          icon: '🔗',
-          actionUrl: '/chat/chat1',
-          userId: userId,
-          createdAt: new Date(Date.now() - 5 * 60000) // 5 minutes ago
-        },
-        { 
-          _id: 'notif2',
-          type: 'message',
-          title: 'New Message',
-          message: 'Sarah replied to your book suggestion',
-          timestamp: '1h ago',
-          read: false,
-          icon: '💬',
-          actionUrl: '/chat/chat2',
-          userId: userId,
-          createdAt: new Date(Date.now() - 60 * 60000) // 1 hour ago
-        },
-        { 
-          _id: 'notif3',
-          type: 'board',
-          title: 'Board Update',
-          message: 'New discussion started in Fantasy Worlds',
-          timestamp: '3h ago',
-          read: true,
-          icon: '📌',
-          actionUrl: '/board/board1',
-          userId: userId,
-          createdAt: new Date(Date.now() - 180 * 60000) // 3 hours ago
-        },
-        { 
-          _id: 'notif4',
-          type: 'voice',
-          title: 'Voice Room Starting',
-          message: 'Mystery Book Club voice chat starts in 10 minutes',
-          timestamp: '5h ago',
-          read: true,
-          icon: '🎙️',
-          actionUrl: '/voice/room1',
-          userId: userId,
-          createdAt: new Date(Date.now() - 300 * 60000) // 5 hours ago
-        },
-        { 
-          _id: 'notif5',
-          type: 'achievement',
-          title: 'Achievement Unlocked!',
-          message: 'You\'ve completed your weekly reading goal!',
-          timestamp: '1d ago',
-          read: true,
-          icon: '🏆',
-          actionUrl: '/profile#achievements',
-          userId: userId,
-          createdAt: new Date(Date.now() - 24 * 60 * 60000) // 1 day ago
-        }
-      ];
-      
-      unreadCount = notifications.filter(n => !n.read).length;
+    let query = { userId, archived: false };
+    
+    // Filter by read status
+    if (read !== undefined) {
+      query.read = read === 'true';
     }
     
-    // Format timestamp for display
-    const formattedNotifications = notifications.map(notif => {
-      const timeDiff = Date.now() - new Date(notif.createdAt).getTime();
-      let timestamp;
-      
-      if (timeDiff < 60000) timestamp = 'Just now';
-      else if (timeDiff < 3600000) timestamp = `${Math.floor(timeDiff / 60000)}m ago`;
-      else if (timeDiff < 86400000) timestamp = `${Math.floor(timeDiff / 3600000)}h ago`;
-      else timestamp = `${Math.floor(timeDiff / 86400000)}d ago`;
-      
-      return {
-        id: notif._id || notif.id,
-        type: notif.type,
-        title: notif.title,
-        message: notif.message,
-        timestamp: timestamp,
-        read: notif.read,
-        icon: notif.icon || getIconByType(notif.type),
-        actionUrl: notif.actionUrl
-      };
+    // Filter by type
+    if (type) {
+      if (type === 'admin') {
+        // Filter for admin notifications only
+        query.type = { $regex: '^admin_', $options: 'i' };
+      } else if (type === 'user') {
+        // Filter for user notifications only (non-admin)
+        query.type = { $not: { $regex: '^admin_', $options: 'i' } };
+      } else {
+        query.type = type;
+      }
+    }
+    
+    // Filter by priority
+    if (priority) {
+      query.priority = priority;
+    }
+    
+    // Get notifications
+    const notifications = await Notification.find(query)
+      .populate('userId', 'name email profilePicture')
+      .populate('sourceUserId', 'name email profilePicture')
+      .sort(sort)
+      .skip(parseInt(offset))
+      .limit(parseInt(limit));
+    
+    const total = await Notification.countDocuments(query);
+    const unreadCount = await Notification.countDocuments({ 
+      userId, 
+      read: false,
+      archived: false 
     });
+    
+    // Format response
+    const formattedNotifications = notifications.map(notif => ({
+      id: notif._id,
+      type: notif.type,
+      title: notif.title,
+      message: notif.message,
+      timestamp: notif.formattedTime,
+      read: notif.read,
+      icon: notif.icon,
+      priority: notif.priority,
+      actionUrl: notif.actionUrl,
+      metadata: notif.metadata,
+      createdAt: notif.createdAt,
+      sourceUser: notif.sourceUserId
+    }));
     
     res.json({ 
       success: true, 
       notifications: formattedNotifications,
-      unreadCount: unreadCount
+      total,
+      unreadCount
     });
     
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ success: false, message: 'Error fetching notifications' });
+  }
+});
+
+// GET /api/notifications/admin - Get admin-specific notifications
+router.get('/admin', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    // Check if user is admin
+    const User = require('../models/User');
+    const user = await User.findById(userId);
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+    
+    const {
+      limit = 20,
+      offset = 0,
+      read,
+      priority
+    } = req.query;
+    
+    let query = { 
+      userId,
+      archived: false,
+      type: { $regex: '^admin_', $options: 'i' }
+    };
+    
+    if (read !== undefined) {
+      query.read = read === 'true';
+    }
+    
+    if (priority) {
+      query.priority = priority;
+    }
+    
+    const notifications = await Notification.find(query)
+      .populate('sourceUserId', 'name email profilePicture')
+      .sort('-createdAt')
+      .skip(parseInt(offset))
+      .limit(parseInt(limit));
+    
+    const total = await Notification.countDocuments(query);
+    const unreadCount = await Notification.countDocuments({ 
+      userId, 
+      read: false,
+      archived: false,
+      type: { $regex: '^admin_', $options: 'i' }
+    });
+    
+    // Get urgent count
+    const urgentCount = await Notification.countDocuments({
+      userId,
+      read: false,
+      archived: false,
+      type: { $regex: '^admin_', $options: 'i' },
+      priority: 'urgent'
+    });
+    
+    const formattedNotifications = notifications.map(notif => ({
+      id: notif._id,
+      type: notif.type,
+      title: notif.title,
+      message: notif.message,
+      timestamp: notif.formattedTime,
+      read: notif.read,
+      icon: notif.icon,
+      priority: notif.priority,
+      actionUrl: notif.actionUrl,
+      metadata: notif.metadata,
+      createdAt: notif.createdAt,
+      sourceUser: notif.sourceUserId
+    }));
+    
+    res.json({
+      success: true,
+      notifications: formattedNotifications,
+      total,
+      unreadCount,
+      urgentCount
+    });
+    
+  } catch (error) {
+    console.error('Error fetching admin notifications:', error);
+    res.status(500).json({ success: false, message: 'Error fetching admin notifications' });
   }
 });
 
@@ -134,18 +183,32 @@ router.post('/read/:id', authenticate, async (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
     
-    if (Notification) {
-      // Update in database
-      await Notification.findOneAndUpdate(
-        { _id: id, userId: userId },
-        { read: true, readAt: new Date() }
-      );
-    } else {
-      // Mock implementation - store in localStorage on client side
-      console.log(`Mock: Marking notification ${id} as read for user ${userId}`);
+    const notification = await Notification.findOneAndUpdate(
+      { _id: id, userId: userId },
+      { read: true, readAt: new Date() },
+      { new: true }
+    ).populate('sourceUserId', 'name email profilePicture');
+    
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
     }
     
-    res.json({ success: true, message: 'Notification marked as read' });
+    // Get updated unread count
+    const unreadCount = await Notification.countDocuments({ 
+      userId, 
+      read: false,
+      archived: false 
+    });
+    
+    res.json({
+      success: true,
+      message: 'Notification marked as read',
+      notification,
+      unreadCount
+    });
     
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -157,19 +220,32 @@ router.post('/read/:id', authenticate, async (req, res) => {
 router.post('/read-all', authenticate, async (req, res) => {
   try {
     const userId = req.userId;
+    const { type } = req.body; // Optional: 'all', 'admin', 'user'
     
-    if (Notification) {
-      // Update all in database
-      await Notification.updateMany(
-        { userId: userId, read: false },
-        { read: true, readAt: new Date() }
-      );
-    } else {
-      // Mock implementation
-      console.log(`Mock: Marking all notifications as read for user ${userId}`);
+    let query = { userId: userId, read: false };
+    
+    if (type === 'admin') {
+      query.type = { $regex: '^admin_', $options: 'i' };
+    } else if (type === 'user') {
+      query.type = { $not: { $regex: '^admin_', $options: 'i' } };
     }
     
-    res.json({ success: true, message: 'All notifications marked as read' });
+    await Notification.updateMany(
+      query,
+      { read: true, readAt: new Date() }
+    );
+    
+    const unreadCount = await Notification.countDocuments({ 
+      userId, 
+      read: false,
+      archived: false 
+    });
+    
+    res.json({
+      success: true,
+      message: 'All notifications marked as read',
+      unreadCount
+    });
     
   } catch (error) {
     console.error('Error marking all as read:', error);
@@ -177,47 +253,73 @@ router.post('/read-all', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/notifications/create - Create a new notification (for testing)
+// POST /api/notifications/create - Create a new notification
 router.post('/create', authenticate, async (req, res) => {
   try {
     const userId = req.userId;
-    const { type, title, message, actionUrl } = req.body;
+    const { type, title, message, actionUrl, priority, metadata } = req.body;
     
     if (!type || !title || !message) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
     }
     
-    const notificationData = {
+    // Check if creating admin notification requires admin access
+    if (type.startsWith('admin_')) {
+      const User = require('../models/User');
+      const user = await User.findById(userId);
+      
+      if (!user || !user.isAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'Admin access required for admin notifications'
+        });
+      }
+    }
+    
+    const notification = new Notification({
       userId,
       type,
       title,
       message,
       actionUrl: actionUrl || null,
-      icon: getIconByType(type),
-      read: false,
-      archived: false,
-      createdAt: new Date()
-    };
+      priority: priority || 'medium',
+      metadata: metadata || {},
+      read: false
+    });
     
-    if (Notification) {
-      // Save to database
-      const notification = new Notification(notificationData);
-      await notification.save();
-      
-      res.json({ 
-        success: true, 
-        message: 'Notification created',
-        notification: notification
-      });
-    } else {
-      // Mock response
-      console.log(`Mock: Created notification for user ${userId}`);
-      res.json({ 
-        success: true, 
-        message: 'Mock notification created (not saved to DB)',
-        notification: notificationData
-      });
+    await notification.save();
+    
+    const populatedNotification = await Notification.findById(notification._id)
+      .populate('userId', 'name email profilePicture');
+
+    // Emit real-time notification to the connected user
+    // (Admin real-time notifications are handled separately via admin events / hooks.)
+    try {
+      const io = global.io;
+      if (io && typeof io.sendToUser === 'function') {
+        io.sendToUser(userId.toString(), {
+          type: 'notification',
+          notificationType: type,
+          title,
+          message,
+          timestamp: new Date(),
+          priority: priority || 'medium',
+          actionUrl: actionUrl || null,
+          metadata: metadata || {}
+        });
+      }
+    } catch (socketError) {
+      console.error('Error emitting user websocket notification:', socketError);
     }
+    
+    res.json({
+      success: true,
+      message: 'Notification created',
+      notification: populatedNotification
+    });
     
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -231,18 +333,22 @@ router.delete('/:id', authenticate, async (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
     
-    if (Notification) {
-      // Soft delete by archiving
-      await Notification.findOneAndUpdate(
-        { _id: id, userId: userId },
-        { archived: true }
-      );
-    } else {
-      // Mock implementation
-      console.log(`Mock: Archiving notification ${id} for user ${userId}`);
+    const notification = await Notification.findOneAndUpdate(
+      { _id: id, userId: userId },
+      { archived: true }
+    );
+    
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
     }
     
-    res.json({ success: true, message: 'Notification archived' });
+    res.json({
+      success: true,
+      message: 'Notification archived'
+    });
     
   } catch (error) {
     console.error('Error deleting notification:', error);
@@ -250,25 +356,43 @@ router.delete('/:id', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/notifications/unread-count - Get only unread count (for polling)
+// GET /api/notifications/unread-count - Get only unread count
 router.get('/unread-count', authenticate, async (req, res) => {
   try {
     const userId = req.userId;
+    const { type } = req.query; // Optional: 'all', 'admin', 'user'
     
-    let unreadCount;
+    let query = { userId, read: false, archived: false };
     
-    if (Notification) {
-      unreadCount = await Notification.countDocuments({ 
-        userId, 
-        read: false,
-        archived: false 
-      });
-    } else {
-      // Mock count - in real app, this would come from localStorage on client
-      unreadCount = 2; // Mock value
+    if (type === 'admin') {
+      query.type = { $regex: '^admin_', $options: 'i' };
+    } else if (type === 'user') {
+      query.type = { $not: { $regex: '^admin_', $options: 'i' } };
     }
     
-    res.json({ success: true, unreadCount });
+    const unreadCount = await Notification.countDocuments(query);
+    
+    // For admin users, also get urgent count
+    if (type === 'admin') {
+      const urgentCount = await Notification.countDocuments({
+        userId,
+        read: false,
+        archived: false,
+        type: { $regex: '^admin_', $options: 'i' },
+        priority: 'urgent'
+      });
+      
+      return res.json({
+        success: true,
+        unreadCount,
+        urgentCount
+      });
+    }
+    
+    res.json({
+      success: true,
+      unreadCount
+    });
     
   } catch (error) {
     console.error('Error fetching unread count:', error);
@@ -276,21 +400,46 @@ router.get('/unread-count', authenticate, async (req, res) => {
   }
 });
 
-// Helper function to get icon by notification type
-function getIconByType(type) {
-  const iconMap = {
-    'match': '🔗',
-    'message': '💬',
-    'board': '📌',
-    'voice': '🎙️',
-    'achievement': '🏆',
-    'warning': '⚠️',
-    'info': 'ℹ️',
-    'success': '✅',
-    'error': '❌'
-  };
-  
-  return iconMap[type] || '🔔';
-}
+// POST /api/notifications/admin/create-test - Create test admin notification
+router.post('/admin/create-test', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    // Check if user is admin
+    const User = require('../models/User');
+    const user = await User.findById(userId);
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+    
+    const { type, title, message } = req.body;
+    
+    const notification = await AdminNotificationService.sendToAdmin(
+      userId,
+      type || 'admin_new_user',
+      title || 'Test Admin Notification',
+      message || 'This is a test admin notification',
+      {
+        priority: 'medium',
+        actionUrl: '/admin/dashboard',
+        metadata: { test: true, timestamp: new Date() }
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Test admin notification created',
+      notification
+    });
+    
+  } catch (error) {
+    console.error('Error creating test admin notification:', error);
+    res.status(500).json({ success: false, message: 'Error creating test notification' });
+  }
+});
 
 module.exports = router;

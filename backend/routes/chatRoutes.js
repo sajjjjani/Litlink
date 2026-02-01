@@ -1,35 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
+const User = require('../models/User');
 
-// GET /api/chat/matches
+// GET /api/chat/matches - returns real users (for WebSocket chat) or demo fallback
 router.get('/matches', authenticate, async (req, res) => {
   try {
-    const demoMatches = [
-      {
-        id: 'match_1',
-        name: 'Eleanor Vance',
-        avatar: 'https://i.pravatar.cc/150?img=45',
-        genre: 'Horror • Gothic',
-        preview: 'Have you reached the part wit...',
-        online: true,
-        notifications: 2,
-        compatibility: 85
-      },
-      {
-        id: 'match_2',
-        name: 'Julian Blackthorn',
-        avatar: 'https://i.pravatar.cc/150?img=12',
-        genre: 'Literary Fiction • Mystery',
-        preview: 'The ending completely destroy...',
-        online: true,
-        notifications: 0,
-        compatibility: 78
-      }
-    ];
-    
-    res.json({ success: true, matches: demoMatches });
-    
+    const currentUserId = req.userId;
+    const users = await User.find(
+      { _id: { $ne: currentUserId }, isBanned: { $ne: true } }
+    )
+      .select('name profilePicture favoriteGenres')
+      .limit(20)
+      .lean();
+
+    const matches = users.map((u, i) => ({
+      id: u._id.toString(),
+      name: u.name || 'User',
+      avatar: u.profilePicture || `https://i.pravatar.cc/150?img=${(i % 70) + 1}`,
+      genre: (u.favoriteGenres && u.favoriteGenres[0]) ? u.favoriteGenres[0] : 'Fiction',
+      preview: '',
+      online: false,
+      notifications: 0,
+      compatibility: 75 + Math.floor(Math.random() * 20)
+    }));
+
+    res.json({ success: true, matches });
   } catch (error) {
     console.error('Error fetching matches:', error);
     res.status(500).json({ success: false, message: 'Error fetching matches' });

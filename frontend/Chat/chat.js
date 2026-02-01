@@ -2,6 +2,36 @@
 let currentUser = null;
 let currentMatchId = null;
 let matches = [];
+let chatSocket = null;
+let currentConversationId = null;
+let chatTypingTimeout = null;
+
+// WebSocket config (same server as API)
+const CHAT_WS_HOST = (function () {
+    try {
+        if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+            return window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+        }
+    } catch (e) {}
+    return 'localhost:5002';
+})();
+
+function getAuthToken() {
+    try {
+        return localStorage.getItem('litlink_token') || localStorage.getItem('authToken') || localStorage.getItem('token');
+    } catch (e) { return null; }
+}
+
+function getCurrentUserId() {
+    if (currentUser && (currentUser._id || currentUser.id)) return (currentUser._id || currentUser.id).toString();
+    try {
+        return localStorage.getItem('litlink_userId') || localStorage.getItem('userId') || '';
+    } catch (e) { return ''; }
+}
+
+function isRealUserId(id) {
+    return typeof id === 'string' && /^[a-f0-9]{24}$/i.test(id);
+}
 
 // ===== DOM ELEMENTS =====
 const matchesList = document.getElementById('matchesList');
@@ -22,7 +52,6 @@ async function initializeChat() {
     try {
         console.log('🚀 Initializing chat...');
         
-        // Get user from localStorage
         const userStr = localStorage.getItem('litlink_user');
         if (userStr) {
             currentUser = JSON.parse(userStr);
@@ -33,20 +62,220 @@ async function initializeChat() {
             return;
         }
         
-        // Load demo matches
-        loadDemoMatches();
-        
-        // Initialize event listeners
         initializeEventListeners();
+        initChatWebSocket();
+        await loadMatches();
         
         console.log('✅ Chat initialized successfully');
-        
     } catch (error) {
         console.error('❌ Error initializing chat:', error);
         showNotification('Failed to load chat', 'error');
         loadDemoData();
     }
 }
+
+// ===== WEBSOCKET CHAT =====
+function initChatWebSocket() {
+    const token = getAuthToken();
+    if (!token) {
+        console.log('Chat: No auth token, WebSocket disabled');
+        return;
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = protocol + '//' + CHAT_WS_HOST + '?token=' + encodeURIComponent(token);
+    try {
+        chatSocket = new WebSocket(wsUrl);
+        chatSocket.onopen = function () {
+            console.log('✅ Chat WebSocket connected');
+        };
+        chatSocket.onmessage = function (event) {
+            try {
+                const data = JSON.parse(event.data);
+                handleChatSocketMessage(data);
+            } catch (e) {
+                console.error('Chat WS parse error:', e);
+            }
+        };
+        chatSocket.onclose = function () {
+            console.warn('Chat WebSocket closed');
+        };
+        chatSocket.onerror = function (err) {
+            console.error('Chat WebSocket error:', err);
+        };
+    } catch (e) {
+        console.error('Chat WebSocket init error:', e);
+    }
+}
+
+function handleChatSocketMessage(data) {
+    if (!data || !data.type) return;
+    switch (data.type) {
+        case 'user-authenticated':
+            console.log('Chat: authenticated as user');
+            break;
+        case 'chat:message':
+            onIncomingChatMessage(data);
+            break;
+        case 'chat:message:sent':
+            onChatMessageSent(data);
+            break;
+        case 'chat:typing':
+            onChatTyping(data);
+            break;
+        case 'chat:history':
+            onChatHistory(data);
+            break;
+        case 'chat:online':
+            if (data.online && matches.length) {
+                Object.keys(data.online).forEach(function (userId) {
+                    const m = matches.find(function (x) { return x.id === userId; });
+                    if (m) m.online = !!data.online[userId];
+                });
+                renderMatches();
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+function onIncomingChatMessage(data) {
+    const senderId = data.senderId || (data.message && data.message.sender);
+    const currentMatch = matches.find(function (m) { return m.active; });
+    if (!currentMatch || currentMatch.id !== senderId) return;
+    const msg = data.message || {};
+    const text = msg.content || '';
+    const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'Just now';
+    if (!currentMatch.messages) currentMatch.messages = [];
+    currentMatch.messages.push({
+        id: msg._id || Date.now(),
+        type: 'received',
+        text: text,
+        time: time
+    });
+    currentMatch.preview = text.length > 30 ? text.substring(0, 27) + '...' : text;
+    renderMatches();
+    renderMessages(currentMatch.messages, currentMatch);
+    var statEl = document.getElementById('statMessages');
+    if (statEl) statEl.textContent = matches.reduce(function (t, m) { return t + (m.messages ? m.messages.length : 0); }, 0);
+}
+
+function onChatMessageSent(data) {
+    if (data.conversationId) currentConversationId = data.conversationId;
+}
+
+function onChatTyping(data) {
+    var currentMatch = matches.find(function (m) { return m.active; });
+    if (!currentMatch || currentMatch.id !== data.senderId) return;
+    if (data.isTyping) {
+        showTypingIndicator(currentMatch);
+    } else {
+        removeTypingIndicator();
+    }
+}
+
+function onChatHistory(data) {
+    var currentMatch = matches.find(function (m) { return m.active; });
+    if (data.conversationId) currentConversationId = data.conversationId;
+    if (data.error || !currentMatch) {
+        hideMessageLoading();
+        if (currentMatch) loadMessages(currentMatch);
+        return;
+    }
+    var list = data.messages || [];
+    currentMatch.messages = list.map(function (m) {
+        var isSent = (m.sender && m.sender.toString()) === getCurrentUserId();
+        return {
+            id: m._id,
+            type: isSent ? 'sent' : 'received',
+            text: m.content || '',
+            time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''
+        };
+    });
+    renderMessages(currentMatch.messages, currentMatch);
+    hideMessageLoading();
+}
+
+function sendChatWebSocket(recipientId, content) {
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return false;
+    try {
+        chatSocket.send(JSON.stringify({
+            type: 'chat:message',
+            recipientId: recipientId,
+            content: content,
+            conversationId: currentConversationId || undefined
+        }));
+        return true;
+    } catch (e) {
+        console.error('sendChatWebSocket error:', e);
+        return false;
+    }
+}
+
+function requestChatHistory(otherUserId) {
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+    try {
+        chatSocket.send(JSON.stringify({
+            type: 'chat:history',
+            otherUserId: otherUserId,
+            limit: 50
+        }));
+    } catch (e) {
+        console.error('requestChatHistory error:', e);
+    }
+}
+
+function sendChatTyping(recipientId, isTyping) {
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+    try {
+        chatSocket.send(JSON.stringify({
+            type: 'chat:typing',
+            recipientId: recipientId,
+            isTyping: !!isTyping
+        }));
+    } catch (e) {}
+}
+
+// ===== LOAD MATCHES (API or demo) =====
+async function loadMatches() {
+    const token = getAuthToken();
+    if (token) {
+        try {
+            const base = window.location.port === '5500' || window.location.port === '3000' ? 'http://localhost:5002' : '';
+            const res = await fetch((base || '') + '/api/chat/matches', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && Array.isArray(data.matches)) {
+                    matches = data.matches.map(function (m) {
+                        return Object.assign({}, m, { active: false, messages: m.messages || [] });
+                    });
+                    document.getElementById('statMatches').textContent = matches.length;
+                    document.getElementById('statOnline').textContent = matches.filter(function (m) { return m.online; }).length;
+                    renderMatches();
+                    requestChatOnlineStatus();
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn('Chat API matches failed, using demo:', e);
+        }
+    }
+    loadDemoMatches();
+}
+
+function requestChatOnlineStatus() {
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN || !matches.length) return;
+    try {
+        chatSocket.send(JSON.stringify({
+            type: 'chat:online',
+            userIds: matches.map(function (m) { return m.id; })
+        }));
+    } catch (e) {}
+}
+
+// ===== DOM ELEMENTS =====
 
 // ===== LOAD DEMO MATCHES =====
 function loadDemoMatches() {
@@ -141,93 +370,60 @@ function renderMatches() {
 
 async function switchMatch(matchId) {
     try {
-        console.log(`🔄 Switching to match: ${matchId}`);
-        
-        // Update active states
-        matches.forEach(match => {
+        console.log('Switching to match: ' + matchId);
+        matches.forEach(function (match) {
             match.active = match.id === matchId;
         });
-        
-        // Find the match
-        const currentMatch = matches.find(m => m.id === matchId);
+        const currentMatch = matches.find(function (m) { return m.id === matchId; });
         if (!currentMatch) {
             console.error('Match not found:', matchId);
             return;
         }
-        
-        // Update chat header
+        currentConversationId = null;
         currentAvatar.src = currentMatch.avatar;
         currentAvatar.alt = currentMatch.name;
         currentUserName.textContent = currentMatch.name;
         currentUserGenre.textContent = currentMatch.genre;
-        
-        // Clear notifications for this match
         currentMatch.notifications = 0;
-        
-        // Re-render matches list
         renderMatches();
-        
-        // Hide welcome state, show chat
         welcomeState.style.display = 'none';
         messagesContainer.style.display = 'flex';
         messageInputWrapper.style.display = 'flex';
-        
-        // Load messages
-        await loadMessages(currentMatch);
-        
-        // Update message count
-        const totalMessages = matches.reduce((total, match) => total + (match.messages?.length || 0), 0);
-        document.getElementById('statMessages').textContent = totalMessages;
-        
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN && isRealUserId(currentMatch.id)) {
+            showMessageLoading();
+            requestChatHistory(currentMatch.id);
+        } else {
+            await loadMessages(currentMatch);
+        }
+        var totalMessages = matches.reduce(function (total, match) { return total + (match.messages ? match.messages.length : 0); }, 0);
+        var statEl = document.getElementById('statMessages');
+        if (statEl) statEl.textContent = totalMessages;
     } catch (error) {
-        console.error('❌ Error switching match:', error);
+        console.error('Error switching match:', error);
         showNotification('Failed to load conversation', 'error');
     }
 }
 
 async function loadMessages(currentMatch) {
     try {
-        // Show loading
         showMessageLoading();
-        
-        // Generate demo messages if none exist
         if (!currentMatch.messages || currentMatch.messages.length === 0) {
+            var firstName = (currentUser && currentUser.name && currentUser.name.split(' ')[0]) || 'there';
+            var genrePart = (currentMatch.genre && currentMatch.genre.split('•')[0]) ? currentMatch.genre.split('•')[0].trim() : 'books';
+            var otherName = (currentMatch.name && currentMatch.name.split(' ')[0]) || 'there';
             currentMatch.messages = [
-                {
-                    id: 1,
-                    type: 'received',
-                    text: `Hi ${currentUser?.name?.split(' ')[0] || 'there'}! I noticed we both enjoy ${currentMatch.genre.split('•')[0].trim()} books. What are you reading right now?`,
-                    time: '10:30 AM'
-                },
-                {
-                    id: 2,
-                    type: 'sent',
-                    text: `Hi ${currentMatch.name.split(' ')[0]}! I'm currently reading "The Silent Patient". Have you read it?`,
-                    time: '10:32 AM'
-                },
-                {
-                    id: 3,
-                    type: 'received',
-                    text: 'Yes, I loved it! The twist was incredible. Do you enjoy psychological thrillers?',
-                    time: '10:35 AM'
-                }
+                { id: 1, type: 'received', text: 'Hi ' + firstName + '! I noticed we both enjoy ' + genrePart + '. What are you reading right now?', time: '10:30 AM' },
+                { id: 2, type: 'sent', text: 'Hi ' + otherName + '! I\'m currently reading "The Silent Patient". Have you read it?', time: '10:32 AM' },
+                { id: 3, type: 'received', text: 'Yes, I loved it! The twist was incredible. Do you enjoy psychological thrillers?', time: '10:35 AM' }
             ];
         }
-        
-        // Render messages
         renderMessages(currentMatch.messages, currentMatch);
-        
+        hideMessageLoading();
     } catch (error) {
         console.error('Error loading messages:', error);
-        currentMatch.messages = [
-            {
-                id: 1,
-                type: 'received',
-                text: 'Hello! Nice to meet you. What brings you to Litlink?',
-                time: 'Just now'
-            }
-        ];
+        currentMatch.messages = [{ id: 1, type: 'received', text: 'Hello! Nice to meet you. What brings you to Litlink?', time: 'Just now' }];
         renderMessages(currentMatch.messages, currentMatch);
+        hideMessageLoading();
     }
 }
 
@@ -265,56 +461,40 @@ function renderMessages(messages, currentMatch) {
 // ===== MESSAGE SENDING =====
 async function sendMessage() {
     try {
-        const text = messageInput.value.trim();
+        var text = messageInput && messageInput.value ? messageInput.value.trim() : '';
         if (!text) return;
-
-        const currentMatch = matches.find(m => m.active);
+        var currentMatch = matches.find(function (m) { return m.active; });
         if (!currentMatch) {
             showNotification('No active conversation', 'warning');
             return;
         }
-
-        // Get current time
-        const now = new Date();
-        const time = now.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-        });
-
-        // Create message object
-        const newMessage = {
-            id: Date.now(),
-            type: 'sent',
-            text: text,
-            time: time
-        };
-
-        // Add to messages
+        var now = new Date();
+        var time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        var useWebSocket = chatSocket && chatSocket.readyState === WebSocket.OPEN && isRealUserId(currentMatch.id);
+        if (useWebSocket && sendChatWebSocket(currentMatch.id, text)) {
+            if (!currentMatch.messages) currentMatch.messages = [];
+            currentMatch.messages.push({ id: 'pending-' + Date.now(), type: 'sent', text: text, time: time });
+            messageInput.value = '';
+            currentMatch.preview = text.length > 30 ? text.substring(0, 27) + '...' : text;
+            renderMatches();
+            renderMessages(currentMatch.messages, currentMatch);
+            var statEl = document.getElementById('statMessages');
+            if (statEl) statEl.textContent = matches.reduce(function (t, m) { return t + (m.messages ? m.messages.length : 0); }, 0);
+            return;
+        }
+        var newMessage = { id: Date.now(), type: 'sent', text: text, time: time };
         if (!currentMatch.messages) currentMatch.messages = [];
         currentMatch.messages.push(newMessage);
-
-        // Clear input
         messageInput.value = '';
-
-        // Update match preview
         currentMatch.preview = text.length > 30 ? text.substring(0, 27) + '...' : text;
-        
-        // Re-render
         renderMatches();
         renderMessages(currentMatch.messages, currentMatch);
-        
-        // Update message count
-        const totalMessages = matches.reduce((total, match) => total + (match.messages?.length || 0), 0);
-        document.getElementById('statMessages').textContent = totalMessages;
-
-        // Simulate response after 1-2 seconds
-        if (currentMatch.online) {
-            simulateResponse(currentMatch);
-        }
-
+        var totalMessages = matches.reduce(function (total, match) { return total + (match.messages ? match.messages.length : 0); }, 0);
+        var statEl2 = document.getElementById('statMessages');
+        if (statEl2) statEl2.textContent = totalMessages;
+        if (currentMatch.online) simulateResponse(currentMatch);
     } catch (error) {
-        console.error('❌ Error sending message:', error);
+        console.error('Error sending message:', error);
         showNotification('Failed to send message', 'error');
     }
 }
@@ -377,25 +557,22 @@ function simulateResponse(currentMatch) {
 }
 
 function showTypingIndicator(currentMatch) {
-    const typingIndicator = document.createElement('div');
+    removeTypingIndicator();
+    var typingIndicator = document.createElement('div');
     typingIndicator.className = 'message received message-loading';
-    typingIndicator.innerHTML = `
-        <div class="avatar-wrapper">
-            <img src="${currentMatch.avatar}" alt="Typing" class="avatar">
-        </div>
-        <div class="message-content">
-            <div class="message-bubble typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
-    `;
-    
-    messagesContainer.appendChild(typingIndicator);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
+    typingIndicator.setAttribute('data-chat-typing', '1');
+    typingIndicator.innerHTML = '<div class="avatar-wrapper"><img src="' + (currentMatch.avatar || '') + '" alt="Typing" class="avatar"></div><div class="message-content"><div class="message-bubble typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+    if (messagesContainer) {
+        messagesContainer.appendChild(typingIndicator);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
     return typingIndicator;
+}
+
+function removeTypingIndicator() {
+    if (!messagesContainer) return;
+    var el = messagesContainer.querySelector('[data-chat-typing="1"]');
+    if (el) el.remove();
 }
 
 // ===== LOADING STATES =====
@@ -508,12 +685,19 @@ function initializeEventListeners() {
         sendBtn.addEventListener('click', sendMessage);
     }
     
-    // Enter key in message input
     if (messageInput) {
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
+        messageInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+        messageInput.addEventListener('input', function () {
+            var currentMatch = matches.find(function (m) { return m.active; });
+            if (!currentMatch || !isRealUserId(currentMatch.id)) return;
+            if (chatTypingTimeout) clearTimeout(chatTypingTimeout);
+            sendChatTyping(currentMatch.id, true);
+            chatTypingTimeout = setTimeout(function () {
+                sendChatTyping(currentMatch.id, false);
+                chatTypingTimeout = null;
+            }, 2000);
         });
     }
     

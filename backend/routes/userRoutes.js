@@ -1,5 +1,6 @@
 const express = require('express');
-const fetch = require('node-fetch');
+// Use safe fetch wrapper (Node 18+ global fetch, with node-fetch fallback)
+const fetch = require('../utils/fetch');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');

@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Explore - LitLink Dashboard</title>
-    <link rel="icon" type="image/png" href="../images/litlink-logo.png">
+    <!-- Inline favicon to avoid missing-asset 404s in dev servers -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1810'/%3E%3Cpath d='M18 18h20a8 8 0 0 1 8 8v20H26a8 8 0 0 1-8-8V18z' fill='%23d4a574'/%3E%3Cpath d='M24 22h16v4H24zm0 8h16v4H24zm0 8h12v4H24z' fill='%232c1810'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -152,10 +153,15 @@
             z-index: 1000;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
             display: none;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         
         .search-results-dropdown.show {
             display: block;
+            opacity: 1;
+            transform: translateY(0);
             animation: fadeInUp 0.3s ease;
         }
         
@@ -1739,9 +1745,10 @@
             </a>
             
             <div class="search-bar">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="dashSearchInput" placeholder="Search book, clubs, genres, users...">
-            </div>
+    <i class="fas fa-search search-icon"></i>
+    <input type="text" id="dashSearchInput" placeholder="Search books, authors, genres... (Type 3+ letters)">
+</div>
+
             
             <!-- Dynamic User Profile - Will be populated by JavaScript -->
             <div class="user-profile">
@@ -1878,7 +1885,6 @@
         const API_BASE_URL = 'http://localhost:5002/api';
         
         // ===== ENHANCED DATA =====
-        // More genres added
         const genres = [
             { name: 'Fantasy', icon: '🧙' },
             { name: 'Mystery', icon: '🔍' },
@@ -2044,133 +2050,115 @@
             return { token, user };
         }
 
-// ===== USER DATA INTEGRATION =====
-async function loadUserData() {
-    try {
-        const auth = checkAuth();
-        if (!auth) return;
-        
-        const { token, user } = auth;
-        
-        console.log('Loading user data for:', user.email);
-        
-        // Update header with real user data
-        const userAvatar = document.querySelector('.user-avatar');
-        const userName = document.querySelector('.user-name');
-        
-        if (userAvatar) {
-            // Use first letters of name for avatar
-            const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
-            userAvatar.textContent = initials;
-            
-            // Add random gradient
-            const colors = [
-                ['#667eea', '#764ba2'],
-                ['#f093fb', '#f5576c'],
-                ['#4ecdc4', '#44a08d'],
-                ['#ff6b6b', '#ee5a52'],
-                ['#8b5cf6', '#7c3aed']
-            ];
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            userAvatar.style.background = `linear-gradient(135deg, ${randomColor[0]} 0%, ${randomColor[1]} 100%)`;
-            
-            // Set profile picture if available
-            if (user.profilePicture) {
-                userAvatar.style.backgroundImage = `url(${user.profilePicture})`;
-                userAvatar.style.backgroundSize = 'cover';
-                userAvatar.style.backgroundPosition = 'center';
-                userAvatar.textContent = '';
+        // ===== USER DATA INTEGRATION =====
+        async function loadUserData() {
+            try {
+                const auth = checkAuth();
+                if (!auth) return;
+                
+                const { token, user } = auth;
+                
+                console.log('Loading user data for:', user.email);
+                
+                // Update header with real user data
+                const userAvatar = document.querySelector('.user-avatar');
+                const userName = document.querySelector('.user-name');
+                
+                if (userAvatar) {
+                    const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+                    userAvatar.textContent = initials;
+                    
+                    const colors = [
+                        ['#667eea', '#764ba2'],
+                        ['#f093fb', '#f5576c'],
+                        ['#4ecdc4', '#44a08d'],
+                        ['#ff6b6b', '#ee5a52'],
+                        ['#8b5cf6', '#7c3aed']
+                    ];
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    userAvatar.style.background = `linear-gradient(135deg, ${randomColor[0]} 0%, ${randomColor[1]} 100%)`;
+                    
+                    if (user.profilePicture) {
+                        userAvatar.style.backgroundImage = `url(${user.profilePicture})`;
+                        userAvatar.style.backgroundSize = 'cover';
+                        userAvatar.style.backgroundPosition = 'center';
+                        userAvatar.textContent = '';
+                    }
+                }
+                
+                if (userName) {
+                    userName.textContent = user.name || user.email.split('@')[0];
+                }
+                
+                // Load genre books with better error handling
+                await loadGenreBooks(token);
+                
+                // Load dashboard data for recommendations
+                const userId = user.id || user._id;
+                if (userId) {
+                    await loadDashboardData(userId, token);
+                }
+                
+                console.log('✅ User data loaded successfully');
+                
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                // Load fallback content even if there's an error
+                generateVoiceRooms();
+                generateDiscussions();
+                generateMatches();
+                generateBookClubs();
+                generateQuickActions();
             }
         }
-        
-        if (userName) {
-            userName.textContent = user.name || user.email.split('@')[0];
-        }
-        
-        // Load genre books
-        await loadGenreBooks(token);
-        
-        // Load dashboard data for recommendations
-        const userId = user.id || user._id;
-        if (userId) {
-            await loadDashboardData(userId, token);
-        }
-        
-        console.log('✅ User data loaded successfully');
-        
-    } catch (error) {
-        console.error('Error loading user data:', error);
-        // Load fallback content even if there's an error
-        generateVoiceRooms();
-        generateDiscussions();
-        generateMatches();
-        generateBookClubs();
-        generateQuickActions();
-    }
-}
 
-// ===== DASHBOARD DATA LOADING =====
-async function loadDashboardData(userId, token) {
-    try {
-        console.log('Loading dashboard data for user:', userId);
-        
-        // Try to load user-specific data for recommendations
-        const [matchesResponse, clubsResponse] = await Promise.allSettled([
-            fetch(`${API_BASE_URL}/users/${userId}/matches`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            }).catch(() => ({ ok: false })), // Handle fetch errors
-            fetch(`${API_BASE_URL}/users/${userId}/clubs`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            }).catch(() => ({ ok: false })) // Handle fetch errors
-        ]);
-        
-        console.log('Matches response status:', matchesResponse.status);
-        console.log('Clubs response status:', clubsResponse.status);
-        
-        // Handle matches data - only if endpoint exists
-        if (matchesResponse.status === 'fulfilled' && matchesResponse.value.ok) {
+        // ===== DASHBOARD DATA LOADING =====
+        async function loadDashboardData(userId, token) {
             try {
-                const matchesData = await matchesResponse.value.json();
-                if (matchesData.success && matchesData.matches && matchesData.matches.length > 0) {
-                    console.log('Loaded real matches:', matchesData.matches.length);
-                    updateMatchesWithRealData(matchesData.matches);
-                    return; // Skip fallback if we have real data
+                console.log('Loading dashboard data for user:', userId);
+                
+                // Generate fallback content first
+                generateMatches();
+                generateBookClubs();
+                
+                // Then try to load real data if API is available
+                try {
+                    // Use Promise.allSettled to handle API failures gracefully
+                    const [matchesResponse, clubsResponse] = await Promise.allSettled([
+                        fetch(`${API_BASE_URL}/users/${userId}/matches`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        }),
+                        fetch(`${API_BASE_URL}/users/${userId}/clubs`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        })
+                    ]);
+                    
+                    // Handle matches data
+                    if (matchesResponse.status === 'fulfilled' && matchesResponse.value.ok) {
+                        const matchesData = await matchesResponse.value.json();
+                        if (matchesData.success && matchesData.matches?.length > 0) {
+                            console.log('Loaded real matches:', matchesData.matches.length);
+                            updateMatchesWithRealData(matchesData.matches);
+                        }
+                    }
+                    
+                    // Handle clubs data
+                    if (clubsResponse.status === 'fulfilled' && clubsResponse.value.ok) {
+                        const clubsData = await clubsResponse.value.json();
+                        if (clubsData.success && clubsData.clubs?.length > 0) {
+                            console.log('Loaded real clubs:', clubsData.clubs.length);
+                            updateClubsWithRealData(clubsData.clubs);
+                        }
+                    }
+                    
+                } catch (apiError) {
+                    console.log('API not available, using fallback data:', apiError.message);
                 }
+                
             } catch (error) {
-                console.log('Could not parse matches data:', error.message);
+                console.error('Error loading dashboard data:', error);
             }
-        } else {
-            console.log('Matches endpoint not available or returned error');
         }
-        
-        // Handle clubs data - only if endpoint exists
-        if (clubsResponse.status === 'fulfilled' && clubsResponse.value.ok) {
-            try {
-                const clubsData = await clubsResponse.value.json();
-                if (clubsData.success && clubsData.clubs && clubsData.clubs.length > 0) {
-                    console.log('Loaded real clubs:', clubsData.clubs.length);
-                    updateClubsWithRealData(clubsData.clubs);
-                    return; // Skip fallback if we have real data
-                }
-            } catch (error) {
-                console.log('Could not parse clubs data:', error.message);
-            }
-        } else {
-            console.log('Clubs endpoint not available or returned error');
-        }
-        
-        // If we reach here, use fallback data
-        console.log('Using fallback matches and clubs data');
-        generateMatches();
-        generateBookClubs();
-        
-    } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        // Use fallback data
-        generateMatches();
-        generateBookClubs();
-    }
-}
 
         function updateMatchesWithRealData(realMatches) {
             const container = document.getElementById('matchesList');
@@ -2182,7 +2170,6 @@ async function loadDashboardData(userId, token) {
                 const card = document.createElement('div');
                 card.className = 'match-card';
                 
-                // Generate initials from name
                 const initials = match.name ? match.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'UR';
                 
                 card.innerHTML = `
@@ -2208,7 +2195,6 @@ async function loadDashboardData(userId, token) {
                 const card = document.createElement('div');
                 card.className = 'club-card';
                 
-                // Determine icon based on club name or category
                 const icons = ['📖', '📚', '👥', '💬', '🔥', '✨'];
                 const randomIcon = icons[Math.floor(Math.random() * icons.length)];
                 
@@ -2246,45 +2232,44 @@ async function loadDashboardData(userId, token) {
                 
                 genresScroll.innerHTML = '<div class="loading-genre"><div class="genre-header"><div class="genre-category-icon">📚</div><div class="genre-category-name">Loading books...</div></div></div>';
                 
-                // Load books for first 5 genres - only 1 book initially
+                // Load first 5 genres with fallback data first
                 const genresToLoad = ['Fantasy', 'Mystery', 'Romance', 'Sci-Fi', 'Horror'];
                 
-                const loadPromises = genresToLoad.map(async (genre) => {
-                    try {
-                        const response = await fetch(`${API_BASE_URL}/books/popular/${genre}?limit=1`, {
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            },
-                            signal: AbortSignal.timeout(10000) // 10 second timeout
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.success && data.books && data.books.length > 0) {
-                                createGenreCategory(genre, data.books.slice(0, 1), data.total_results || 0);
-                                return true;
-                            } else {
-                                createFallbackGenreCategory(genre);
-                                return false;
-                            }
-                        } else {
-                            console.log(`Failed to load ${genre} books: HTTP ${response.status}`);
-                            createFallbackGenreCategory(genre);
-                            return false;
-                        }
-                    } catch (error) {
-                        if (error.name === 'AbortError') {
-                            console.log(`Timeout loading ${genre} books`);
-                        } else {
-                            console.log(`Could not load ${genre} books:`, error.message);
-                        }
-                        createFallbackGenreCategory(genre);
-                        return false;
-                    }
+                // Create fallback genre categories immediately
+                genresToLoad.forEach(genre => {
+                    createFallbackGenreCategory(genre);
                 });
                 
-                // Wait for all genre loads to complete
-                await Promise.allSettled(loadPromises);
+                // Then try to load real data from API
+                try {
+                    // Try to fetch from local API first
+                    const loadPromises = genresToLoad.map(async (genre) => {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/books/popular/${genre}?limit=1`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.success && data.books && data.books.length > 0) {
+                                    // Update the existing genre category with real data
+                                    updateGenreCategoryWithRealData(genre, data.books[0], data.total_results || 0);
+                                    return true;
+                                }
+                            }
+                        } catch (error) {
+                            console.log(`Could not load ${genre} books from API:`, error.message);
+                        }
+                        return false;
+                    });
+                    
+                    await Promise.allSettled(loadPromises);
+                    
+                } catch (error) {
+                    console.log('API not available, using fallback data');
+                }
                 
                 // Remove loading indicator
                 const loadingIndicator = genresScroll.querySelector('.loading-genre');
@@ -2303,75 +2288,28 @@ async function loadDashboardData(userId, token) {
             }
         }
 
-function createGenreCategory(genreName, books, totalCount = 0) {
-    const genresScroll = document.getElementById('genresScroll');
-    
-    const genreCategory = document.createElement('div');
-    genreCategory.className = 'genre-category';
-    genreCategory.dataset.genre = genreName.toLowerCase();
-    genreCategory.dataset.totalCount = totalCount;
-    
-    // Get icon for this genre
-    const genreInfo = genres.find(g => g.name === genreName);
-    const genreIcon = genreInfo ? genreInfo.icon : '📚';
-    
-    // Only show first book initially (preview style)
-    const previewBook = books[0];
-    if (!previewBook) {
-        createFallbackGenreCategory(genreName);
-        return;
-    }
-    
-    const shortDescription = previewBook.description 
-        ? (previewBook.description.length > 100 ? previewBook.description.substring(0, 100) + '...' : previewBook.description)
-            : 'No description available';
-        
-    const coverUrl = previewBook.cover || `https://placehold.co/60x90/3d2617/f5e6d3?text=${encodeURIComponent(previewBook.title.substring(0, 10))}&font=montserrat`;
-    
-    genreCategory.innerHTML = `
-        <div class="genre-header">
-            <div class="genre-category-icon">${genreIcon}</div>
-            <div class="genre-category-name">${genreName}</div>
-            ${totalCount > 0 ? `<span style="color: #d4b5a0; font-size: 0.85rem; margin-left: auto;">${totalCount} books</span>` : ''}
-        </div>
-        <div class="genre-books-container" style="max-height: 140px;">
-            <div class="genre-book-item preview-book" data-book-id="${previewBook.id}" data-book-title="${previewBook.title.replace(/"/g, '&quot;')}" style="cursor: pointer;">
-                <img src="${coverUrl}" alt="${previewBook.title}" class="genre-book-cover" 
-                     onerror="this.src='https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat'">
-                <div class="genre-book-info">
-                    <div class="genre-book-title">${previewBook.title}</div>
-                    <div class="genre-book-author">${previewBook.authors?.[0] || 'Unknown Author'}</div>
-                    <div class="genre-book-description">${shortDescription}</div>
-        </div>
-            </div>
-        </div>
-        <button class="genre-action-btn" onclick="loadFullGenreList('${genreName}')" style="margin-top: 15px;">
-            <i class="fas fa-chevron-right"></i> View All ${genreName} Books
-        </button>
-    `;
-    
-    genresScroll.appendChild(genreCategory);
-    
-    // Add click event to preview book
-    const bookItem = genreCategory.querySelector('.preview-book');
-    bookItem.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const bookId = this.dataset.bookId;
-            const bookTitle = this.dataset.bookTitle;
-        showBookDetailsModal(bookId, bookTitle);
-    });
-}
-
         function createFallbackGenreCategory(genreName) {
             const genresScroll = document.getElementById('genresScroll');
+            if (!genresScroll) return;
             
             const genreCategory = document.createElement('div');
             genreCategory.className = 'genre-category';
             genreCategory.dataset.genre = genreName.toLowerCase();
+            genreCategory.dataset.fallback = 'true';
             
-            // Get icon for this genre
             const genreInfo = genres.find(g => g.name === genreName);
             const genreIcon = genreInfo ? genreInfo.icon : '📚';
+            
+            // Fallback book data for each genre
+            const fallbackBooks = {
+                'Fantasy': { title: 'The Hobbit', author: 'J.R.R. Tolkien', description: 'A classic fantasy adventure about Bilbo Baggins.' },
+                'Mystery': { title: 'The Silent Patient', author: 'Alex Michaelides', description: 'A psychological thriller with shocking twists.' },
+                'Romance': { title: 'Pride and Prejudice', author: 'Jane Austen', description: 'A timeless romance novel about love and society.' },
+                'Sci-Fi': { title: 'Dune', author: 'Frank Herbert', description: 'Epic science fiction set on the desert planet Arrakis.' },
+                'Horror': { title: 'The Shining', author: 'Stephen King', description: 'A terrifying story of isolation and supernatural forces.' }
+            };
+            
+            const fallbackBook = fallbackBooks[genreName] || { title: 'Popular Book', author: 'Famous Author', description: 'Explore amazing stories' };
             
             genreCategory.innerHTML = `
                 <div class="genre-header">
@@ -2379,12 +2317,12 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                     <div class="genre-category-name">${genreName}</div>
                 </div>
                 <div class="genre-books-container">
-                    <div class="genre-book-item">
-                        <div style="width: 60px; height: 90px; background: rgba(245, 230, 211, 0.1); border-radius: 8px;"></div>
-                        <div style="flex: 1;">
-                            <div class="genre-book-title">Popular ${genreName} Title</div>
-                            <div class="genre-book-author">Famous Author</div>
-                            <div class="genre-book-description">Explore amazing ${genreName.toLowerCase()} stories</div>
+                    <div class="genre-book-item preview-book" data-book-title="${fallbackBook.title.replace(/"/g, '&quot;')}" style="cursor: pointer;">
+                        <img src="https://placehold.co/60x90/3d2617/f5e6d3?text=${encodeURIComponent(fallbackBook.title.substring(0, 10))}&font=montserrat" alt="${fallbackBook.title}" class="genre-book-cover">
+                        <div class="genre-book-info">
+                            <div class="genre-book-title">${fallbackBook.title}</div>
+                            <div class="genre-book-author">${fallbackBook.author}</div>
+                            <div class="genre-book-description">${fallbackBook.description}</div>
                         </div>
                     </div>
                 </div>
@@ -2394,123 +2332,124 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             `;
             
             genresScroll.appendChild(genreCategory);
+            
+            // Add click event to preview book
+            const bookItem = genreCategory.querySelector('.preview-book');
+            bookItem.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const bookTitle = this.dataset.bookTitle;
+                showFallbackBookDetails(genreName, bookTitle);
+            });
         }
 
-        // Load full genre list (200+ books)
-        async function loadFullGenreList(genreName) {
-            try {
-                const auth = checkAuth();
-                if (!auth) return;
-                
-                const { token } = auth;
-                
-                // Show loading state
-                const genreCategory = document.querySelector(`[data-genre="${genreName.toLowerCase()}"]`);
-                if (!genreCategory) return;
-                
-                const actionBtn = genreCategory.querySelector('.genre-action-btn');
-                actionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                actionBtn.disabled = true;
-                
-                // Load up to 200 books
-                const response = await fetch(`${API_BASE_URL}/books/popular/${genreName}?limit=200&page=1`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.books.length > 0) {
-                        displayFullGenreList(genreCategory, genreName, data.books);
-                    } else {
-                        actionBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> No books found';
-                        setTimeout(() => {
-                            actionBtn.innerHTML = `<i class="fas fa-chevron-right"></i> View All ${genreName} Books`;
-                            actionBtn.disabled = false;
-                        }, 2000);
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading full genre list:', error);
-                showMessageModal('Error', `Could not load ${genreName} books at the moment. Please try again later.`, 'error');
-                const actionBtn = genreCategory.querySelector('.genre-action-btn');
-                actionBtn.innerHTML = `<i class="fas fa-chevron-right"></i> View All ${genreName} Books`;
-                actionBtn.disabled = false;
-            }
-        }
-        
-        function displayFullGenreList(genreCategory, genreName, books) {
-            const booksContainer = genreCategory.querySelector('.genre-books-container');
-            const actionBtn = genreCategory.querySelector('.genre-action-btn');
+        function updateGenreCategoryWithRealData(genreName, book, totalCount = 0) {
+            const genreCategory = document.querySelector(`[data-genre="${genreName.toLowerCase()}"]`);
+            if (!genreCategory) return;
             
-            // Clear preview book
-            booksContainer.innerHTML = '';
-            booksContainer.style.maxHeight = '400px';
-            booksContainer.style.overflowY = 'auto';
+            // Update with real data
+            const shortDescription = book.description 
+                ? (book.description.length > 100 ? book.description.substring(0, 100) + '...' : book.description)
+                : 'No description available';
             
-            // Display all books
-            books.forEach(book => {
-                const shortDescription = book.description 
-                    ? (book.description.length > 80 ? book.description.substring(0, 80) + '...' : book.description)
-                    : 'No description available';
-                
-                const coverUrl = book.cover || `https://placehold.co/60x90/3d2617/f5e6d3?text=${encodeURIComponent(book.title.substring(0, 10))}&font=montserrat`;
-                
-                const bookItem = document.createElement('div');
-                bookItem.className = 'genre-book-item';
-                bookItem.dataset.bookId = book.id;
-                bookItem.dataset.bookTitle = book.title.replace(/"/g, '&quot;');
-                bookItem.style.cursor = 'pointer';
-                
-                bookItem.innerHTML = `
-                    <img src="${coverUrl}" alt="${book.title}" class="genre-book-cover" 
-                         onerror="this.src='https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat'">
-                    <div class="genre-book-info">
-                        <div class="genre-book-title">${book.title}</div>
-                        <div class="genre-book-author">${book.authors?.[0] || 'Unknown Author'}</div>
-                        <div class="genre-book-description">${shortDescription}</div>
+            const coverUrl = book.cover || `https://placehold.co/60x90/3d2617/f5e6d3?text=${encodeURIComponent(book.title.substring(0, 10))}&font=montserrat`;
+            
+            genreCategory.innerHTML = `
+                <div class="genre-header">
+                    <div class="genre-category-icon">${genres.find(g => g.name === genreName)?.icon || '📚'}</div>
+                    <div class="genre-category-name">${genreName}</div>
+                    ${totalCount > 0 ? `<span style="color: #d4b5a0; font-size: 0.85rem; margin-left: auto;">${totalCount} books</span>` : ''}
+                </div>
+                <div class="genre-books-container" style="max-height: 140px;">
+                    <div class="genre-book-item preview-book" data-book-id="${book.id}" data-book-title="${book.title.replace(/"/g, '&quot;')}" style="cursor: pointer;">
+                        <img src="${coverUrl}" alt="${book.title}" class="genre-book-cover" 
+                             onerror="this.src='https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat'">
+                        <div class="genre-book-info">
+                            <div class="genre-book-title">${book.title}</div>
+                            <div class="genre-book-author">${book.authors?.[0] || 'Unknown Author'}</div>
+                            <div class="genre-book-description">${shortDescription}</div>
+                        </div>
                     </div>
-                `;
-                
-                bookItem.addEventListener('click', function() {
-                    showBookDetailsModal(book.id, book.title);
-                });
-                
-                booksContainer.appendChild(bookItem);
+                </div>
+                <button class="genre-action-btn" onclick="showMoreGenreBooks('${genreName}')" style="margin-top: 15px;">
+                    <i class="fas fa-chevron-right"></i> View All ${genreName} Books
+                </button>
+            `;
+            
+            // Add click event
+            const bookItem = genreCategory.querySelector('.preview-book');
+            bookItem.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const bookId = this.dataset.bookId;
+                const bookTitle = this.dataset.bookTitle;
+                if (bookId && bookId !== 'undefined') {
+                    showBookDetailsModal(bookId, bookTitle);
+                } else {
+                    showFallbackBookDetails(genreName, bookTitle);
+                }
             });
             
-            // Update button
-            actionBtn.innerHTML = `<i class="fas fa-check"></i> Showing ${books.length} ${genreName} Books`;
-            actionBtn.style.background = 'rgba(16, 185, 129, 0.1)';
-            actionBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            // Mark as updated
+            genreCategory.dataset.fallback = 'false';
         }
-        
-        // Show more genre books - wrapper function for fallback genre categories
-        async function showMoreGenreBooks(genreName) {
-            try {
-                const auth = checkAuth();
-                if (!auth) return;
-                
-                const { token } = auth;
-                
-                // Find the genre category element
-                const genreCategory = document.querySelector(`[data-genre="${genreName.toLowerCase()}"]`);
-                if (!genreCategory) {
-                    console.error(`Genre category not found: ${genreName}`);
-                    return;
+
+        function showFallbackBookDetails(genreName, bookTitle) {
+            const fallbackBookDetails = {
+                'Fantasy': {
+                    title: 'The Hobbit',
+                    author: 'J.R.R. Tolkien',
+                    description: 'The Hobbit is a fantasy novel by English author J. R. R. Tolkien. It was published in 1937 to wide critical acclaim, being nominated for the Carnegie Medal and awarded a prize from the New York Herald Tribune for best juvenile fiction. The book remains popular and is recognized as a classic in children\'s literature.',
+                    year: 1937,
+                    pages: 310,
+                    rating: '4.28/5'
+                },
+                'Mystery': {
+                    title: 'The Silent Patient',
+                    author: 'Alex Michaelides',
+                    description: 'The Silent Patient is a 2019 psychological thriller novel written by British-Cypriot author Alex Michaelides. The successful debut novel was published by Celadon Books, a division of Macmillan Publishers, on 5 February 2019. The audiobook is read by Louise Brealey and Jack Hawkins.',
+                    year: 2019,
+                    pages: 323,
+                    rating: '4.18/5'
+                },
+                'Romance': {
+                    title: 'Pride and Prejudice',
+                    author: 'Jane Austen',
+                    description: 'Pride and Prejudice is an 1813 romantic novel of manners written by Jane Austen. The novel follows the character development of Elizabeth Bennet, the dynamic protagonist of the book who learns about the repercussions of hasty judgments and comes to appreciate the difference between superficial goodness and actual goodness.',
+                    year: 1813,
+                    pages: 432,
+                    rating: '4.28/5'
+                },
+                'Sci-Fi': {
+                    title: 'Dune',
+                    author: 'Frank Herbert',
+                    description: 'Dune is a 1965 epic science fiction novel by American author Frank Herbert, originally published as two separate serials in Analog magazine. It tied with Roger Zelazny\'s This Immortal for the Hugo Award in 1966 and it won the inaugural Nebula Award for Best Novel. It is the first installment of the Dune saga.',
+                    year: 1965,
+                    pages: 412,
+                    rating: '4.25/5'
+                },
+                'Horror': {
+                    title: 'The Shining',
+                    author: 'Stephen King',
+                    description: 'The Shining is a 1977 horror novel by American author Stephen King. It is King\'s third published novel and first hardback bestseller; its success firmly established King as a preeminent author in the horror genre. The setting and characters are influenced by King\'s personal experiences, including both his visit to The Stanley Hotel in 1974 and his recovery from alcoholism.',
+                    year: 1977,
+                    pages: 447,
+                    rating: '4.26/5'
                 }
-                
-                // Use the same logic as loadFullGenreList
-                await loadFullGenreList(genreName);
-            } catch (error) {
-                console.error(`Error showing more ${genreName} books:`, error);
-                showMessageModal('Error', `Could not load ${genreName} books at the moment. Please try again later.`, 'error');
-            }
+            };
+            
+            const bookDetails = fallbackBookDetails[genreName] || {
+                title: bookTitle,
+                author: 'Unknown Author',
+                description: 'No description available.',
+                year: 'Unknown',
+                pages: 'Unknown',
+                rating: 'N/A'
+            };
+            
+            showBookDetailsModal('fallback', bookTitle, bookDetails);
         }
-        
+
         // Comprehensive book details modal
-        async function showBookDetailsModal(bookId, bookTitle) {
+        async function showBookDetailsModal(bookId, bookTitle, fallbackData = null) {
             const auth = checkAuth();
             if (!auth) return;
             
@@ -2530,13 +2469,19 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                     <div style="text-align: center; padding: 40px;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #d4b5a0;"></i>
                         <p style="color: #d4b5a0; margin-top: 15px;">Loading book details...</p>
-                        </div>
+                    </div>
                 </div>
             `;
             document.body.appendChild(loadingModal);
             
+            // If it's a fallback book, use fallback data
+            if (bookId === 'fallback' && fallbackData) {
+                renderBookDetailModal(fallbackData, true);
+                return;
+            }
+            
             try {
-                // Fetch comprehensive book details
+                // Try to fetch book details from API
                 const response = await fetch(`${API_BASE_URL}/books/details/${bookId}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -2548,38 +2493,36 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                     const data = await response.json();
                     if (data.success && data.book) {
                         bookData = data.book;
+                        renderBookDetailModal(bookData, false);
+                        return;
                     }
                 }
                 
-                // If details fetch failed, try to get basic info
-                if (!bookData) {
-                    bookData = {
-                        id: bookId,
-                        title: bookTitle,
-                        description: 'Loading description...',
-                        cover: null,
-                        authors: [{ name: 'Unknown Author' }],
-                        firstPublishDate: null,
-                        publishers: [],
-                        isbn10: null,
-                        isbn13: null,
-                        numberOfPages: null,
-                        subjects: [],
-                        ratings: { average: null, count: 0 }
-                    };
-                }
-                
-                // Render full book detail modal
-                renderBookDetailModal(bookData);
+                // If API fails, show fallback
+                showFallbackBookDetailsFromSearch(bookTitle);
                 
             } catch (error) {
                 console.error('Error loading book details:', error);
                 loadingModal.remove();
-                showMessageModal('Error', 'Could not load book details. Please try again.', 'error');
+                showFallbackBookDetailsFromSearch(bookTitle);
             }
         }
-        
-        function renderBookDetailModal(book) {
+
+        function showFallbackBookDetailsFromSearch(bookTitle) {
+            const fallbackDetails = {
+                title: bookTitle,
+                author: 'Unknown Author',
+                description: 'Details for this book are not currently available. This book may be in our database but detailed information needs to be loaded. Try searching for this book title to find more information.',
+                year: 'Unknown',
+                pages: 'Unknown',
+                rating: 'N/A',
+                subjects: ['General Fiction']
+            };
+            
+            renderBookDetailModal(fallbackDetails, true);
+        }
+
+        function renderBookDetailModal(book, isFallback = false) {
             const modal = document.getElementById('bookDetailModal');
             if (!modal) return;
             
@@ -2587,7 +2530,8 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             const isDescriptionLong = description.length > 300;
             const shortDescription = isDescriptionLong ? description.substring(0, 300) + '...' : description;
             
-            const coverUrl = book.cover || `https://placehold.co/200x300/3d2617/f5e6d3?text=${encodeURIComponent(book.title.substring(0, 15))}&font=montserrat`;
+            const coverUrl = isFallback ? `https://placehold.co/200x300/3d2617/f5e6d3?text=${encodeURIComponent(book.title.substring(0, 15))}&font=montserrat` : 
+                          (book.cover || `https://placehold.co/200x300/3d2617/f5e6d3?text=${encodeURIComponent(book.title.substring(0, 15))}&font=montserrat`);
             
             modal.innerHTML = `
                 <div class="book-detail-overlay" onclick="closeBookDetailModal()"></div>
@@ -2604,12 +2548,10 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                             <h1 class="book-detail-title">${book.title}</h1>
                             
                             <div class="book-detail-authors">
-                                ${book.authors.map(author => `
-                                    <div class="book-author-item">
-                                        <strong>${author.name}</strong>
-                                        ${author.bio ? `<p class="author-bio">${author.bio.substring(0, 150)}...</p>` : ''}
-                                    </div>
-                                `).join('')}
+                                <div class="book-author-item">
+                                    <strong>${book.author || 'Unknown Author'}</strong>
+                                    ${book.author && !isFallback ? `<p class="author-bio">Author information not available</p>` : ''}
+                                </div>
                             </div>
                             
                             <div class="book-detail-description">
@@ -2618,19 +2560,16 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                                 ${isDescriptionLong ? `
                                     <button onclick="toggleDescription()" class="toggle-description-btn">
                                         <span id="descToggle">Show More</span>
-                            </button>
+                                    </button>
                                 ` : ''}
                             </div>
                             
                             <div class="book-detail-meta">
                                 <h3>Publication Details</h3>
                                 <table class="book-meta-table">
-                                    ${book.firstPublishDate ? `<tr><td>First Published:</td><td>${book.firstPublishDate}</td></tr>` : ''}
-                                    ${book.publishers && book.publishers.length > 0 ? `<tr><td>Publisher:</td><td>${book.publishers[0]}</td></tr>` : ''}
-                                    ${book.isbn13 ? `<tr><td>ISBN-13:</td><td>${book.isbn13}</td></tr>` : ''}
-                                    ${book.isbn10 ? `<tr><td>ISBN-10:</td><td>${book.isbn10}</td></tr>` : ''}
-                                    ${book.numberOfPages ? `<tr><td>Pages:</td><td>${book.numberOfPages}</td></tr>` : ''}
-                                    ${book.ratings?.average ? `<tr><td>Rating:</td><td>${book.ratings.average}/5 (${book.ratings.count} ratings)</td></tr>` : ''}
+                                    ${book.year ? `<tr><td>Published:</td><td>${book.year}</td></tr>` : ''}
+                                    ${book.pages ? `<tr><td>Pages:</td><td>${book.pages}</td></tr>` : ''}
+                                    ${book.rating ? `<tr><td>Rating:</td><td>${book.rating}</td></tr>` : ''}
                                 </table>
                             </div>
                             
@@ -2646,15 +2585,15 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                             ` : ''}
                             
                             <div class="book-detail-actions">
-                                <button class="action-btn primary" onclick="addBookToFavorites('${book.id}', '${book.title.replace(/'/g, "\\'")}')">
+                                <button class="action-btn primary" onclick="addBookToFavorites('${book.id || 'fallback'}', '${book.title.replace(/'/g, "\\'")}')">
                                     <i class="fas fa-heart"></i> Add to Favorites
                                 </button>
-                                <button class="action-btn secondary" onclick="findSimilarBooks('${book.id}')">
+                                <button class="action-btn secondary" onclick="findSimilarBooks('${book.id || 'fallback'}')">
                                     <i class="fas fa-search"></i> Find Similar
                                 </button>
-                                <button class="action-btn secondary" onclick="shareBook('${book.id}', '${book.title.replace(/'/g, "\\'")}')">
+                                <button class="action-btn secondary" onclick="shareBook('${book.id || 'fallback'}', '${book.title.replace(/'/g, "\\'")}')">
                                     <i class="fas fa-share"></i> Share
-                            </button>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2667,7 +2606,7 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 window.showFullDescription = false;
             }
         }
-        
+
         function toggleDescription() {
             const descEl = document.getElementById('bookDescription');
             const toggleEl = document.getElementById('descToggle');
@@ -2682,16 +2621,16 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 window.showFullDescription = true;
             }
         }
-        
+
         function closeBookDetailModal() {
             const modal = document.getElementById('bookDetailModal');
             if (modal) modal.remove();
         }
-        
+
         function findSimilarBooks(bookId) {
             showMessageModal('Coming Soon', 'Finding similar books feature coming soon!', 'info');
         }
-        
+
         function shareBook(bookId, bookTitle) {
             const url = window.location.href;
             if (navigator.share) {
@@ -2714,45 +2653,38 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 const { token, user } = auth;
                 const userId = user.id || user._id;
                 
-                // Add to user's profile books
-                const response = await fetch(`${API_BASE_URL}/users/${userId}/books`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        bookId: bookId,
-                        bookTitle: bookTitle
-                    })
-                });
+                if (bookId === 'fallback') {
+                    showMessageModal('Info', `"${bookTitle}" is a sample book. In the full version, this would be added to your favorites.`, 'info');
+                    return;
+                }
                 
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Show success message
-                    const successMsg = document.createElement('div');
-                    successMsg.style.cssText = `
-                        position: fixed;
-                        bottom: 20px;
-                        right: 20px;
-                        background: #10b981;
-                        color: white;
-                        padding: 15px 25px;
-                        border-radius: 10px;
-                        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-                        z-index: 10002;
-                        animation: fadeInUp 0.3s ease;
-                    `;
-                    successMsg.innerHTML = `<i class="fas fa-check"></i> "${bookTitle}" added to your profile!`;
-                    document.body.appendChild(successMsg);
+                // Try to add to user's profile books
+                try {
+                    const response = await fetch(`${API_BASE_URL}/users/${userId}/books`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            bookId: bookId,
+                            bookTitle: bookTitle
+                        })
+                    });
                     
-                    setTimeout(() => {
-                        successMsg.style.animation = 'fadeOut 0.3s ease';
-                        setTimeout(() => successMsg.remove(), 300);
-                    }, 3000);
-                } else {
-                    showMessageModal('Error', data.message || 'Failed to add book', 'error');
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            showMessageModal('Success', `"${bookTitle}" added to your profile!`, 'success');
+                        } else {
+                            showMessageModal('Error', data.message || 'Failed to add book', 'error');
+                        }
+                    } else {
+                        showMessageModal('Info', `"${bookTitle}" would be added to your favorites. API not available.`, 'info');
+                    }
+                } catch (apiError) {
+                    console.log('API not available:', apiError.message);
+                    showMessageModal('Info', `"${bookTitle}" would be added to your favorites.`, 'info');
                 }
             } catch (error) {
                 console.error('Error adding book to favorites:', error);
@@ -2760,123 +2692,497 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             }
         }
 
-        // ===== INTERACTION HANDLERS =====
-        function setupConnectButtons() {
-            document.addEventListener('click', async function(e) {
-                if (e.target.classList.contains('match-btn')) {
-                    e.stopPropagation();
-                    const userId = e.target.dataset.userId;
-                    const userName = e.target.dataset.userName || 'User';
-                    
-                    if (e.target.textContent === 'Connect') {
-                        try {
-                            const token = localStorage.getItem('litlink_token');
-                            
-                            console.log(`Connecting with user ${userId}...`);
-                            
-                            // Simulate API call (replace with real API)
-                            setTimeout(() => {
-                                e.target.textContent = 'Connected';
-                                e.target.disabled = true;
-                                e.target.innerHTML = 'Connected <i class="fas fa-check"></i>';
-                                showMessageModal('Success', `Connected with ${userName}!`, 'success');
-                            }, 500);
-                            
-                        } catch (error) {
-                            console.error('Connection error:', error);
-                            showMessageModal('Error', 'Failed to connect. Please try again.', 'error');
+        // ===== IMPROVED SEARCH FUNCTIONALITY =====
+function setupSearch() {
+    const searchInput = document.getElementById('dashSearchInput');
+    if (!searchInput) {
+        console.warn('Search input not found');
+        return;
+    }
+    
+    let searchTimeout;
+    let lastQuery = '';
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear dropdown if query is empty
+        if (query.length === 0) {
+            closeSearchResults();
+            return;
+        }
+        
+        // Show suggestions for short queries (1-2 characters)
+        if (query.length < 3) {
+            closeSearchResults();
+            
+            // Show helpful message for short queries
+            if (query.length > 0) {
+                showSearchSuggestions(query);
+            }
+            return;
+        }
+        
+        // Only search if query changed significantly
+        if (query !== lastQuery) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performDashboardSearch(query);
+                lastQuery = query;
+            }, 500); // Reduced delay for better UX
+        }
+    });
+    
+    // Handle Enter key
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const query = this.value.trim();
+            if (query.length >= 2) {
+                clearTimeout(searchTimeout);
+                performDashboardSearch(query);
+            } else if (query.length > 0) {
+                showSearchSuggestions(query);
+            }
+        }
+    });
+    
+    // Focus/blur handling
+    searchInput.addEventListener('focus', function() {
+        const query = this.value.trim();
+        if (query.length > 0 && query.length < 3) {
+            showSearchSuggestions(query);
+        }
+    });
+}
+
+// Show helpful suggestions for short queries
+function showSearchSuggestions(query) {
+    closeSearchResults();
+    
+    const searchBar = document.querySelector('.search-bar');
+    if (!searchBar) return;
+    
+    const dropdown = document.createElement('div');
+    dropdown.id = 'searchResultsDropdown';
+    dropdown.className = 'search-results-dropdown show';
+    
+    let suggestionMessage = '';
+    if (query.length === 1) {
+        suggestionMessage = 'Type more letters to see search results';
+    } else if (query.length === 2) {
+        suggestionMessage = 'Almost there! Type one more letter for better results';
+    }
+    
+    const suggestions = getSearchSuggestions(query);
+    
+    dropdown.innerHTML = `
+        <div class="search-results-header">
+            <h4>Search Tips</h4>
+            <button class="search-results-close" onclick="closeSearchResults()">&times;</button>
+        </div>
+        <div class="search-results-list">
+            <div class="search-results-empty">
+                <i class="fas fa-lightbulb" style="color: #eab308;"></i>
+                <p style="margin-bottom: 15px;">${suggestionMessage}</p>
+                
+                ${suggestions.length > 0 ? `
+                    <div style="text-align: left;">
+                        <p style="color: #f5e6d3; font-size: 0.9rem; margin-bottom: 10px;">Try these popular searches:</p>
+                        ${suggestions.map(suggestion => `
+                            <div class="search-result-item" style="cursor: pointer;" onclick="useSearchSuggestion('${suggestion}')">
+                                <i class="fas fa-search" style="color: #d4b5a0;"></i>
+                                <div class="search-result-info">
+                                    <div class="search-result-title">${suggestion}</div>
+                                    <div class="search-result-author">Popular search</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(245, 230, 211, 0.1);">
+                    <p style="color: #d4b5a0; font-size: 0.85rem;">
+                        <i class="fas fa-info-circle"></i> Tip: Type at least 3 letters for best results
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    searchBar.appendChild(dropdown);
+    
+    // Close on outside click
+    setTimeout(() => {
+        document.addEventListener('click', function closeOnOutsideClick(e) {
+            if (!searchBar.contains(e.target)) {
+                closeSearchResults();
+                document.removeEventListener('click', closeOnOutsideClick);
+            }
+        });
+    }, 100);
+}
+
+// Get search suggestions based on query
+function getSearchSuggestions(query) {
+    const popularSearches = [
+        'Harry Potter',
+        'Stephen King',
+        'Fantasy',
+        'Romance',
+        'Mystery',
+        'Science Fiction',
+        'Biography',
+        'Self Help',
+        'Classic Literature',
+        'Young Adult'
+    ];
+    
+    if (!query) return popularSearches.slice(0, 3);
+    
+    const lowerQuery = query.toLowerCase();
+    
+    // Exact matches first
+    const exactMatches = popularSearches.filter(item => 
+        item.toLowerCase().startsWith(lowerQuery)
+    );
+    
+    // Partial matches
+    const partialMatches = popularSearches.filter(item => 
+        item.toLowerCase().includes(lowerQuery) && 
+        !item.toLowerCase().startsWith(lowerQuery)
+    );
+    
+    // Combine and limit to 3 results
+    return [...exactMatches, ...partialMatches].slice(0, 3);
+}
+
+// Use a search suggestion
+function useSearchSuggestion(suggestion) {
+    const searchInput = document.getElementById('dashSearchInput');
+    if (searchInput) {
+        searchInput.value = suggestion;
+        performDashboardSearch(suggestion);
+    }
+}
+
+        // Show a loading state while searching real books
+        function showSearchLoading(query) {
+            const searchBar = document.querySelector('.search-bar');
+            if (!searchBar) return;
+            
+            closeSearchResults();
+            
+            const dropdown = document.createElement('div');
+            dropdown.id = 'searchResultsDropdown';
+            dropdown.className = 'search-results-dropdown show';
+            
+            dropdown.innerHTML = `
+                <div class="search-results-header">
+                    <h4>Searching for "${query}"...</h4>
+                    <button class="search-results-close" onclick="closeSearchResults()">&times;</button>
+                </div>
+                <div class="search-results-list">
+                    <div class="search-results-empty">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p style="margin-top: 10px;">Finding real books for "<strong>${query}</strong>"</p>
+                        <p style="font-size: 0.85rem; color: #d4b5a0; margin-top: 6px;">
+                            Connected to Litlink book service&hellip;
+                        </p>
+                    </div>
+                </div>
+                <div style="padding: 15px; border-top: 1px solid rgba(245, 230, 211, 0.1); background: rgba(245, 230, 211, 0.05);">
+                    <p style="color: #d4b5a0; font-size: 0.85rem; text-align: center; margin: 0;">
+                        Results will update automatically once loaded.
+                    </p>
+                </div>
+            `;
+            
+            searchBar.appendChild(dropdown);
+        }
+
+        async function performDashboardSearch(query) {
+            try {
+                if (!query || query.trim().length < 3) {
+                    console.log('Query too short, showing suggestions instead');
+                    showSearchSuggestions(query);
+                    return;
+                }
+                
+                const auth = checkAuth();
+                if (!auth) return;
+                
+                console.log('🔍 Searching for:', query);
+                
+                // Show real-time loading state instead of demo data
+                showSearchLoading(query);
+                
+                const { token } = auth;
+                const response = await fetch(`${API_BASE_URL}/books/search?query=${encodeURIComponent(query)}&limit=8`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Search failed with status ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Search response:', data);
+                
+                if (data.success && Array.isArray(data.books) && data.books.length > 0) {
+                    // Render only real books from backend
+                    updateSearchResultsWithRealData(data.books, query);
+                } else {
+                    // No real results – show a helpful empty state (no demo titles)
+                    const dropdown = document.getElementById('searchResultsDropdown');
+                    if (dropdown) {
+                        const header = dropdown.querySelector('.search-results-header h4');
+                        if (header) {
+                            header.textContent = `No results for "${query}"`;
+                        }
+                        const list = dropdown.querySelector('.search-results-list');
+                        if (list) {
+                            list.innerHTML = `
+                                <div class="search-results-empty">
+                                    <i class="fas fa-book-open" style="opacity: 0.4;"></i>
+                                    <p style="margin-top: 10px;">No books found for "<strong>${query}</strong>".</p>
+                                    <p style="font-size: 0.85rem; color: #d4b5a0; margin-top: 6px;">
+                                        Try another title, author, or genre.
+                                    </p>
+                                </div>
+                            `;
                         }
                     }
                 }
-            });
-        }
-
-        // Setup join room handlers
-        function setupRoomJoinButtons() {
-            document.addEventListener('click', async function(e) {
-                if (e.target.classList.contains('room-join-btn')) {
-                    e.stopPropagation();
-                    const roomTitle = e.target.closest('.voice-room-card').querySelector('.room-title').textContent;
-                    
-                    const token = localStorage.getItem('litlink_token');
-                    if (!token) {
-                        showMessageModal('Login Required', 'Please login first', 'warning');
-                        return;
-                    }
-                    
-                    // Simulate joining
-                    showMessageModal('Joining Room', `Joining voice room: ${roomTitle}`, 'info');
-                    
-                    // Update button state
-                    e.target.textContent = 'Joined';
-                    e.target.disabled = true;
-                    e.target.innerHTML = '<i class="fas fa-check"></i> Joined';
-                }
-            });
-        }
-
-        // Setup join club handlers
-        function setupClubJoinButtons() {
-            document.addEventListener('click', async function(e) {
-                if (e.target.classList.contains('club-join-btn')) {
-                    e.stopPropagation();
-                    const clubName = e.target.closest('.club-card').querySelector('.club-title').textContent;
-                    
-                    const token = localStorage.getItem('litlink_token');
-                    if (!token) {
-                        showMessageModal('Login Required', 'Please login first', 'warning');
-                        return;
-                    }
-                    
-                    // Simulate API call
-                    showMessageModal('Joining Club', `Joining book club: ${clubName}`, 'info');
-                    
-                    // Update button state
-                    e.target.textContent = 'Joined';
-                    e.target.disabled = true;
-                    e.target.innerHTML = 'Joined <i class="fas fa-check"></i>';
-                }
-            });
-        }
-
-        function handleQuickAction(action) {
-            const actions = {
-                'viewVoiceRooms': () => {
-                    const voiceRoomsSection = document.querySelector('.voice-rooms-grid').closest('.section');
-                    voiceRoomsSection.scrollIntoView({ 
-                        behavior: 'smooth' 
-                    });
-                },
-                'viewDiscussions': () => {
-                    const discussionsSection = document.querySelector('.discussions-list').closest('.section');
-                    discussionsSection.scrollIntoView({ 
-                        behavior: 'smooth' 
-                    });
-                },
-                'findMatches': () => {
-                    const matchesSection = document.querySelector('.matches-list').closest('.section');
-                    matchesSection.scrollIntoView({ 
-                        behavior: 'smooth' 
-                    });
-                },
-                'viewClubs': () => {
-                    const clubsSection = document.querySelector('.clubs-grid').closest('.section');
-                    clubsSection.scrollIntoView({ 
-                        behavior: 'smooth' 
-                    });
-                },
-                'startDiscussion': () => {
-                    showMessageModal('Coming Soon', 'Opening discussion creator...', 'info');
-                },
-                'createClub': () => {
-                    showMessageModal('Coming Soon', 'Opening club creator...', 'info');
-                }
-            };
-            
-            if (actions[action]) {
-                actions[action]();
+            } catch (error) {
+                console.error('Search error:', error);
+                // Fall back to demo results only if backend/search is unavailable
+                showDemoSearchResults(query);
             }
         }
+
+function showDemoSearchResults(query) {
+    const searchBar = document.querySelector('.search-bar');
+    if (!searchBar) return;
+    
+    closeSearchResults();
+    
+    // Demo search results based on query
+    const demoBooks = generateDemoSearchResults(query);
+    
+    const dropdown = document.createElement('div');
+    dropdown.id = 'searchResultsDropdown';
+    dropdown.className = 'search-results-dropdown show';
+    
+    dropdown.innerHTML = `
+        <div class="search-results-header">
+            <h4>Found ${demoBooks.length} demo result${demoBooks.length !== 1 ? 's' : ''} for "${query}"</h4>
+            <button class="search-results-close" onclick="closeSearchResults()">&times;</button>
+        </div>
+        <div class="search-results-list">
+            ${demoBooks.map((book, index) => {
+                const title = book.title.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                return `
+                    <div class="search-result-item" onclick="addBookFromSearch('demo${index}', '${title}')">
+                        <img src="${book.cover}" alt="${book.title}" class="search-result-cover">
+                        <div class="search-result-info">
+                            <div class="search-result-title">${book.title}</div>
+                            <div class="search-result-author">${book.author}</div>
+                            ${book.description ? `<div style="color: #8b6f47; font-size: 0.8rem; margin-top: 5px;">${book.description}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        <div style="padding: 15px; border-top: 1px solid rgba(245, 230, 211, 0.1); background: rgba(245, 230, 211, 0.05);">
+            <p style="color: #d4b5a0; font-size: 0.85rem; text-align: center; margin: 0;">
+                <i class="fas fa-info-circle"></i> Showing demo results. Real books will appear when API is connected.
+            </p>
+        </div>
+    `;
+    
+    searchBar.appendChild(dropdown);
+}
+
+function generateDemoSearchResults(query) {
+    const lowerQuery = query.toLowerCase();
+    
+    // Common book titles for demo
+    const demoBookLibrary = [
+        {
+            title: 'Harry Potter and the Philosopher\'s Stone',
+            author: 'J.K. Rowling',
+            description: 'The first book in the Harry Potter series',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=HP1&font=montserrat'
+        },
+        {
+            title: 'The Hobbit',
+            author: 'J.R.R. Tolkien',
+            description: 'A fantasy adventure novel',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=Hobbit&font=montserrat'
+        },
+        {
+            title: 'Pride and Prejudice',
+            author: 'Jane Austen',
+            description: 'Classic romance novel',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=P&P&font=montserrat'
+        },
+        {
+            title: '1984',
+            author: 'George Orwell',
+            description: 'Dystopian social science fiction',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=1984&font=montserrat'
+        },
+        {
+            title: 'To Kill a Mockingbird',
+            author: 'Harper Lee',
+            description: 'Southern Gothic novel',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=TKAM&font=montserrat'
+        },
+        {
+            title: 'The Great Gatsby',
+            author: 'F. Scott Fitzgerald',
+            description: 'Tragic story of Jay Gatsby',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=Gatsby&font=montserrat'
+        },
+        {
+            title: 'Moby Dick',
+            author: 'Herman Melville',
+            description: 'Adventure of Captain Ahab',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=Moby&font=montserrat'
+        },
+        {
+            title: 'War and Peace',
+            author: 'Leo Tolstoy',
+            description: 'Historical novel set during Napoleon\'s invasion',
+            cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=War&font=montserrat'
+        }
+    ];
+    
+    // Filter based on query
+    let results = demoBookLibrary.filter(book => 
+        book.title.toLowerCase().includes(lowerQuery) ||
+        book.author.toLowerCase().includes(lowerQuery) ||
+        book.description.toLowerCase().includes(lowerQuery)
+    );
+    
+    // If no matches, show some general results
+    if (results.length === 0) {
+        results = [
+            {
+                title: `Books related to "${query}"`,
+                author: 'Various Authors',
+                description: 'Search our full library for more results',
+                cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=Search&font=montserrat'
+            },
+            {
+                title: 'Explore Different Genres',
+                author: 'LitLink Suggestions',
+                description: 'Try searching by genre: Fantasy, Mystery, Romance, etc.',
+                cover: 'https://placehold.co/60x90/3d2617/f5e6d3?text=Genres&font=montserrat'
+            }
+        ];
+    }
+    
+    // Limit to 6 results for better UI
+    return results.slice(0, 6);
+}
+
+function updateSearchResultsWithRealData(realBooks, query) {
+    const dropdown = document.getElementById('searchResultsDropdown');
+    if (!dropdown || !realBooks || realBooks.length === 0) return;
+    
+    // Only update if we have real data
+    dropdown.querySelector('.search-results-header h4').textContent = `Found ${realBooks.length} result${realBooks.length !== 1 ? 's' : ''} for "${query}"`;
+    
+    const resultsList = dropdown.querySelector('.search-results-list');
+    if (resultsList) {
+        resultsList.innerHTML = realBooks.map(book => {
+            const title = (book.title || 'Unknown Title').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const author = book.authors ? (Array.isArray(book.authors) ? book.authors[0] : book.authors) : 'Unknown Author';
+            const cover = book.cover || 'https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat';
+            return `
+                <div class="search-result-item" onclick="addBookFromSearch('${book.id}', '${title}')">
+                    <img src="${cover}" alt="${title}" class="search-result-cover" 
+                         onerror="this.src='https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat'">
+                    <div class="search-result-info">
+                        <div class="search-result-title">${title}</div>
+                        <div class="search-result-author">${author}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Update footer message
+        const footer = dropdown.querySelector('div[style*="padding: 15px; border-top"]');
+        if (footer) {
+            footer.innerHTML = `
+                <p style="color: #10b981; font-size: 0.85rem; text-align: center; margin: 0;">
+                    <i class="fas fa-check-circle"></i> Showing real search results from database
+                </p>
+            `;
+        }
+    }
+}
+
+function closeSearchResults() {
+    const dropdown = document.getElementById('searchResultsDropdown');
+    if (dropdown) {
+        dropdown.style.opacity = '0';
+        dropdown.style.transform = 'translateY(-10px)';
+        setTimeout(() => dropdown.remove(), 300);
+    }
+}
+
+async function addBookFromSearch(bookId, bookTitle) {
+    try {
+        const auth = checkAuth();
+        if (!auth) return;
+        
+        if (bookId.startsWith('demo')) {
+            showMessageModal('Demo Feature', 
+                `"${bookTitle}" is a demo search result. In the full version, this would open the book details or add it to your favorites.`, 
+                'info');
+            return;
+        }
+        
+        const { token, user } = auth;
+        const userId = user.id || user._id;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/users/${userId}/books`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bookId: bookId,
+                    bookTitle: bookTitle
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessageModal('Success', `"${bookTitle}" added to your profile!`, 'success');
+                closeSearchResults();
+            } else {
+                showMessageModal('Error', data.message || 'Failed to add book', 'error');
+            }
+        } catch (apiError) {
+            console.log('API not available:', apiError.message);
+            showMessageModal('Info', 
+                `"${bookTitle}" would be added to your favorites in the full version.`, 
+                'info');
+            closeSearchResults();
+        }
+    } catch (error) {
+        console.error('Error adding book from search:', error);
+        showMessageModal('Error', 'Failed to add book to favorites', 'error');
+    }
+}
 
         // ===== CONTENT GENERATION FUNCTIONS =====
         function generateVoiceRooms() {
@@ -3033,179 +3339,94 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             });
         }
 
-        // ===== FIXED SEARCH FUNCTIONALITY =====
-        function setupSearch() {
-            const searchInput = document.getElementById('dashSearchInput');
-            if (!searchInput) {
-                console.warn('Search input not found');
-                return;
+        function handleQuickAction(action) {
+            const actions = {
+                'viewVoiceRooms': () => {
+                    const voiceRoomsSection = document.querySelector('.voice-rooms-grid').closest('.section');
+                    voiceRoomsSection.scrollIntoView({ 
+                        behavior: 'smooth' 
+                    });
+                },
+                'viewDiscussions': () => {
+                    const discussionsSection = document.querySelector('.discussions-list').closest('.section');
+                    discussionsSection.scrollIntoView({ 
+                        behavior: 'smooth' 
+                    });
+                },
+                'findMatches': () => {
+                    const matchesSection = document.querySelector('.matches-list').closest('.section');
+                    matchesSection.scrollIntoView({ 
+                        behavior: 'smooth' 
+                    });
+                },
+                'viewClubs': () => {
+                    const clubsSection = document.querySelector('.clubs-grid').closest('.section');
+                    clubsSection.scrollIntoView({ 
+                        behavior: 'smooth' 
+                    });
+                },
+                'startDiscussion': () => {
+                    showMessageModal('Coming Soon', 'Opening discussion creator...', 'info');
+                },
+                'createClub': () => {
+                    showMessageModal('Coming Soon', 'Opening club creator...', 'info');
+                }
+            };
+            
+            if (actions[action]) {
+                actions[action]();
             }
-            let searchTimeout;
-            
-            searchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    const query = this.value.trim();
-                    if (query.length >= 2) {
-                        performDashboardSearch(query);
-                    }
-                }
-            });
-            
-            searchInput.addEventListener('input', function() {
-                const query = this.value.trim();
-                if (query.length >= 3) {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        performDashboardSearch(query);
-                    }, 500);
-                }
-            });
         }
 
-        async function performDashboardSearch(query) {
-            try {
-                const auth = checkAuth();
-                if (!auth) return;
-                
-                const { token } = auth;
-                
-                console.log('Searching for:', query);
-                
-                const response = await fetch(`${API_BASE_URL}/books/search?query=${encodeURIComponent(query)}&limit=8`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Search response:', data);
+        // ===== INTERACTION HANDLERS =====
+        function setupConnectButtons() {
+            document.addEventListener('click', async function(e) {
+                if (e.target.classList.contains('match-btn')) {
+                    e.stopPropagation();
+                    const userName = e.target.dataset.userName || 'User';
                     
-                    if (data.success && data.books) {
-                        // Show results even if empty - showSearchResults handles empty state
-                        showSearchResults(data.books, query);
-                    } else {
-                        // If response format is unexpected, try fallback
-                        console.warn('Unexpected search response format:', data);
-                        // Still show empty results instead of trying fallback
-                        showSearchResults([], query);
+                    if (e.target.textContent === 'Connect') {
+                        e.target.textContent = 'Connected';
+                        e.target.disabled = true;
+                        e.target.innerHTML = 'Connected <i class="fas fa-check"></i>';
+                        showMessageModal('Success', `Connected with ${userName}!`, 'success');
                     }
-                } else {
-                    console.error('Search API error:', response.status);
-                    const errorText = await response.text().catch(() => '');
-                    console.error('Error details:', errorText);
-                    // Show empty results instead of fallback
-                    showSearchResults([], query);
                 }
-            } catch (error) {
-                console.error('Search error:', error);
-                showMessageModal('Search Unavailable', 'Search service unavailable. Please try again later.', 'error');
-            }
+            });
         }
 
-        async function tryFallbackSearch(query) {
-            console.log('Trying fallback search for:', query);
-            
-            // Simulate fallback search
-            setTimeout(() => {
-                const fallbackBooks = [
-                    {
-                        id: 'fallback1',
-                        title: `Search results for "${query}"`,
-                        authors: ['Try different keywords'],
-                        cover: 'https://via.placeholder.com/180x200.png?text=No+Results'
-                    },
-                    {
-                        id: 'fallback2',
-                        title: 'Try: Fantasy, Mystery, Romance',
-                        authors: ['Popular genres'],
-                        cover: 'https://via.placeholder.com/180x200.png?text=Try+Again'
-                    }
-                ];
-                
-                showSearchResults(fallbackBooks, query);
-            }, 500);
+        function setupRoomJoinButtons() {
+            document.addEventListener('click', async function(e) {
+                if (e.target.classList.contains('room-join-btn')) {
+                    e.stopPropagation();
+                    const roomTitle = e.target.closest('.voice-room-card').querySelector('.room-title').textContent;
+                    
+                    showMessageModal('Joining Room', `Joining voice room: ${roomTitle}`, 'info');
+                    
+                    e.target.textContent = 'Joined';
+                    e.target.disabled = true;
+                    e.target.innerHTML = '<i class="fas fa-check"></i> Joined';
+                }
+            });
         }
 
-        function showSearchResults(books, query) {
-            // Remove existing search results dropdown
-            const existingDropdown = document.getElementById('searchResultsDropdown');
-            if (existingDropdown) {
-                existingDropdown.remove();
-            }
-            
-            // Get search bar container
-            const searchBar = document.querySelector('.search-bar');
-            if (!searchBar) return;
-            
-            // Create dropdown container
-            const dropdown = document.createElement('div');
-            dropdown.id = 'searchResultsDropdown';
-            dropdown.className = 'search-results-dropdown show';
-            
-            if (books.length > 0) {
-                dropdown.innerHTML = `
-                    <div class="search-results-header">
-                        <h4>Found ${books.length} result${books.length !== 1 ? 's' : ''} for "${query}"</h4>
-                        <button class="search-results-close" onclick="closeSearchResults()">&times;</button>
-                        </div>
-                    <div class="search-results-list">
-                        ${books.map(book => {
-                            const title = (book.title || 'Unknown Title').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                            const author = book.authors ? (Array.isArray(book.authors) ? book.authors[0] : book.authors) : 'Unknown Author';
-                            const cover = book.cover || 'https://placehold.co/60x90/3d2617/f5e6d3?text=No+Cover&font=montserrat';
-                            return `
-                                <div class="search-result-item" onclick="addBookFromSearch('${book.id}', '${title}')">
-                                    <img src="${cover}" alt="${title}" class="search-result-cover" 
-                                         onerror="this.src='https://placehold.co/60x90/3d2617/f5e6d3?text=Book&font=montserrat'">
-                                    <div class="search-result-info">
-                                        <div class="search-result-title">${title}</div>
-                                        <div class="search-result-author">${author}</div>
-                                            </div>
-                                            </div>
-                            `;
-                        }).join('')}
-                                        </div>
-                `;
-            } else {
-                dropdown.innerHTML = `
-                    <div class="search-results-header">
-                        <h4>Search Results</h4>
-                        <button class="search-results-close" onclick="closeSearchResults()">&times;</button>
-                                    </div>
-                    <div class="search-results-empty">
-                        <i class="fas fa-book-open"></i>
-                        <p>No results found for "${query}"</p>
-                        <p style="font-size: 0.85rem; margin-top: 5px;">Try different keywords or browse genres</p>
-                            </div>
-                `;
-            }
-            
-            // Append to search bar
-            searchBar.appendChild(dropdown);
-            
-            // Close dropdown when clicking outside
-            setTimeout(() => {
-                document.addEventListener('click', function closeOnOutsideClick(e) {
-                    if (!searchBar.contains(e.target)) {
-                        closeSearchResults();
-                        document.removeEventListener('click', closeOnOutsideClick);
-                    }
-                });
-            }, 100);
+        function setupClubJoinButtons() {
+            document.addEventListener('click', async function(e) {
+                if (e.target.classList.contains('club-join-btn')) {
+                    e.stopPropagation();
+                    const clubName = e.target.closest('.club-card').querySelector('.club-title').textContent;
+                    
+                    showMessageModal('Joining Club', `Joining book club: ${clubName}`, 'info');
+                    
+                    e.target.textContent = 'Joined';
+                    e.target.disabled = true;
+                    e.target.innerHTML = 'Joined <i class="fas fa-check"></i>';
+                }
+            });
         }
-        
-        function closeSearchResults() {
-            const dropdown = document.getElementById('searchResultsDropdown');
-            if (dropdown) {
-                dropdown.classList.remove('show');
-                setTimeout(() => dropdown.remove(), 300);
-            }
-        }
-        
+
         // ===== CUSTOM MODAL SYSTEM =====
-        function showMessageModal(title, message, type = 'info', callback = null) {
-            // Remove existing modals
+        function showMessageModal(title, message, type = 'info') {
             const existingModal = document.getElementById('customModalOverlay');
             if (existingModal) existingModal.remove();
             
@@ -3226,32 +3447,30 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                     <div class="custom-modal-header">
                         <div class="custom-modal-icon ${type}">
                             ${icons[type] || icons.info}
-                            </div>
+                        </div>
                         <h3 class="custom-modal-title">${title}</h3>
                         <button class="custom-modal-close" onclick="closeCustomModal()">&times;</button>
-                            </div>
+                    </div>
                     <div class="custom-modal-body">
                         ${message}
                     </div>
                     <div class="custom-modal-actions">
-                        <button class="custom-modal-btn custom-modal-btn-primary" onclick="closeCustomModal(${callback ? 'true' : ''})">OK</button>
+                        <button class="custom-modal-btn custom-modal-btn-primary" onclick="closeCustomModal()">OK</button>
                     </div>
                 </div>
             `;
             
             document.body.appendChild(overlay);
             
-            // Close on overlay click
             overlay.addEventListener('click', function(e) {
                 if (e.target === overlay) {
-                    closeCustomModal(callback);
+                    closeCustomModal();
                 }
             });
             
-            // Close on Escape key
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
-                    closeCustomModal(callback);
+                    closeCustomModal();
                     document.removeEventListener('keydown', escapeHandler);
                 }
             };
@@ -3259,7 +3478,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
         }
         
         function showConfirmModal(title, message, onConfirm, onCancel = null) {
-            // Remove existing modals
             const existingModal = document.getElementById('customModalOverlay');
             if (existingModal) existingModal.remove();
             
@@ -3288,19 +3506,16 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             
             document.body.appendChild(overlay);
             
-            // Store callbacks
             overlay.dataset.onConfirm = 'true';
             window.__modalOnConfirm = onConfirm;
             window.__modalOnCancel = onCancel;
             
-            // Close on overlay click
             overlay.addEventListener('click', function(e) {
                 if (e.target === overlay) {
                     closeCustomModal(false);
                 }
             });
             
-            // Close on Escape key
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     closeCustomModal(false);
@@ -3330,7 +3545,7 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 }, 300);
             }
         }
-        
+
         // Add fadeOut animation
         const style = document.createElement('style');
         style.textContent += `
@@ -3340,51 +3555,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             }
         `;
         document.head.appendChild(style);
-
-        async function addBookFromSearch(bookId, bookTitle) {
-            try {
-                const auth = checkAuth();
-                if (!auth) return;
-                
-                const { token, user } = auth;
-                const userId = user.id || user._id;
-                
-                if (bookId.startsWith('fallback')) {
-                    showMessageModal('Cannot Add Book', `Cannot add "${bookTitle}" - this is a placeholder result.`, 'warning');
-                    return;
-                }
-                
-                // Add to user's profile books
-                const response = await fetch(`${API_BASE_URL}/users/${userId}/books`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        bookId: bookId,
-                        bookTitle: bookTitle
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showMessageModal('Success', `"${bookTitle}" added to your profile!`, 'success');
-                    closeSearchResults();
-                    
-                    // Remove modal
-                    const modal = document.querySelector('div[style*="position: fixed; top: 0; left: 0"]');
-                    if (modal) modal.remove();
-                    
-                } else {
-                    showMessageModal('Error', data.message || 'Failed to add book', 'error');
-                }
-            } catch (error) {
-                console.error('Error adding book from search:', error);
-                showMessageModal('Error', 'Failed to add book to favorites', 'error');
-            }
-        }
 
         // ===== UTILITY FUNCTIONS =====
         function setupGenreScrolling() {
@@ -3402,7 +3572,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 scrollContainer.scrollBy({ left: 300, behavior: 'smooth' });
             });
             
-            // Keyboard navigation
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') {
                     scrollContainer.scrollBy({ left: -300, behavior: 'smooth' });
@@ -3427,7 +3596,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 });
             }, observerOptions);
             
-            // Observe all sections
             document.querySelectorAll('.section').forEach(section => {
                 observer.observe(section);
             });
@@ -3442,7 +3610,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                 e.stopPropagation();
                 
                 showConfirmModal('Confirm Logout', 'Are you sure you want to logout?', function() {
-                    // Clear auth data
                     localStorage.removeItem('litlink_token');
                     localStorage.removeItem('litlink_user');
                     localStorage.removeItem('authToken');
@@ -3451,7 +3618,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
                     
                     showMessageModal('Success', 'Logged out successfully!', 'success');
                     
-                    // Redirect to homepage
                     setTimeout(() => {
                         window.location.href = '../Homepage/index.html';
                     }, 1000);
@@ -3460,7 +3626,6 @@ function createGenreCategory(genreName, books, totalCount = 0) {
         }
 
         function addHoverEffects() {
-            // Add subtle hover effects to cards
             const cards = document.querySelectorAll('.voice-room-card, .match-card, .club-card, .quick-action-card');
             
             cards.forEach(card => {
@@ -3474,65 +3639,86 @@ function createGenreCategory(genreName, books, totalCount = 0) {
             });
         }
 
+        // Load more genre books
+        async function showMoreGenreBooks(genreName) {
+            try {
+                const auth = checkAuth();
+                if (!auth) return;
+                
+                const { token } = auth;
+                
+                showMessageModal('Loading', `Loading more ${genreName} books...`, 'info');
+                
+                // Simulate loading
+                setTimeout(() => {
+                    showMessageModal('Feature Demo', `In the full version, this would load more ${genreName} books from the database.`, 'info');
+                }, 1000);
+                
+            } catch (error) {
+                console.error(`Error showing more ${genreName} books:`, error);
+                showMessageModal('Error', `Could not load ${genreName} books at the moment.`, 'error');
+            }
+        }
+
         // ===== INITIALIZATION =====
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 Dashboard Explore page loaded');
-    
-    try {
-        // Check authentication first
-        const auth = checkAuth();
-        if (!auth) {
-            console.error('❌ Authentication failed, redirecting...');
-            return;
-        }
-        
-        // Load user data first (requires auth)
-        await loadUserData();
-        
-        // Generate fallback content (will be replaced by real data if available)
-        generateVoiceRooms();
-        generateDiscussions();
-        generateQuickActions();
-        
-    } catch (error) {
-        console.error('Initialization error:', error);
-        // Load all fallback content even on error
-        try {
-            generateVoiceRooms();
-            generateDiscussions();
-            generateMatches();
-            generateBookClubs();
-            generateQuickActions();
-        } catch (fallbackError) {
-            console.error('Error generating fallback content:', fallbackError);
-        }
-    }
-    
-    // Setup all interactive handlers
-    try {
-        setupGenreScrolling();
-        setupScrollAnimations();
-        setupConnectButtons();
-        setupRoomJoinButtons();
-        setupClubJoinButtons();
-        setupLogout();
-        setupSearch();
-        addHoverEffects();
-        
-        console.log('✅ Dashboard Explore initialized');
-    } catch (setupError) {
-        console.error('Error setting up interactive handlers:', setupError);
-    }
-});
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 Dashboard Explore page loaded');
+            
+            try {
+                // Check authentication first
+                const auth = checkAuth();
+                if (!auth) {
+                    console.error('❌ Authentication failed, redirecting...');
+                    return;
+                }
+                
+                // Load user data first (requires auth)
+                await loadUserData();
+                
+                // Generate fallback content
+                generateVoiceRooms();
+                generateDiscussions();
+                generateQuickActions();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                // Load all fallback content even on error
+                try {
+                    generateVoiceRooms();
+                    generateDiscussions();
+                    generateMatches();
+                    generateBookClubs();
+                    generateQuickActions();
+                } catch (fallbackError) {
+                    console.error('Error generating fallback content:', fallbackError);
+                }
+            }
+            
+            // Setup all interactive handlers
+            try {
+                setupGenreScrolling();
+                setupScrollAnimations();
+                setupConnectButtons();
+                setupRoomJoinButtons();
+                setupClubJoinButtons();
+                setupLogout();
+                setupSearch();
+                addHoverEffects();
+                
+                console.log('✅ Dashboard Explore initialized');
+            } catch (setupError) {
+                console.error('Error setting up interactive handlers:', setupError);
+            }
+        });
 
-// Global error handler
-window.addEventListener('error', function(e) {
-    console.error('Global error:', e.error);
-});
+        // Global error handler
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+        });
 
-window.addEventListener('unhandledrejection', function(e) {
-    console.error('Unhandled promise rejection:', e.reason);
-});
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
 
     </script>
 </body>

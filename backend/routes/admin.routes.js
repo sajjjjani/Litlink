@@ -1,9 +1,11 @@
+// routes/admin.routes.js
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const FilterWord = require('../models/FilterWord');
 const Report = require('../models/Report');
 const { requireAdmin, requirePermission } = require('../middleware/adminAuth');
+const AdminNotificationService = require('../services/adminNotificationService');
 
 // ===== DASHBOARD STATS =====
 router.get('/dashboard/stats', requireAdmin, async (req, res) => {
@@ -386,6 +388,9 @@ router.post('/users/:userId/ban', requireAdmin, requirePermission('manage_users'
     
     await user.save();
     
+    // Send admin notification
+    await AdminNotificationService.notifyUserBanned(user, req.user, reason);
+    
     // Create a report for this action
     const report = new Report({
       reporter: req.user._id,
@@ -425,6 +430,85 @@ router.post('/users/:userId/ban', requireAdmin, requirePermission('manage_users'
   }
 });
 
+// ===== TEST WEBSOCKET NOTIFICATION =====
+router.post('/test-socket', requireAdmin, async (req, res) => {
+  try {
+    const { message, type, title } = req.body;
+    
+    // Send test notification via WebSocket
+    const io = global.io;
+    if (io) {
+      const notificationData = {
+        type: 'admin-notification',
+        notificationType: type || 'admin_test',
+        title: title || 'Test Notification',
+        message: message || 'This is a test notification from the server',
+        timestamp: new Date(),
+        priority: 'medium',
+        metadata: { 
+          test: true,
+          sentBy: req.user.name,
+          sentAt: new Date()
+        }
+      };
+      
+      const sentCount = io.broadcastToAdmins(notificationData);
+      
+      return res.json({
+        success: true,
+        message: `✅ Test notification sent to ${sentCount} connected admins`,
+        data: notificationData,
+        connectedAdmins: sentCount
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: '❌ WebSocket server not available'
+      });
+    }
+  } catch (error) {
+    console.error('Test socket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ===== GET WEBSOCKET STATUS =====
+router.get('/websocket-status', requireAdmin, async (req, res) => {
+  try {
+    const io = global.io;
+    if (io) {
+      return res.json({
+        success: true,
+        websocket: {
+          enabled: true,
+          connectedAdmins: io.getConnectedAdminCount(),
+          connectedAdminIds: io.getConnectedAdminIds(),
+          status: 'active'
+        }
+      });
+    } else {
+      return res.json({
+        success: true,
+        websocket: {
+          enabled: false,
+          connectedAdmins: 0,
+          connectedAdminIds: [],
+          status: 'inactive'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('WebSocket status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 // Suspend user temporarily
 router.post('/users/:userId/suspend', requireAdmin, requirePermission('manage_users'), async (req, res) => {
   try {
@@ -454,6 +538,9 @@ router.post('/users/:userId/suspend', requireAdmin, requirePermission('manage_us
     user.suspensionEnds = new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
     
     await user.save();
+    
+    // Send admin notification
+    await AdminNotificationService.notifyUserSuspended(user, req.user, reason, duration);
     
     // Create a report for this action
     const report = new Report({
@@ -549,6 +636,29 @@ router.post('/users/:userId/warn', requireAdmin, requirePermission('manage_users
       });
     }
     
+    // Send admin notification
+    await AdminNotificationService.sendToAllAdmins(
+      'admin_warning_issued',
+      'User Warning Issued',
+      `${user.name} warned: ${reason}`,
+      {
+        priority: 'medium',
+        sourceUserId: req.user._id,
+        relatedEntityId: user._id,
+        relatedEntityType: 'User',
+        actionUrl: `/admin/users/${user._id}`,
+        metadata: {
+          userId: user._id.toString(),
+          userName: user.name,
+          userEmail: user.email,
+          warningReason: reason,
+          warnedById: req.user._id.toString(),
+          warnedByName: req.user.name,
+          warnedAt: new Date()
+        }
+      }
+    );
+    
     // Create a report as a warning
     const report = new Report({
       reporter: req.user._id,
@@ -617,6 +727,27 @@ router.delete('/users/:userId', requireAdmin, requirePermission('manage_users'),
     user.bannedBy = req.user._id;
     
     await user.save();
+    
+    // Send admin notification
+    await AdminNotificationService.sendToAllAdmins(
+      'admin_user_banned',
+      'User Account Deleted',
+      `${user.email} account has been deleted`,
+      {
+        priority: 'high',
+        sourceUserId: req.user._id,
+        relatedEntityId: user._id,
+        relatedEntityType: 'User',
+        actionUrl: '/admin/users',
+        metadata: {
+          userId: user._id.toString(),
+          userEmail: user.email,
+          deletedById: req.user._id.toString(),
+          deletedByName: req.user.name,
+          deletedAt: new Date()
+        }
+      }
+    );
     
     res.json({
       success: true,
@@ -743,6 +874,27 @@ router.post('/filter-words', requireAdmin, requirePermission('system_settings'),
     });
     
     await filterWord.save();
+    
+    // Send admin notification
+    await AdminNotificationService.sendToAllAdmins(
+      'admin_filter_word_added',
+      'Filter Word Added',
+      `New filter word added: ${word}`,
+      {
+        priority: 'low',
+        sourceUserId: req.user._id,
+        relatedEntityId: filterWord._id,
+        relatedEntityType: 'FilterWord',
+        actionUrl: '/admin/filter-words',
+        metadata: {
+          word: word,
+          category: category,
+          severity: severity,
+          addedById: req.user._id.toString(),
+          addedByName: req.user.name
+        }
+      }
+    );
     
     res.json({
       success: true,
@@ -921,6 +1073,26 @@ router.post('/filter-words/import', requireAdmin, requirePermission('system_sett
       }
     }
     
+    // Send admin notification for bulk import
+    if (results.added > 0) {
+      await AdminNotificationService.sendToAllAdmins(
+        'admin_filter_word_added',
+        'Filter Words Imported',
+        `${results.added} filter words imported`,
+        {
+          priority: 'low',
+          sourceUserId: req.user._id,
+          actionUrl: '/admin/filter-words',
+          metadata: {
+            addedCount: results.added,
+            skippedCount: results.skipped,
+            errorCount: results.errors,
+            importedBy: req.user.name
+          }
+        }
+      );
+    }
+    
     res.json({
       success: true,
       message: `Imported ${results.added} words, skipped ${results.skipped}, errors: ${results.errors}`,
@@ -1091,6 +1263,11 @@ router.put('/reports/:reportId', requireAdmin, requirePermission('view_reports')
       });
     }
     
+    // Send notification if report was resolved
+    if (status === 'resolved') {
+      await AdminNotificationService.notifyReportResolved(report, req.user);
+    }
+    
     res.json({
       success: true,
       message: 'Report updated successfully',
@@ -1165,6 +1342,9 @@ router.post('/reports/:reportId/resolve', requireAdmin, requirePermission('view_
     
     await report.save();
     
+    // Send admin notification
+    await AdminNotificationService.notifyReportResolved(report, req.user);
+    
     res.json({
       success: true,
       message: 'Report resolved successfully',
@@ -1201,6 +1381,28 @@ router.post('/reports/:reportId/dismiss', requireAdmin, requirePermission('view_
     report.resolvedAt = new Date();
     
     await report.save();
+    
+    // Send admin notification
+    await AdminNotificationService.sendToAllAdmins(
+      'admin_report_resolved',
+      'Report Dismissed',
+      `${report.category} report dismissed by ${req.user.name}`,
+      {
+        priority: 'low',
+        sourceUserId: req.user._id,
+        relatedEntityId: report._id,
+        relatedEntityType: 'Report',
+        actionUrl: `/admin/reports/${report._id}`,
+        metadata: {
+          reportId: report._id.toString(),
+          reportReason: report.reason,
+          dismissedById: req.user._id.toString(),
+          dismissedByName: req.user.name,
+          dismissedAt: new Date(),
+          dismissalReason: reason
+        }
+      }
+    );
     
     res.json({
       success: true,
@@ -1307,6 +1509,86 @@ router.get('/me', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Get admin info error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// Update admin profile (used by Admin Profile page)
+// PUT /api/admin/me
+router.put('/me', requireAdmin, async (req, res) => {
+  try {
+    const { name, email, location } = req.body || {};
+
+    // Only allow safe fields to be updated via this endpoint
+    const updates = {};
+    if (typeof name === 'string') updates.name = name.trim();
+    if (typeof email === 'string') updates.email = email.trim().toLowerCase();
+    if (typeof location === 'string') updates.location = location.trim();
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid fields provided to update'
+      });
+    }
+
+    // Persist changes
+    const updated = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password -verificationCode -resetToken');
+
+    res.json({
+      success: true,
+      message: 'Profile updated',
+      user: updated
+    });
+  } catch (error) {
+    // Handle duplicate email nicely
+    if (error && error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'That email is already in use'
+      });
+    }
+
+    console.error('Update admin profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// Send test notification
+router.post('/test-notification', requireAdmin, async (req, res) => {
+  try {
+    const { type, title, message } = req.body;
+    
+    const notification = await AdminNotificationService.sendToAdmin(
+      req.user._id,
+      type || 'admin_new_user',
+      title || 'Test Notification',
+      message || 'This is a test notification from the admin panel',
+      {
+        priority: 'medium',
+        actionUrl: '/admin/dashboard',
+        metadata: { test: true, timestamp: new Date() }
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Test notification sent',
+      notification
+    });
+    
+  } catch (error) {
+    console.error('Test notification error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

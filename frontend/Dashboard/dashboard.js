@@ -569,6 +569,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Initialize notification system
     initNotifications();
+    // Connect WebSocket for real-time notifications (no refresh)
+    initUserWebSocket(token);
     
     // Update welcome card immediately with user data
     updateWelcomeCard(user);
@@ -642,6 +644,90 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     console.log('📚 Litlink Book Community Dashboard loaded successfully!');
 });
+
+// ===== USER WEBSOCKET (REAL-TIME NOTIFICATIONS) =====
+let userSocket = null;
+let userSocketReconnectTimer = null;
+
+function initUserWebSocket(token) {
+    if (!token) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = 'localhost:5002'; // Backend default
+    const wsUrl = `${protocol}://${host}?token=${encodeURIComponent(token)}`;
+
+    try {
+        console.log('🔌 Connecting to user WebSocket:', wsUrl);
+        userSocket = new WebSocket(wsUrl);
+
+        userSocket.onopen = () => {
+            console.log('✅ User WebSocket connected');
+            try {
+                userSocket.send(JSON.stringify({ type: 'get-unread-count' }));
+            } catch (e) {
+                console.error('Error requesting unread count:', e);
+            }
+        };
+
+        userSocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleUserSocketMessage(data);
+            } catch (e) {
+                console.error('Error parsing user WebSocket message:', e, event.data);
+            }
+        };
+
+        userSocket.onclose = (event) => {
+            console.warn('User WebSocket closed:', event.code, event.reason);
+            scheduleUserSocketReconnect(token);
+        };
+
+        userSocket.onerror = (error) => {
+            console.error('User WebSocket error:', error);
+        };
+    } catch (error) {
+        console.error('Failed to open user WebSocket:', error);
+        scheduleUserSocketReconnect(token);
+    }
+}
+
+function scheduleUserSocketReconnect(token) {
+    if (userSocketReconnectTimer) return;
+    userSocketReconnectTimer = setTimeout(() => {
+        userSocketReconnectTimer = null;
+        initUserWebSocket(token);
+    }, 5000);
+}
+
+function handleUserSocketMessage(data) {
+    if (!data || !data.type) return;
+
+    switch (data.type) {
+        case 'user-authenticated':
+            console.log('User WebSocket authenticated as:', data.userName);
+            break;
+
+        case 'notification-count': {
+            // Keep it simple: refresh notifications so badge + list stay consistent
+            loadNotifications();
+            break;
+        }
+
+        case 'notification':
+            // Show toast + refresh list/badge
+            showNotification(data.title || 'New notification', 'info');
+            loadNotifications();
+            break;
+
+        case 'pong':
+            break;
+
+        default:
+            // Ignore unknown messages
+            break;
+    }
+}
 
 // ===== LOADING STATE FUNCTIONS =====
 

@@ -9,12 +9,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global variables
 let API_BASE = 'http://localhost:5002/api/admin';
+// Root API base for non-admin endpoints (served by same backend)
+// This avoids `/api/...` being requested from Live Server (:5500) which causes 404s.
+let API_ROOT = API_BASE.replace(/\/admin\/?$/, '');
 let authToken = null;
 let currentUser = null;
+// WebSocket handled by modules/admin-websocket.js
 
 async function checkAuthAndInitialize() {
     // Get auth data
     authToken = localStorage.getItem('authToken');
+    if (authToken) window.authToken = authToken;
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     currentUser = user;
     
@@ -27,7 +32,7 @@ async function checkAuthAndInitialize() {
     // Redirect if not admin
     if (!authToken || user.isAdmin !== true) {
         console.log('❌ Not authenticated as admin, redirecting...');
-        showToast('Admin access required. Please login as administrator.', 'warning');
+        AdminUtils.showToast('Admin access required. Please login as administrator.', 'warning');
         
         setTimeout(() => {
             window.location.href = '../login.html';
@@ -66,7 +71,7 @@ async function checkAuthAndInitialize() {
         console.error('❌ Admin authentication failed:', error);
         localStorage.clear();
         
-        showToast('Admin authentication failed. Please login again.', 'warning');
+        AdminUtils.showToast('Admin authentication failed. Please login again.', 'warning');
         
         setTimeout(() => {
             window.location.href = '../login.html';
@@ -111,43 +116,82 @@ function initDashboard() {
     
     // Start real-time updates
     startRealtimeUpdates();
+    // WebSocket init is called below after defining badge/status/toast callbacks
+    initAdminWebSocketWithCallbacks();
     
-    // Load initial data
-    fetchDashboardStats();
+    // Load initial data (with cache + loading strategy)
+    loadDashboardData();
     
     // ===== DATA LOADING FUNCTIONS =====
-    async function fetchDashboardStats() {
+    const DASHBOARD_CACHE_KEY = 'litlink_admin_dashboard_cache';
+    const DASHBOARD_CACHE_MAX_AGE_MS = 60 * 1000; // 1 min
+    const DASHBOARD_SLOW_THRESHOLD_MS = 2000;
+
+    function getCachedDashboardData() {
         try {
-            showLoadingState(true);
-            
-            const response = await fetch(`${API_BASE}/dashboard/stats`, {
-                headers: {
-                    'Authorization': `Bearer ${authToken}`
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch stats');
+            const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+            if (!raw) return null;
+            const { data, at } = JSON.parse(raw);
+            if (Date.now() - at > DASHBOARD_CACHE_MAX_AGE_MS) return null;
+            return data;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function cacheDashboardData(data) {
+        try {
+            sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+                data,
+                at: Date.now()
+            }));
+        } catch (e) {}
+    }
+
+    async function loadDashboardData() {
+        AdminUtils.showLoadingState(true);
+        const cached = getCachedDashboardData();
+        if (cached && cached.success) {
+            updateStats(cached.stats || {});
+            updateRecentReports(cached.recentReports || []);
+            updateRecentActivity(cached.recentActivity || []);
+        }
+        let slowShown = false;
+        const slowTimer = setTimeout(() => {
+            slowShown = true;
+            if (cached && cached.success) {
+                AdminUtils.showToast('Loading latest data…', 'info');
             }
-            
+        }, DASHBOARD_SLOW_THRESHOLD_MS);
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/stats`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            clearTimeout(slowTimer);
+            if (!response.ok) throw new Error('Failed to fetch stats');
             const data = await response.json();
-            
             if (data.success) {
                 updateStats(data.stats);
                 updateRecentReports(data.recentReports || []);
                 updateRecentActivity(data.recentActivity || []);
+                cacheDashboardData(data);
+                if (slowShown) AdminUtils.showToast('Dashboard updated', 'success');
             } else {
-                showToast('Failed to load dashboard data', 'warning');
+                AdminUtils.showToast('Failed to load dashboard data', 'warning');
             }
-            
         } catch (error) {
+            clearTimeout(slowTimer);
             console.error('Error fetching dashboard stats:', error);
-            showToast('Could not connect to server. Please try again.', 'error');
-            // Show empty state instead of mock data
-            showEmptyStatsState();
+            AdminUtils.showToast('Could not connect to server. Please try again.', 'error');
+            if (!cached || !cached.success) showEmptyStatsState();
+            else AdminUtils.showToast('Showing cached data', 'warning');
         } finally {
-            showLoadingState(false);
+            AdminUtils.showLoadingState(false);
         }
+    }
+
+    async function fetchDashboardStats() {
+        await loadDashboardData();
     }
     
     // ===== UI UPDATE FUNCTIONS =====
@@ -305,7 +349,7 @@ function initDashboard() {
             
             // Format time
             const reportTime = new Date(report.createdAt);
-            const timeAgo = getTimeAgo(reportTime);
+            const timeAgo = AdminUtils.getTimeAgo(reportTime);
             
             // Determine badge class
             let badgeClass = 'badge-pending';
@@ -356,7 +400,6 @@ function initDashboard() {
             if (header) {
                 const timestamp = document.createElement('div');
                 timestamp.className = 'timestamp';
-                timestamp.style.cssText = 'font-size: 12px; color: #a78c6d; margin-top: 5px;';
                 timestamp.textContent = message;
                 header.appendChild(timestamp);
             }
@@ -386,7 +429,7 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching report details:', error);
-            showToast('Could not load report details', 'warning');
+            AdminUtils.showToast('Could not load report details', 'warning');
         }
     }
     
@@ -394,20 +437,6 @@ function initDashboard() {
         // Create modal
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
         
         // Format dates
         const createdAt = new Date(report.createdAt).toLocaleString();
@@ -592,27 +621,13 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching user details:', error);
-            showToast('Could not load user details', 'warning');
+            AdminUtils.showToast('Could not load user details', 'warning');
         }
     }
     
     function showUserModal(user, recentReports = [], summary = {}) {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
         
         // Format dates
         const createdAt = new Date(user.createdAt).toLocaleDateString();
@@ -860,15 +875,15 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast(`Warning sent to user: ${reason}`, 'info');
+                AdminUtils.showToast(`Warning sent to user: ${reason}`, 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to warn user', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to warn user', 'warning');
             }
             
         } catch (error) {
             console.error('Error warning user:', error);
-            showToast('Failed to warn user', 'warning');
+            AdminUtils.showToast('Failed to warn user', 'warning');
         }
     }
     
@@ -895,15 +910,15 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast(`User suspended: ${data.message}`, 'info');
+                AdminUtils.showToast(`User suspended: ${data.message}`, 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to suspend user', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to suspend user', 'warning');
             }
             
         } catch (error) {
             console.error('Error suspending user:', error);
-            showToast('Failed to suspend user', 'warning');
+            AdminUtils.showToast('Failed to suspend user', 'warning');
         }
     }
     
@@ -929,15 +944,15 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast(`User banned: ${data.message}`, 'info');
+                AdminUtils.showToast(`User banned: ${data.message}`, 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to ban user', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to ban user', 'warning');
             }
             
         } catch (error) {
             console.error('Error banning user:', error);
-            showToast('Failed to ban user', 'warning');
+            AdminUtils.showToast('Failed to ban user', 'warning');
         }
     }
     
@@ -955,15 +970,15 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast(`User unbanned: ${data.message}`, 'info');
+                AdminUtils.showToast(`User unbanned: ${data.message}`, 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to unban user', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to unban user', 'warning');
             }
             
         } catch (error) {
             console.error('Error unbanning user:', error);
-            showToast('Failed to unban user', 'warning');
+            AdminUtils.showToast('Failed to unban user', 'warning');
         }
     }
     
@@ -984,15 +999,15 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast('Report resolved successfully', 'info');
+                AdminUtils.showToast('Report resolved successfully', 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to resolve report', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to resolve report', 'warning');
             }
             
         } catch (error) {
             console.error('Error resolving report:', error);
-            showToast('Failed to resolve report', 'warning');
+            AdminUtils.showToast('Failed to resolve report', 'warning');
         }
     }
     
@@ -1013,21 +1028,21 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast('Report dismissed successfully', 'info');
+                AdminUtils.showToast('Report dismissed successfully', 'info');
                 fetchDashboardStats(); // Refresh stats
             } else {
-                showToast(data.message || 'Failed to dismiss report', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to dismiss report', 'warning');
             }
             
         } catch (error) {
             console.error('Error dismissing report:', error);
-            showToast('Failed to dismiss report', 'warning');
+            AdminUtils.showToast('Failed to dismiss report', 'warning');
         }
     }
     
     function editUser(userId) {
         // Implement edit user modal
-        showToast('Edit user functionality coming soon', 'info');
+        AdminUtils.showToast('Edit user functionality coming soon', 'info');
     }
     
     async function viewProfileChanges(userId) {
@@ -1046,28 +1061,13 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching profile changes:', error);
-            showToast('Could not load profile changes', 'warning');
+            AdminUtils.showToast('Could not load profile changes', 'warning');
         }
     }
     
     function showProfileChangesModal(user, profileReports, changeCount) {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
-        
         modal.innerHTML = `
             <div class="modal-content" style="
                 background: #2c1810;
@@ -1223,28 +1223,13 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching filter words:', error);
-            showToast('Could not load filter words', 'warning');
+            AdminUtils.showToast('Could not load filter words', 'warning');
         }
     }
     
     function showFilterWordsModal(filterWords, stats) {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
-        
         modal.innerHTML = `
             <div class="modal-content" style="
                 background: #2c1810;
@@ -1550,7 +1535,7 @@ function initDashboard() {
             const wordsText = textarea.value.trim();
             
             if (!wordsText) {
-                showToast('Please enter some words', 'warning');
+                AdminUtils.showToast('Please enter some words', 'warning');
                 return;
             }
             
@@ -1560,7 +1545,7 @@ function initDashboard() {
                 .filter(word => word.length > 0);
             
             if (words.length === 0) {
-                showToast('No valid words found', 'warning');
+                AdminUtils.showToast('No valid words found', 'warning');
                 return;
             }
             
@@ -1586,18 +1571,18 @@ function initDashboard() {
                 const data = await response.json();
                 
                 if (data.success) {
-                    showToast(`Successfully imported ${data.results.added} words`, 'info');
+                    AdminUtils.showToast(`Successfully imported ${data.results.added} words`, 'info');
                     textarea.value = '';
                     // Refresh the list
                     openFilterWordsManager();
                     document.body.removeChild(modal);
                 } else {
-                    showToast(data.message || 'Import failed', 'warning');
+                    AdminUtils.showToast(data.message || 'Import failed', 'warning');
                 }
                 
             } catch (error) {
                 console.error('Error importing words:', error);
-                showToast('Failed to import words', 'warning');
+                AdminUtils.showToast('Failed to import words', 'warning');
             }
         });
         
@@ -1617,7 +1602,7 @@ function initDashboard() {
                     const data = await response.json();
                     
                     if (data.success) {
-                        showToast(`Word ${data.filterWord.isActive ? 'activated' : 'deactivated'}`, 'info');
+                        AdminUtils.showToast(`Word ${data.filterWord.isActive ? 'activated' : 'deactivated'}`, 'info');
                         // Update button text and color
                         btn.textContent = data.filterWord.isActive ? 'Deactivate' : 'Activate';
                         btn.style.background = data.filterWord.isActive ? '#dc2626' : '#16a34a';
@@ -1631,7 +1616,7 @@ function initDashboard() {
                     
                 } catch (error) {
                     console.error('Error toggling word:', error);
-                    showToast('Failed to toggle word status', 'warning');
+                    AdminUtils.showToast('Failed to toggle word status', 'warning');
                 }
             });
         });
@@ -1655,7 +1640,7 @@ function initDashboard() {
                     const data = await response.json();
                     
                     if (data.success) {
-                        showToast('Filter word deleted', 'info');
+                        AdminUtils.showToast('Filter word deleted', 'info');
                         // Remove the row
                         btn.closest('div').parentElement.remove();
                         
@@ -1673,7 +1658,7 @@ function initDashboard() {
                     
                 } catch (error) {
                     console.error('Error deleting word:', error);
-                    showToast('Failed to delete word', 'warning');
+                    AdminUtils.showToast('Failed to delete word', 'warning');
                 }
             });
         });
@@ -1713,18 +1698,18 @@ function initDashboard() {
             const data = await response.json();
             
             if (data.success) {
-                showToast('Filter word added successfully', 'info');
+                AdminUtils.showToast('Filter word added successfully', 'info');
                 // Refresh if filter words modal is open
                 if (document.querySelector('.modal-overlay')) {
                     openFilterWordsManager();
                 }
             } else {
-                showToast(data.message || 'Failed to add filter word', 'warning');
+                AdminUtils.showToast(data.message || 'Failed to add filter word', 'warning');
             }
             
         } catch (error) {
             console.error('Error adding filter word:', error);
-            showToast('Failed to add filter word', 'warning');
+            AdminUtils.showToast('Failed to add filter word', 'warning');
         }
     }
     
@@ -1846,24 +1831,7 @@ function initDashboard() {
                         </a>
                     `;
                     
-                    dropdown.style.cssText = `
-                        position: absolute;
-                        top: 100%;
-                        right: 0;
-                        background: rgba(44, 24, 16, 0.95);
-                        backdrop-filter: blur(10px);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 8px;
-                        padding: 8px;
-                        margin-top: 8px;
-                        min-width: 180px;
-                        z-index: 1000;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-                        opacity: 0;
-                        transform: translateY(-10px);
-                        animation: dropdownAppear 0.2s ease-out forwards;
-                    `;
-                    
+                    dropdown.className = 'user-dropdown';
                     this.appendChild(dropdown);
                     
                     // Add logout functionality
@@ -1906,12 +1874,12 @@ function initDashboard() {
             // Click handler
             button.addEventListener('click', function(e) {
                 e.preventDefault();
-                createRipple(e);
+                AdminUtils.createRipple(e);
                 
                 const action = this.getAttribute('data-action') || this.textContent.trim();
                 console.log(`🚀 Action triggered: ${action}`);
                 
-                showToast(`Opening ${action.replace('-', ' ')}...`, 'info');
+                AdminUtils.showToast(`Opening ${action.replace('-', ' ')}...`, 'info');
                 
                 // Handle different actions
                 handleAdminAction(action);
@@ -1931,7 +1899,7 @@ function initDashboard() {
                 break;
             case 'monitor-voice':
                 // Voice room monitoring (placeholder)
-                showToast('Voice room monitoring coming soon', 'info');
+                AdminUtils.showToast('Voice room monitoring coming soon', 'info');
                 break;
             case 'edit-filters':
                 // Open filter words manager
@@ -1956,28 +1924,13 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching users:', error);
-            showToast('Could not load users', 'warning');
+            AdminUtils.showToast('Could not load users', 'warning');
         }
     }
     
     function showUsersModal(users, pagination, stats) {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
-        
         modal.innerHTML = `
             <div class="modal-content" style="
                 background: #2c1810;
@@ -2231,14 +2184,14 @@ function initDashboard() {
         modal.querySelector('[data-action="prev-page"]').addEventListener('click', () => {
             if (pagination.currentPage > 1) {
                 // Implement pagination
-                showToast('Pagination coming soon', 'info');
+                AdminUtils.showToast('Pagination coming soon', 'info');
             }
         });
         
         modal.querySelector('[data-action="next-page"]').addEventListener('click', () => {
             if (pagination.currentPage < pagination.totalPages) {
                 // Implement pagination
-                showToast('Pagination coming soon', 'info');
+                AdminUtils.showToast('Pagination coming soon', 'info');
             }
         });
     }
@@ -2259,28 +2212,13 @@ function initDashboard() {
             
         } catch (error) {
             console.error('Error fetching reports:', error);
-            showToast('Could not load reports', 'warning');
+            AdminUtils.showToast('Could not load reports', 'warning');
         }
     }
     
     function showReportsModal(reports, pagination, stats) {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-        `;
-        
         modal.innerHTML = `
             <div class="modal-content" style="
                 background: #2c1810;
@@ -2518,13 +2456,13 @@ function initDashboard() {
         // Add pagination handlers
         modal.querySelector('[data-action="prev-page"]').addEventListener('click', () => {
             if (pagination.currentPage > 1) {
-                showToast('Pagination coming soon', 'info');
+                AdminUtils.showToast('Pagination coming soon', 'info');
             }
         });
         
         modal.querySelector('[data-action="next-page"]').addEventListener('click', () => {
             if (pagination.currentPage < pagination.totalPages) {
-                showToast('Pagination coming soon', 'info');
+                AdminUtils.showToast('Pagination coming soon', 'info');
             }
         });
     }
@@ -2534,7 +2472,7 @@ function initDashboard() {
         if (viewAllBtn) {
             viewAllBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                createRipple(e);
+                AdminUtils.createRipple(e);
                 
                 this.style.transform = 'scale(0.95)';
                 setTimeout(() => {
@@ -2550,35 +2488,10 @@ function initDashboard() {
     function setupNotificationBell() {
         const notificationIcon = document.querySelector('.notification-icon');
         if (notificationIcon) {
-            // Check for new notifications periodically
-            setInterval(async () => {
-                try {
-                    // Check for new reports
-                    const response = await fetch(`${API_BASE}/dashboard/stats`, {
-                        headers: {
-                            'Authorization': `Bearer ${authToken}`
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success && data.stats.newReports > 0) {
-                            notificationIcon.style.animation = 'shake 0.5s ease-in-out';
-                            setTimeout(() => {
-                                notificationIcon.style.animation = '';
-                            }, 500);
-                            
-                            // Update badge count
-                            const badge = notificationIcon.querySelector('.notification-badge');
-                            if (badge) {
-                                badge.textContent = data.stats.newReports;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking notifications:', error);
-                }
-            }, 30000); // Check every 30 seconds
+            // Open the notification panel on click
+            notificationIcon.addEventListener('click', function () {
+                toggleNotificationPanel();
+            });
         }
     }
     
@@ -2609,326 +2522,228 @@ function initDashboard() {
             fetchDashboardStats();
         }, 30000);
     }
-    
-    // ===== UTILITY FUNCTIONS =====
-    function createRipple(event) {
-        const button = event.currentTarget;
-        const ripple = document.createElement('span');
-        const rect = button.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const x = event.clientX - rect.left - size / 2;
-        const y = event.clientY - rect.top - size / 2;
 
-        ripple.style.width = ripple.style.height = size + 'px';
-        ripple.style.left = x + 'px';
-        ripple.style.top = y + 'px';
-        ripple.classList.add('ripple');
-        ripple.style.animation = 'ripple 0.6s ease-out';
-
-        const existingRipple = button.querySelector('.ripple');
-        if (existingRipple) {
-            existingRipple.remove();
+    // ===== ADMIN WEBSOCKET (REAL-TIME NOTIFICATIONS) =====
+    function initAdminWebSocketWithCallbacks() {
+        if (typeof window.AdminWebSocket === 'undefined' || !window.AdminWebSocket.init) {
+            console.warn('AdminWebSocket module not loaded');
+            return;
         }
-
-        button.style.position = 'relative';
-        button.style.overflow = 'hidden';
-        button.appendChild(ripple);
-
-        setTimeout(() => {
-            ripple.remove();
-        }, 600);
+        window.AdminWebSocket.init({
+            authToken: authToken,
+            wsHost: 'localhost:5002',
+            updateNotificationBadge: updateAdminNotificationBadge,
+            updateStatusIndicator: updateAdminStatusIndicator,
+            showNotificationToast: showAdminNotificationToast
+        });
     }
-    
-    function showLoadingState(show) {
-        const loader = document.getElementById('dashboard-loader');
-        if (!loader && show) {
-            // Create loader if it doesn't exist
-            const loaderEl = document.createElement('div');
-            loaderEl.id = 'dashboard-loader';
-            loaderEl.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(26, 15, 10, 0.8);
-                backdrop-filter: blur(5px);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 9999;
-                font-size: 18px;
-                color: #d4a574;
-            `;
-            loaderEl.innerHTML = '🔄 Loading dashboard data...';
-            document.body.appendChild(loaderEl);
-        } else if (loader && !show) {
-            loader.remove();
-        }
-    }
-    
-    function showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
+
+    function updateAdminNotificationBadge(count) {
+        const icon = document.querySelector('.notification-icon');
+        if (!icon) return;
         
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: ${type === 'warning' ? 'rgba(234, 179, 8, 0.9)' : 
-                         type === 'error' ? 'rgba(220, 38, 38, 0.9)' : 
-                         type === 'success' ? 'rgba(22, 163, 74, 0.9)' : 
-                         'rgba(44, 24, 16, 0.9)'};
-            color: #f5e6d3;
-            padding: 12px 20px;
-            border-radius: 8px;
-            border-left: 4px solid ${type === 'warning' ? '#eab308' : 
-                              type === 'error' ? '#dc2626' : 
-                              type === 'success' ? '#16a34a' : '#d4a574'};
-            z-index: 10000;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            animation: slideInRight 0.3s ease-out;
-            font-size: 14px;
+        const badge = icon.querySelector('.notification-badge');
+        if (!badge) return;
+        
+        let newCount = 0;
+        if (typeof count === 'string' && count.startsWith('+')) {
+            const current = parseInt(badge.textContent) || 0;
+            newCount = current + parseInt(count.substring(1) || '1', 10);
+        } else {
+            newCount = Math.max(0, parseInt(count, 10) || 0);
+        }
+        
+        if (newCount > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = newCount > 99 ? '99+' : String(newCount);
+            // Subtle shake to draw attention
+            icon.style.animation = 'shake 0.5s ease-in-out';
+            setTimeout(() => {
+                icon.style.animation = '';
+            }, 500);
+        } else {
+            badge.style.display = 'none';
+            badge.textContent = '0';
+        }
+    }
+
+    function updateAdminStatusIndicator(connectedAdmins) {
+        const statusIndicator = document.querySelector('.status-indicator');
+        const footerRight = document.querySelector('.footer-right');
+        if (!statusIndicator || !footerRight) return;
+        
+        // Update tooltip-like text about live admin connections
+        let statusText = footerRight.querySelector('span:nth-child(2)');
+        if (!statusText) return;
+        
+        statusText.textContent = connectedAdmins > 1
+            ? `System Operational • ${connectedAdmins} admins online`
+            : 'System Operational • 1 admin online';
+    }
+
+    function showAdminNotificationToast(payload) {
+        const existing = document.querySelector('.notification-toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'notification-toast';
+        
+        const title = payload.title || 'Admin Notification';
+        const message = payload.message || 'You have a new admin alert.';
+        const time = new Date(payload.timestamp || Date.now()).toLocaleTimeString();
+        
+        toast.innerHTML = `
+            <div style="display:flex; align-items:flex-start; gap:10px;">
+                <div style="font-size:20px; line-height:1.2;">
+                    ${payload.notificationType === 'admin_new_user' ? '👤' :
+                       payload.notificationType === 'admin_new_report' ? '⚠️' :
+                       payload.notificationType === 'admin_user_banned' ? '🚫' :
+                       payload.notificationType === 'admin_user_suspended' ? '⏸️' :
+                       payload.notificationType === 'admin_system_alert' ? '🔧' : '🔔'}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:600; margin-bottom:4px;">${title}</div>
+                    <div style="font-size:0.9rem; color:#d4b5a0;">${message}</div>
+                    <div class="timestamp">${time}</div>
+                </div>
+            </div>
         `;
+        
+        toast.addEventListener('click', () => {
+            toast.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => toast.remove(), 280);
+        });
         
         document.body.appendChild(toast);
         
         setTimeout(() => {
-            toast.style.animation = 'slideOutRight 0.3s ease-out forwards';
-            setTimeout(() => {
-                toast.remove();
-            }, 300);
-        }, 3000);
+            if (!document.body.contains(toast)) return;
+            toast.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => toast.remove(), 280);
+        }, 5000);
     }
-    
-    function getTimeAgo(date) {
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
+
+    async function toggleNotificationPanel() {
+        let panel = document.querySelector('.notification-panel');
+        if (panel) {
+            panel.remove();
+            return;
+        }
         
-        if (diffMins < 1) return 'just now';
-        if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'min' : 'mins'} ago`;
-        if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-        if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
-        return date.toLocaleDateString();
+        try {
+            const response = await fetch(`${API_ROOT}/notifications/admin`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to load admin notifications');
+            }
+            
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to load admin notifications');
+            }
+            
+            renderNotificationPanel(data.notifications || [], data.unreadCount || 0);
+        } catch (error) {
+            console.error('Error loading admin notifications:', error);
+            AdminUtils.showToast('Could not load admin notifications', 'warning');
+        }
+    }
+
+    function renderNotificationPanel(notifications, unreadCount) {
+        const existing = document.querySelector('.notification-panel');
+        if (existing) existing.remove();
+        
+        const panel = document.createElement('div');
+        panel.className = 'notification-panel';
+        
+        const countLabel = unreadCount > 0
+            ? `${unreadCount} unread`
+            : 'No unread';
+        
+        panel.innerHTML = `
+            <div class="notification-header">
+                <h3>Admin Notifications</h3>
+                <button class="notification-action" id="markAllAdminRead">Mark all read</button>
+                <button class="close-notifications" aria-label="Close">&times;</button>
+            </div>
+            <div class="notification-list">
+                ${notifications.length === 0 ? `
+                    <div class="notification-item">
+                        <div class="notification-message">
+                            No admin notifications yet.
+                        </div>
+                    </div>
+                ` : notifications.map(n => `
+                    <div class="notification-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
+                        <div class="notification-item-header">
+                            <div>
+                                <div class="notification-title">${n.title}</div>
+                                <span class="notification-time">${n.timestamp}</span>
+                            </div>
+                            ${n.priority ? `<span class="notification-priority ${n.priority}">${n.priority}</span>` : ''}
+                        </div>
+                        <div class="notification-message">${n.message}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="notification-footer">
+                <button id="viewAllNotifications">View all (${countLabel})</button>
+            </div>
+        `;
+        
+        document.body.appendChild(panel);
+        
+        const closeBtn = panel.querySelector('.close-notifications');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => panel.remove());
+        }
+        
+        const markAllBtn = panel.querySelector('#markAllAdminRead');
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', async () => {
+                try {
+                    const res = await fetch(`${API_ROOT}/notifications/read-all`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ type: 'admin' })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        panel.querySelectorAll('.notification-item.unread').forEach(el => {
+                            el.classList.remove('unread');
+                        });
+                        updateAdminNotificationBadge(0);
+                    }
+                } catch (e) {
+                    console.error('Error marking admin notifications read:', e);
+                }
+            });
+        }
     }
     
+    // ===== UTILITY FUNCTIONS (see modules/admin-utils.js) =====
     function logout() {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        showToast('Logged out successfully', 'info');
+        AdminUtils.showToast('Logged out successfully', 'info');
         
         setTimeout(() => {
-            window.location.href = '../login.html';
+            // Redirect to homepage after admin logout (requested behavior)
+            window.location.href = '../Homepage/index.html';
         }, 1000);
     }
     
     // ===== ERROR HANDLING =====
     window.addEventListener('error', function(e) {
         console.error('Dashboard error:', e.error);
-        showToast('An error occurred. Please refresh.', 'warning');
+        AdminUtils.showToast('An error occurred. Please refresh.', 'warning');
     });
     
-    // Add CSS animations
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes ripple {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }
-        
-        @keyframes shake {
-            0%, 100% { transform: rotate(0); }
-            25% { transform: rotate(-5deg); }
-            75% { transform: rotate(5deg); }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        @keyframes dropdownAppear {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        @keyframes slideOutRight {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
-        
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(0);
-            animation: ripple 0.6s ease-out;
-        }
-        
-        .user-dropdown {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: rgba(44, 24, 16, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 8px;
-            padding: 8px;
-            margin-top: 8px;
-            min-width: 180px;
-            z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            opacity: 0;
-            transform: translateY(-10px);
-            animation: dropdownAppear 0.2s ease-out forwards;
-        }
-        
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 12px;
-            color: #e8d5c4;
-            text-decoration: none;
-            border-radius: 6px;
-            transition: background 0.2s;
-            font-size: 14px;
-        }
-        
-        .dropdown-item:hover {
-            background: rgba(212, 165, 116, 0.1);
-        }
-        
-        .dropdown-item svg {
-            width: 16px;
-            height: 16px;
-        }
-        
-        .stat-card, .mod-card, .report-item {
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-        }
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            padding: 20px;
-            animation: fadeIn 0.3s ease-out;
-        }
-        
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-        
-        .modal-content {
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 800px;
-            width: 100%;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.3s ease-out;
-        }
-        
-        @keyframes slideUp {
-            from {
-                transform: translateY(50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .badge-pending {
-            background: #eab308;
-            color: #1a0f0a;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .badge-reviewed {
-            background: #16a34a;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .badge-warning {
-            background: #f97316;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .action-btn {
-            background: rgba(212, 165, 116, 0.1);
-            color: #d4a574;
-            border: 1px solid rgba(212, 165, 116, 0.2);
-            border-radius: 6px;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .action-btn:hover {
-            background: rgba(212, 165, 116, 0.2);
-            transform: translateY(-1px);
-        }
-    `;
-    document.head.appendChild(style);
 }

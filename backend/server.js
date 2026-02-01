@@ -5,8 +5,8 @@ require('dotenv').config();
 
 // Import models
 const User = require('./models/User');
-const FilterWord = require('./models/FilterWord'); // NEW
-const Report = require('./models/Report'); // NEW
+const FilterWord = require('./models/FilterWord');
+const Report = require('./models/Report');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -17,6 +17,9 @@ const chatRoutes = require('./routes/chatRoutes');
 const adminRoutes = require('./routes/admin.routes');
 const miscRoutes = require('./routes/miscRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+
+// Import WebSocket server
+const SocketServer = require('./socketServer');
 
 const app = express();
 
@@ -50,11 +53,11 @@ const connectDB = async () => {
     const userCount = await User.countDocuments();
     console.log(`📊 Total Users in Database: ${userCount}`);
     
-    const filterWordCount = await FilterWord.countDocuments(); // NEW
-    console.log(`🔤 Filter Words in Database: ${filterWordCount}`); // NEW
+    const filterWordCount = await FilterWord.countDocuments();
+    console.log(`🔤 Filter Words in Database: ${filterWordCount}`);
     
-    const reportCount = await Report.countDocuments(); // NEW
-    console.log(`📋 Reports in Database: ${reportCount}`); // NEW
+    const reportCount = await Report.countDocuments();
+    console.log(`📋 Reports in Database: ${reportCount}`);
     
     const adminExists = await User.findOne({ email: 'admin@litlink.com' });
     if (!adminExists) {
@@ -78,19 +81,34 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', miscRoutes);
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    websocket: global.io ? 'enabled' : 'disabled'
+  });
+});
+
 // ===== START SERVER =====
 const PORT = process.env.PORT || 5002;
+
+// Keep reference to socket server
+let socketServer = null;
 
 const startServer = async () => {
   try {
     await connectDB();
     
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log('='.repeat(60));
       console.log('🚀 Litlink Backend Server Started!');
       console.log('='.repeat(60));
       console.log(`🌐 Server URL: http://localhost:${PORT}`);
       console.log(`🔌 API Base: http://localhost:${PORT}/api`);
+      console.log(`🔌 WebSocket URL: ws://localhost:${PORT}`);
       console.log(`👑 ADMIN ENDPOINTS:`);
       console.log(`   GET    /api/admin/dashboard/stats ✨`);
       console.log(`   GET    /api/admin/users ✨`);
@@ -104,6 +122,7 @@ const startServer = async () => {
       console.log(`   GET    /api/admin/reports ✨`);
       console.log(`   GET    /api/admin/system/info ✨`);
       console.log(`   GET    /api/admin/me ✨`);
+      console.log(`   POST   /api/admin/test-socket ✨ (NEW)`);
       console.log('='.repeat(60));
       console.log('📍 Available Endpoints:');
       console.log('   POST /api/auth/signup');
@@ -120,11 +139,48 @@ const startServer = async () => {
       console.log('   Use: node seed-admin.js to create admin account');
       console.log('='.repeat(60));
     });
+    
+    // Initialize WebSocket server
+    socketServer = new SocketServer(server);
+    global.io = socketServer; // Make accessible globally
+    
+    console.log('✅ WebSocket server initialized');
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', gracefulShutdown);
+    process.on('SIGTERM', gracefulShutdown);
+    
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
+
+// Graceful shutdown
+function gracefulShutdown() {
+  console.log('\n🔄 Shutting down gracefully...');
+  
+  // Close WebSocket server
+  if (socketServer) {
+    console.log('Closing WebSocket server...');
+    socketServer.wss.close(() => {
+      console.log('✅ WebSocket server closed');
+    });
+  }
+  
+  // Close MongoDB connection
+  console.log('Closing MongoDB connection...');
+  mongoose.connection.close(false, () => {
+    console.log('✅ MongoDB connection closed');
+    process.exit(0);
+  });
+  
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Could not close connections in time, forcing shutdown');
+    process.exit(1);
+  }, 10000);
+}
 
 startServer();
 
