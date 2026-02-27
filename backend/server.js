@@ -1,12 +1,18 @@
+// server.js - Complete updated version with fixed Socket.IO
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
+const http = require('http'); // IMPORTANT: Added for Socket.IO
 require('dotenv').config();
 
 // Import models
 const User = require('./models/User');
 const FilterWord = require('./models/FilterWord');
 const Report = require('./models/Report');
+const DiscussionThread = require('./models/DiscussionThread');
+const Conversation = require('./models/Conversation');
+const Notification = require('./models/Notification');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -17,6 +23,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const adminRoutes = require('./routes/admin.routes');
 const miscRoutes = require('./routes/miscRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const discussionRoutes = require('./routes/discussionRoutes');
 
 // Import WebSocket server
 const SocketServer = require('./socketServer');
@@ -35,33 +42,48 @@ app.use(cors({
     'http://localhost:5000',
     'http://127.0.0.1:5000',
     'http://localhost:5002',
-    'http://127.0.0.1:5002'
+    'http://127.0.0.1:5002',
+    'http://localhost:5001',
+    'http://127.0.0.1:5001'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' }));
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Serve static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== DATABASE CONNECTION =====
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/litlink', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     console.log('✅ MongoDB Connected Successfully');
     
+    // Log database stats
     const userCount = await User.countDocuments();
-    console.log(`📊 Total Users in Database: ${userCount}`);
-    
+    const threadCount = await DiscussionThread.countDocuments();
     const filterWordCount = await FilterWord.countDocuments();
-    console.log(`🔤 Filter Words in Database: ${filterWordCount}`);
-    
     const reportCount = await Report.countDocuments();
-    console.log(`📋 Reports in Database: ${reportCount}`);
+    const conversationCount = await Conversation.countDocuments();
     
+    console.log('📊 Database Statistics:');
+    console.log(`   Users: ${userCount}`);
+    console.log(`   Discussion Threads: ${threadCount}`);
+    console.log(`   Filter Words: ${filterWordCount}`);
+    console.log(`   Reports: ${reportCount}`);
+    console.log(`   Conversations: ${conversationCount}`);
+    
+    // Check for admin user
     const adminExists = await User.findOne({ email: 'admin@litlink.com' });
     if (!adminExists) {
-      console.log('⚠️ Admin user not found. Run: node seed-admin.js');
+      console.log('⚠️  Admin user not found. Run: node seed-admin.js');
     } else {
       console.log('✅ Admin user exists');
     }
@@ -79,6 +101,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/discussions', discussionRoutes);
 app.use('/api', miscRoutes);
 
 // Health check endpoint
@@ -88,7 +111,96 @@ app.get('/health', (req, res) => {
     timestamp: new Date(),
     uptime: process.uptime(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    websocket: global.io ? 'enabled' : 'disabled'
+    databaseState: mongoose.STATES[mongoose.connection.readyState],
+    websocket: global.io ? 'enabled' : 'disabled',
+    memory: process.memoryUsage(),
+    cpu: process.cpuUsage()
+  });
+});
+
+// API Info endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Litlink Backend API',
+    version: '1.0.0',
+    description: 'Literary Social Network API',
+    endpoints: {
+      auth: '/api/auth',
+      books: '/api/books',
+      users: '/api/users',
+      dashboard: '/api/dashboard',
+      chat: '/api/chat',
+      admin: '/api/admin',
+      notifications: '/api/notifications',
+      discussions: '/api/discussions',
+      health: '/health'
+    },
+    documentation: 'See README.md for detailed API documentation',
+    status: 'running'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Cannot ${req.method} ${req.url}`,
+    availableEndpoints: [
+      '/api/auth',
+      '/api/books',
+      '/api/users',
+      '/api/dashboard',
+      '/api/chat',
+      '/api/admin',
+      '/api/notifications',
+      '/api/discussions',
+      '/health'
+    ]
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server Error:', err.stack);
+  
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation Error',
+      errors: Object.values(err.errors).map(e => e.message)
+    });
+  }
+  
+  // Mongoose duplicate key error
+  if (err.code === 11000) {
+    return res.status(400).json({
+      success: false,
+      message: 'Duplicate key error',
+      field: Object.keys(err.keyPattern)[0]
+    });
+  }
+  
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+  
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Token expired'
+    });
+  }
+  
+  // Default error
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
@@ -102,53 +214,92 @@ const startServer = async () => {
   try {
     await connectDB();
     
-    const server = app.listen(PORT, () => {
-      console.log('='.repeat(60));
-      console.log('🚀 Litlink Backend Server Started!');
-      console.log('='.repeat(60));
-      console.log(`🌐 Server URL: http://localhost:${PORT}`);
-      console.log(`🔌 API Base: http://localhost:${PORT}/api`);
-      console.log(`🔌 WebSocket URL: ws://localhost:${PORT}`);
-      console.log(`👑 ADMIN ENDPOINTS:`);
-      console.log(`   GET    /api/admin/dashboard/stats ✨`);
-      console.log(`   GET    /api/admin/users ✨`);
-      console.log(`   GET    /api/admin/users/:userId ✨`);
-      console.log(`   POST   /api/admin/users/:userId/ban ✨`);
-      console.log(`   POST   /api/admin/users/:userId/unban ✨`);
-      console.log(`   POST   /api/admin/users/:userId/suspend ✨`);
-      console.log(`   POST   /api/admin/users/:userId/warn ✨`);
-      console.log(`   GET    /api/admin/filter-words ✨`);
-      console.log(`   POST   /api/admin/filter-words ✨`);
-      console.log(`   GET    /api/admin/reports ✨`);
-      console.log(`   GET    /api/admin/system/info ✨`);
-      console.log(`   GET    /api/admin/me ✨`);
-      console.log(`   POST   /api/admin/test-socket ✨ (NEW)`);
-      console.log('='.repeat(60));
-      console.log('📍 Available Endpoints:');
-      console.log('   POST /api/auth/signup');
-      console.log('   POST /api/auth/login');
-      console.log('   POST /api/auth/verify-email');
-      console.log('   GET  /api/books/search (Protected)');
-      console.log('   GET  /api/books/popular/:genre (Public)');
-      console.log('   GET  /api/books/details/:bookId (Protected)');
-      console.log('   GET  /api/dashboard/:userId (Protected)');
-      console.log('   GET  /api/notifications (Protected)');
-      console.log('   GET  /api/health');
-      console.log('='.repeat(60));
-      console.log('💡 Tip: Make sure you have an admin user created');
-      console.log('   Use: node seed-admin.js to create admin account');
-      console.log('='.repeat(60));
-    });
+    // IMPORTANT: Create HTTP server explicitly for Socket.IO
+    const server = http.createServer(app);
     
-    // Initialize WebSocket server
+    // Initialize WebSocket server with the HTTP server
     socketServer = new SocketServer(server);
     global.io = socketServer; // Make accessible globally
     
     console.log('✅ WebSocket server initialized');
     
+    // Start listening
+    server.listen(PORT, () => {
+      console.log('='.repeat(70));
+      console.log('🚀 Litlink Backend Server Started!');
+      console.log('='.repeat(70));
+      console.log(`🌐 HTTP Server: http://localhost:${PORT}`);
+      console.log(`🔌 WebSocket Server: ws://localhost:${PORT}/socket.io`);
+      console.log(`🔌 API Base: http://localhost:${PORT}/api`);
+      console.log('='.repeat(70));
+      
+      console.log('📌 MAIN ENDPOINTS:');
+      console.log('   POST   /api/auth/signup - Register new user');
+      console.log('   POST   /api/auth/login - Login user');
+      console.log('   POST   /api/auth/verify-email - Verify email');
+      console.log('   POST   /api/auth/forgot-password - Forgot password');
+      console.log('   POST   /api/auth/reset-password - Reset password');
+      console.log('   GET    /api/auth/me - Get current user');
+      console.log('='.repeat(70));
+      
+      console.log('📌 DISCUSSION ENDPOINTS:');
+      console.log('   GET    /api/discussions/threads - Get all threads (with filters)');
+      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
+      console.log('   POST   /api/discussions/threads - Create new thread');
+      console.log('   PUT    /api/discussions/threads/:threadId - Update thread');
+      console.log('   DELETE /api/discussions/threads/:threadId - Delete thread');
+      console.log('   POST   /api/discussions/threads/:threadId/like - Like/unlike thread');
+      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
+      console.log('   POST   /api/discussions/threads/:threadId/comments/:commentId/like - Like comment');
+      console.log('   DELETE /api/discussions/threads/:threadId/comments/:commentId - Delete comment');
+      console.log('   GET    /api/discussions/stats/genres - Get genre statistics');
+      console.log('   GET    /api/discussions/user/:userId/threads - Get user threads');
+      console.log('='.repeat(70));
+      
+      console.log('📌 ADMIN ENDPOINTS:');
+      console.log('   GET    /api/admin/dashboard/stats - Dashboard statistics');
+      console.log('   GET    /api/admin/users - List all users');
+      console.log('   GET    /api/admin/users/:userId - Get user details');
+      console.log('   POST   /api/admin/users/:userId/ban - Ban user');
+      console.log('   POST   /api/admin/users/:userId/unban - Unban user');
+      console.log('   POST   /api/admin/users/:userId/suspend - Suspend user');
+      console.log('   POST   /api/admin/users/:userId/warn - Warn user');
+      console.log('   GET    /api/admin/filter-words - List filter words');
+      console.log('   POST   /api/admin/filter-words - Add filter word');
+      console.log('   GET    /api/admin/reports - List reports');
+      console.log('   GET    /api/admin/system/info - System information');
+      console.log('   GET    /api/admin/me - Get admin info');
+      console.log('   POST   /api/admin/test-socket - Test WebSocket');
+      console.log('='.repeat(70));
+      
+      console.log('📌 OTHER ENDPOINTS:');
+      console.log('   GET    /api/books/search - Search books');
+      console.log('   GET    /api/books/popular/:genre - Popular books by genre');
+      console.log('   GET    /api/books/details/:bookId - Book details');
+      console.log('   GET    /api/dashboard/:userId - User dashboard');
+      console.log('   GET    /api/notifications - User notifications');
+      console.log('   GET    /health - Health check');
+      console.log('   GET    / - API information');
+      console.log('='.repeat(70));
+      
+      console.log('💡 Tip: Make sure you have an admin user created');
+      console.log('   Use: node seed-admin.js to create admin account');
+      console.log('='.repeat(70));
+      console.log(`🕐 Server started at: ${new Date().toLocaleString()}`);
+      console.log('='.repeat(70));
+    });
+    
     // Handle graceful shutdown
     process.on('SIGINT', gracefulShutdown);
     process.on('SIGTERM', gracefulShutdown);
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+      gracefulShutdown();
+    });
+    process.on('unhandledRejection', (error) => {
+      console.error('❌ Unhandled Rejection:', error);
+      gracefulShutdown();
+    });
     
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -161,9 +312,9 @@ function gracefulShutdown() {
   console.log('\n🔄 Shutting down gracefully...');
   
   // Close WebSocket server
-  if (socketServer) {
+  if (socketServer && socketServer.io) {
     console.log('Closing WebSocket server...');
-    socketServer.wss.close(() => {
+    socketServer.io.close(() => {
       console.log('✅ WebSocket server closed');
     });
   }
@@ -182,6 +333,7 @@ function gracefulShutdown() {
   }, 10000);
 }
 
+// Start the server
 startServer();
 
 module.exports = app;

@@ -42,6 +42,7 @@ class SocketServer {
         });
       });
 
+      // Verify the server is attached
       console.log('✅ Socket.IO server is ready and listening');
       
     } catch (error) {
