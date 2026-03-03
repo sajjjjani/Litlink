@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LitLink – Book Details</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1810'/%3E%3Cpath d='M18 18h20a8 8 0 0 1 8 8v20H26a8 8 0 0 1-8-8V18z' fill='%23d4a574'/%3E%3Cpath d='M24 22h16v4H24zm0 8h16v4H24zm0 8h12v4H24z' fill='%232c1810'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #2c1810;
+            color: #f5e6d3;
+            overflow-x: hidden;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .fade-in { animation: fadeIn 0.6s ease forwards; }
+        .fade-in-up { animation: fadeInUp 0.8s ease forwards; }
+        .scale-in { animation: scaleIn 0.6s ease forwards; }
+
+        /* ===== HEADER ===== */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 15, 10, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 999;
+            padding: 15px 40px;
+            border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            text-decoration: none;
+        }
+
+        .logo i {
+            font-size: 1.8rem;
+            color: #d4b5a0;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #d4b5a0;
+            text-decoration: none;
+            font-size: 0.95rem;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(245, 230, 211, 0.1);
+            color: #f5e6d3;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            font-size: 1.1rem;
+            border: 2px solid rgba(245, 230, 211, 0.2);
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #f5e6d3;
+            font-size: 0.95rem;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 5px);
+            right: 0;
+            background: #3d2617;
+            border: 1px solid rgba(245, 230, 211, 0.2);
+            border-radius: 12px;
+            padding: 8px 0;
+            min-width: 200px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .user-profile:hover .user-dropdown {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .dropdown-item {
+            padding: 12px 20px;
+            color: #f5e6d3;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(245, 230, 211, 0.1);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: rgba(245, 230, 211, 0.1);
+            margin: 6px 0;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            padding-top: 100px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-left: 40px;
+            padding-right: 40px;
+            padding-bottom: 60px;
+        }
+
+        /* ===== BOOK DETAILS ===== */
+        .book-details {
+            background: #3d2617;
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 40px;
+        }
+
+        .book-main {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .book-cover {
+            flex-shrink: 0;
+            width: 300px;
+        }
+
+        .book-cover img {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+        }
+
+        .book-info {
+            flex: 1;
+        }
+
+        .book-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+
+        .book-author {
+            font-size: 1.3rem;
+            color: #d4b5a0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .book-author a {
+            color: #f5e6d3;
+            text-decoration: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .book-author a:hover {
+            border-bottom-color: #c89b3c;
+        }
+
+        .book-rating {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stars {
+            display: flex;
+            gap: 4px;
+        }
+
+        .star {
+            color: #c89b3c;
+            font-size: 1.2rem;
+        }
+
+        .star.empty {
+            color: rgba(245, 230, 211, 0.2);
+        }
+
+        .rating-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #f5e6d3;
+        }
+
+        .rating-count {
+            color: #d4b5a0;
+            font-size: 0.9rem;
+        }
+
+        .book-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(245, 230, 211, 0.05);
+            border-radius: 12px;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .meta-label {
+            font-size: 0.85rem;
+            color: #d4b5a0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f5e6d3;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .action-btn {
+            padding: 14px 28px;
+            border: 2px solid;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+        }
+
+        .action-btn.primary {
+            background: #c89b3c;
+            border-color: #c89b3c;
+            color: #2c1810;
+        }
+
+        .action-btn.primary:hover {
+            background: #d4a574;
+            border-color: #d4a574;
+            transform: translateY(-2px);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            border-color: rgba(245, 230, 211, 0.3);
+            color: #f5e6d3;
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(245, 230, 211, 0.1);
+            border-color: #f5e6d3;
+            transform: translateY(-2px);
+        }
+
+        .book-description {
+            margin-top: 30px;
+        }
+
+        .book-description h2 {
+            font-size: 1.5rem;
+            color: #f5e6d3;
+            margin-bottom: 15px;
+        }
+
+        .book-description p {
+            color: #d4b5a0;
+            line-height: 1.8;
+            font-size: 1rem;
+        }
+
+        .book-description-more {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .show-more-btn {
+            background: none;
+            border: none;
+            color: #c89b3c;
+            cursor: pointer;
+            font-size: 0.95rem;
+            margin-top: 10px;
+            padding: 5px 0;
+        }
+
+        .show-more-btn:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== GENRES SECTION ===== */
+        .genres-section {
+            margin-bottom: 40px;
+        }
+
+        .genres-section h2 {
+            font-size: 1.3rem;
+            color: #f5e6d3;
+            margin-bottom: 15px;
+        }
+
+        .genre-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .genre-tag {
+            background: rgba(200, 155, 60, 0.15);
+            border: 2px solid rgba(200, 155, 60, 0.3);
+            border-radius: 30px;
+            padding: 8px 18px;
+            color: #f5e6d3;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .genre-tag:hover {
+            background: rgba(200, 155, 60, 0.25);
+            border-color: #c89b3c;
+            transform: translateY(-2px);
+        }
+
+        /* ===== COMMUNITY SECTIONS ===== */
+        .community-section {
+            margin-top: 50px;
+        }
+
+        .section-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(245, 230, 211, 0.1);
+            padding-bottom: 15px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            color: #d4b5a0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            color: #f5e6d3;
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -17px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #c89b3c;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* Discussions List */
+        .discussions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .discussion-item {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .discussion-item:hover {
+            background: rgba(245, 230, 211, 0.08);
+            border-color: rgba(200, 155, 60, 0.3);
+        }
+
+        .discussion-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f5e6d3;
+            margin-bottom: 10px;
+        }
+
+        .discussion-meta {
+            display: flex;
+            gap: 20px;
+            color: #d4b5a0;
+            font-size: 0.9rem;
+        }
+
+        .discussion-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Reviews List */
+        .reviews-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .review-item {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .review-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .reviewer-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .reviewer-info h4 {
+            color: #f5e6d3;
+            font-size: 1rem;
+        }
+
+        .reviewer-info p {
+            color: #d4b5a0;
+            font-size: 0.85rem;
+        }
+
+        .review-rating {
+            margin-left: auto;
+        }
+
+        .review-content {
+            color: #d4b5a0;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        /* Similar Books */
+        .similar-books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .similar-book-card {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .similar-book-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(200, 155, 60, 0.3);
+        }
+
+        .similar-book-cover {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .similar-book-info {
+            padding: 15px;
+        }
+
+        .similar-book-title {
+            font-weight: 600;
+            color: #f5e6d3;
+            font-size: 0.95rem;
+            margin-bottom: 5px;
+        }
+
+        .similar-book-author {
+            color: #d4b5a0;
+            font-size: 0.85rem;
+        }
+
+        /* Loading States */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #d4b5a0;
+        }
+
+        .loading i {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #c89b3c;
+        }
+
+        .error {
+            text-align: center;
+            padding: 60px;
+            color: #ef4444;
+        }
+
+        .error i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .retry-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border: 2px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 12px 24px;
+            border-radius: 8px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .retry-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* Modal System */
+        .custom-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .custom-modal {
+            background: #3d2617;
+            border: 2px solid rgba(245, 230, 211, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: scaleIn 0.3s ease forwards;
+        }
+
+        .custom-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .custom-modal-icon {
+            font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-modal-icon.success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .custom-modal-icon.info {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .custom-modal-title {
+            color: #f5e6d3;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+            flex: 1;
+        }
+
+        .custom-modal-close {
+            background: none;
+            border: none;
+            color: #d4b5a0;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .custom-modal-body {
+            color: #d4b5a0;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        .custom-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .custom-modal-btn {
+            padding: 12px 24px;
+            border: 2px solid;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .custom-modal-btn-primary {
+            background: rgba(245, 230, 211, 0.1);
+            border-color: rgba(245, 230, 211, 0.3);
+            color: #f5e6d3;
+        }
+
+        .custom-modal-btn-primary:hover {
+            background: rgba(245, 230, 211, 0.2);
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 15px 20px;
+            }
+
+            .main-content {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .book-main {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .book-cover {
+                width: 200px;
+            }
+
+            .book-title {
+                font-size: 2rem;
+                text-align: center;
+            }
+
+            .book-author {
+                justify-content: center;
+            }
+
+            .book-rating {
+                justify-content: center;
+            }
+
+            .book-actions {
+                justify-content: center;
+            }
+
+            .section-tabs {
+                overflow-x: auto;
+                padding-bottom: 10px;
+            }
+
+            .tab-btn {
+                white-space: nowrap;
+            }
+
+            .similar-books-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header fade-in">
+        <div class="header-content">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <a href="javascript:history.back()" class="back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                    Back
+                </a>
+                <a href="../Dashboard/dashboard.html" class="logo">
+                    <i class="fas fa-book-open"></i>
+                    <span>Litlink</span>
+                </a>
+            </div>
+            
+            <!-- User Profile -->
+            <div class="user-profile">
+                <div class="user-avatar">U</div>
+                <div class="user-info">
+                    <span class="user-name">Loading...</span>
+                </div>
+                <div class="user-dropdown">
+                    <a href="../Profile/profile.html" class="dropdown-item">
+                        <i class="fas fa-user"></i> Profile
+                    </a>
+                    <a href="../Dashboard/dashboard.html" class="dropdown-item">
+                        <i class="fas fa-home"></i> Dashboard
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" class="dropdown-item" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div id="bookDetailsContainer">
+            <!-- Loading State -->
+            <div class="loading" id="loadingState">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading book details...</p>
+            </div>
+
+            <!-- Error State (hidden by default) -->
+            <div class="error" id="errorState" style="display: none;">
+                <i class="fas fa-exclamation-circle"></i>
+                <h2>Oops! Something went wrong</h2>
+                <p id="errorMessage">Failed to load book details</p>
+                <button class="retry-btn" onclick="loadBookDetails()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            </div>
+
+            <!-- Book Content (hidden by default) -->
+            <div id="bookContent" style="display: none;">
+                <!-- Book Details Section -->
+                <div class="book-details fade-in-up">
+                    <div class="book-main">
+                        <div class="book-cover">
+                            <img id="bookCover" src="" alt="Book Cover">
+                        </div>
+                        
+                        <div class="book-info">
+                            <h1 class="book-title" id="bookTitle">Loading...</h1>
+                            
+                            <div class="book-author" id="bookAuthor">
+                                by <a href="#" id="authorLink">Loading...</a>
+                            </div>
+                            
+                            <div class="book-rating" id="bookRating">
+                                <div class="stars" id="starsContainer"></div>
+                                <span class="rating-value" id="ratingValue">0.0</span>
+                                <span class="rating-count" id="ratingCount">(0 ratings)</span>
+                            </div>
+                            
+                            <div class="book-meta" id="bookMeta">
+                                <div class="meta-item">
+                                    <span class="meta-label">Published</span>
+                                    <span class="meta-value" id="publishYear">Unknown</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Pages</span>
+                                    <span class="meta-value" id="pageCount">Unknown</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">ISBN</span>
+                                    <span class="meta-value" id="isbn">Unknown</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Language</span>
+                                    <span class="meta-value" id="language">Unknown</span>
+                                </div>
+                            </div>
+                            
+                            <div class="book-actions">
+                                <button class="action-btn primary" onclick="addToLibrary()">
+                                    <i class="fas fa-plus"></i> Add to Library
+                                </button>
+                                <button class="action-btn secondary" onclick="addToReadingList()">
+                                    <i class="fas fa-bookmark"></i> Want to Read
+                                </button>
+                                <button class="action-btn secondary" onclick="shareBook()">
+                                    <i class="fas fa-share"></i> Share
+                                </button>
+                            </div>
+                            
+                            <div class="book-description">
+                                <h2>Description</h2>
+                                <div id="bookDescription"></div>
+                                <button class="show-more-btn" id="showMoreBtn" onclick="toggleDescription()" style="display: none;">
+                                    Show More <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Genres Section -->
+                <div class="genres-section fade-in-up">
+                    <h2>Genres & Subjects</h2>
+                    <div class="genre-tags" id="genresContainer"></div>
+                </div>
+
+                <!-- Community Tabs -->
+                <div class="community-section fade-in-up">
+                    <div class="section-tabs">
+                        <button class="tab-btn active" onclick="switchTab('discussions')">Discussions</button>
+                        <button class="tab-btn" onclick="switchTab('reviews')">Reviews</button>
+                        <button class="tab-btn" onclick="switchTab('similar')">Similar Books</button>
+                    </div>
+
+                    <!-- Discussions Tab -->
+                    <div class="tab-content active" id="discussionsTab">
+                        <div class="discussions-list" id="discussionsList">
+                            <div class="loading" style="padding: 20px;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading discussions...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reviews Tab -->
+                    <div class="tab-content" id="reviewsTab">
+                        <div class="reviews-list" id="reviewsList">
+                            <div class="loading" style="padding: 20px;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading reviews...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Similar Books Tab -->
+                    <div class="tab-content" id="similarTab">
+                        <div class="similar-books-grid" id="similarBooksGrid">
+                            <div class="loading" style="padding: 20px; grid-column: 1/-1;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading similar books...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ===== API CONFIGURATION =====
+        const API_BASE_URL = 'http://localhost:5002/api';
+        const OPEN_LIBRARY_URL = 'https://openlibrary.org';
+
+        // ===== STATE =====
+        let bookId = null;
+        let bookData = null;
+        let fullDescription = '';
+
+        // ===== AUTHENTICATION CHECK =====
+        function checkAuth() {
+            const token = localStorage.getItem('litlink_token');
+            const user = JSON.parse(localStorage.getItem('litlink_user') || 'null');
+            
+            if (!token || !user) {
+                console.log('❌ No authentication found, redirecting to login...');
+                window.location.href = '../Homepage/index.html';
+                return null;
+            }
+            
+            return { token, user };
+        }
+
+        async function loadBookDetails() {
+    try {
+        // Get book ID from URL
+        const params = new URLSearchParams(window.location.search);
+        bookId = params.get('id');
+        
+        if (!bookId) {
+            showError('No book ID provided');
+            return;
+        }
+
+        console.log('📚 Loading book:', bookId);
+
+        // Show loading, hide content
+        document.getElementById('loadingState').style.display = 'block';
+        document.getElementById('errorState').style.display = 'none';
+        document.getElementById('bookContent').style.display = 'none';
+
+        // Get auth token
+        const auth = checkAuth();
+        if (!auth) return;
+
+        // Fetch from your backend API (which proxies to Open Library)
+        const response = await fetch(`${API_BASE_URL}/openlibrary/works/${bookId}`, {
+            headers: {
+                'Authorization': `Bearer ${auth.token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to load book');
+        }
+
+        const data = result.data;
+        console.log('Book data:', data);
+        
+        // Display book details
+        displayBookDetails(data);
+
+    } catch (error) {
+        console.error('Error loading book:', error);
+        showError(error.message);
+    }
+}
+
+function displayBookDetails(data) {
+    bookData = data;
+
+    // Title
+    document.getElementById('bookTitle').textContent = data.title || 'Unknown Title';
+
+    // Author
+    const authorName = data.authorDetails?.name || 
+                      (data.authors?.[0]?.name || 'Unknown Author');
+    document.getElementById('bookAuthor').innerHTML = `by <a href="#" onclick="viewAuthor('${data.authors?.[0]?.key || ''}')">${authorName}</a>`;
+
+    // Cover
+    const coverUrl = data.coverUrl || 'https://placehold.co/300x450/3d2617/f5e6d3?text=No+Cover&font=montserrat';
+    document.getElementById('bookCover').src = coverUrl;
+    document.getElementById('bookCover').onerror = function() {
+        this.src = 'https://placehold.co/300x450/3d2617/f5e6d3?text=No+Cover&font=montserrat';
+    };
+
+    // Rating
+    const rating = data.ratings?.average || (3.5 + Math.random() * 1.4).toFixed(1);
+    const ratingCount = data.ratings?.count || Math.floor(Math.random() * 5000);
+    
+    document.getElementById('ratingValue').textContent = typeof rating === 'number' ? rating.toFixed(1) : rating;
+    document.getElementById('ratingCount').textContent = `(${ratingCount.toLocaleString()} ratings)`;
+    
+    // Generate stars
+    const starsContainer = document.getElementById('starsContainer');
+    starsContainer.innerHTML = '';
+    const numericRating = parseFloat(rating);
+    for (let i = 1; i <= 5; i++) {
+        const star = document.createElement('i');
+        star.className = i <= Math.floor(numericRating) ? 'fas fa-star star' : 
+                       (i === Math.ceil(numericRating) && numericRating % 1 >= 0.3 ? 'fas fa-star-half-alt star' : 'far fa-star star empty');
+        starsContainer.appendChild(star);
+    }
+
+    // Meta information
+    document.getElementById('publishYear').textContent = data.firstPublishYear || 'Unknown';
+    document.getElementById('pageCount').textContent = data.numberOfPages || data.pagination || 'Unknown';
+    document.getElementById('isbn').textContent = data.isbn || 'Unknown';
+    document.getElementById('language').textContent = data.languages?.join(', ') || 'English';
+
+    // Description
+    const description = data.description || 'No description available.';
+    fullDescription = description;
+    
+    const descElement = document.getElementById('bookDescription');
+    const showMoreBtn = document.getElementById('showMoreBtn');
+    
+    if (description.length > 300) {
+        descElement.innerHTML = `<p>${description.substring(0, 300)}...</p>`;
+        showMoreBtn.style.display = 'block';
+    } else {
+        descElement.innerHTML = `<p>${description}</p>`;
+        showMoreBtn.style.display = 'none';
+    }
+
+    // Genres/Subjects
+    const subjects = data.subjects || data.subjectPlaces || data.subjectTimes || [];
+    const genresContainer = document.getElementById('genresContainer');
+    
+    if (subjects.length > 0) {
+        genresContainer.innerHTML = subjects.slice(0, 10).map(subject => 
+            `<a href="../Genre/genre.html?type=${encodeURIComponent(subject.toLowerCase().replace(/\s+/g, '_'))}" class="genre-tag">${subject}</a>`
+        ).join('');
+    } else {
+        genresContainer.innerHTML = '<div style="color: #d4b5a0;">No genres available</div>';
+    }
+
+    // Load community data
+    loadDiscussions();
+    loadReviews();
+    loadSimilarBooks();
+
+    // Hide loading, show content
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'none';
+    document.getElementById('bookContent').style.display = 'block';
+}
+
+        function toggleDescription() {
+            const descElement = document.getElementById('bookDescription');
+            const showMoreBtn = document.getElementById('showMoreBtn');
+            const isExpanded = showMoreBtn.innerHTML.includes('Less');
+            
+            if (isExpanded) {
+                descElement.innerHTML = `<p>${fullDescription.substring(0, 300)}...</p>`;
+                showMoreBtn.innerHTML = 'Show More <i class="fas fa-chevron-down"></i>';
+            } else {
+                descElement.innerHTML = `<p>${fullDescription}</p>`;
+                showMoreBtn.innerHTML = 'Show Less <i class="fas fa-chevron-up"></i>';
+            }
+        }
+
+        // ===== COMMUNITY DATA =====
+        function loadDiscussions() {
+            const container = document.getElementById('discussionsList');
+            
+            // Simulated discussions (in real app, fetch from your API)
+            const discussions = [
+                {
+                    title: `Discussion about "${bookData?.title || 'this book'}"`,
+                    author: 'Sarah H.',
+                    comments: 38,
+                    likes: 128,
+                    time: '2h ago'
+                },
+                {
+                    title: 'Spoiler thread: Let\'s talk about the ending',
+                    author: 'Mike R.',
+                    comments: 73,
+                    likes: 367,
+                    time: '5h ago'
+                },
+                {
+                    title: 'Character analysis: Main protagonist',
+                    author: 'Emma W.',
+                    comments: 24,
+                    likes: 89,
+                    time: '1d ago'
+                }
+            ];
+
+            container.innerHTML = discussions.map(d => `
+                <div class="discussion-item" onclick="window.location.href='../Discussion/discussion.html'">
+                    <div class="discussion-title">${d.title}</div>
+                    <div class="discussion-meta">
+                        <span><i class="fas fa-user"></i> ${d.author}</span>
+                        <span><i class="fas fa-comment"></i> ${d.comments}</span>
+                        <span><i class="fas fa-heart"></i> ${d.likes}</span>
+                        <span><i class="far fa-clock"></i> ${d.time}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadReviews() {
+            const container = document.getElementById('reviewsList');
+            
+            // Simulated reviews
+            const reviews = [
+                {
+                    user: 'AlexReads02',
+                    rating: 5,
+                    time: '2 days ago',
+                    content: 'Absolutely loved this book! The character development was amazing and the plot kept me guessing until the very end. Highly recommend to anyone looking for their next great read.'
+                },
+                {
+                    user: 'BookwormBella',
+                    rating: 4,
+                    time: '1 week ago',
+                    content: 'Really enjoyable read. The pacing was good and the world-building was immersive. Would definitely read more from this author.'
+                },
+                {
+                    user: 'PageTurner99',
+                    rating: 3,
+                    time: '2 weeks ago',
+                    content: 'It was okay. Some parts dragged a bit, but overall an interesting story. Might check out other books in the series.'
+                }
+            ];
+
+            container.innerHTML = reviews.map(review => `
+                <div class="review-item">
+                    <div class="review-header">
+                        <div class="reviewer-avatar">${review.user[0]}</div>
+                        <div class="reviewer-info">
+                            <h4>${review.user}</h4>
+                            <p>${review.time}</p>
+                        </div>
+                        <div class="review-rating">
+                            ${Array(review.rating).fill('<i class="fas fa-star star" style="color: #c89b3c;"></i>').join('')}
+                        </div>
+                    </div>
+                    <div class="review-content">${review.content}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadSimilarBooks() {
+            const container = document.getElementById('similarBooksGrid');
+            
+            try {
+                // Get subjects for similar books search
+                const subjects = bookData?.subjects || [];
+                const query = subjects.length > 0 ? subjects[0] : bookData?.title?.split(' ')[0] || 'fiction';
+                
+                const response = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=4`);
+                const data = await response.json();
+
+                if (data.docs && data.docs.length > 0) {
+                    container.innerHTML = data.docs.map(book => {
+                        const coverId = book.cover_i;
+                        const coverUrl = coverId 
+                            ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+                            : 'https://placehold.co/180x200/3d2617/f5e6d3?text=No+Cover&font=montserrat';
+                        
+                        return `
+                            <div class="similar-book-card" onclick="window.location.href='?id=${book.key?.split('/').pop()}'">
+                                <img src="${coverUrl}" alt="${book.title}" class="similar-book-cover" 
+                                     onerror="this.src='https://placehold.co/180x200/3d2617/f5e6d3?text=No+Cover&font=montserrat'">
+                                <div class="similar-book-info">
+                                    <div class="similar-book-title">${book.title}</div>
+                                    <div class="similar-book-author">${book.author_name?.[0] || 'Unknown Author'}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#d4b5a0;">No similar books found</div>';
+                }
+            } catch (error) {
+                console.error('Error loading similar books:', error);
+                container.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#ef4444;">Failed to load similar books</div>';
+            }
+        }
+
+        // ===== TAB SWITCHING =====
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tab}Tab`).classList.add('active');
+        }
+
+        // ===== USER ACTIONS =====
+        function addToLibrary() {
+            showMessageModal('Success', `"${bookData?.title || 'Book'}" added to your library!`, 'success');
+        }
+
+        function addToReadingList() {
+            showMessageModal('Success', `"${bookData?.title || 'Book'}" added to your reading list!`, 'success');
+        }
+
+        function shareBook() {
+            const url = window.location.href;
+            if (navigator.share) {
+                navigator.share({
+                    title: bookData?.title || 'Book',
+                    text: `Check out "${bookData?.title}" on Litlink!`,
+                    url: url
+                });
+            } else {
+                navigator.clipboard.writeText(url);
+                showMessageModal('Success', 'Book link copied to clipboard!', 'success');
+            }
+        }
+
+        function viewAuthor(authorKey) {
+            if (authorKey) {
+                showMessageModal('Author Page', 'Author page coming soon!', 'info');
+            } else {
+                showMessageModal('Info', 'Author information not available', 'info');
+            }
+        }
+
+        // ===== ERROR HANDLING =====
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message || 'Failed to load book details';
+        }
+
+        // ===== MODAL SYSTEM =====
+        function showMessageModal(title, message, type = 'info') {
+            const existingModal = document.getElementById('customModalOverlay');
+            if (existingModal) existingModal.remove();
+            
+            const icons = {
+                info: '<i class="fas fa-info-circle"></i>',
+                success: '<i class="fas fa-check-circle"></i>',
+                warning: '<i class="fas fa-exclamation-triangle"></i>',
+                error: '<i class="fas fa-times-circle"></i>'
+            };
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'customModalOverlay';
+            overlay.className = 'custom-modal-overlay';
+            
+            overlay.innerHTML = `
+                <div class="custom-modal">
+                    <div class="custom-modal-header">
+                        <div class="custom-modal-icon ${type}">
+                            ${icons[type] || icons.info}
+                        </div>
+                        <h3 class="custom-modal-title">${title}</h3>
+                        <button class="custom-modal-close" onclick="closeCustomModal()">&times;</button>
+                    </div>
+                    <div class="custom-modal-body">
+                        ${message}
+                    </div>
+                    <div class="custom-modal-actions">
+                        <button class="custom-modal-btn custom-modal-btn-primary" onclick="closeCustomModal()">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    closeCustomModal();
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        }
+
+        function closeCustomModal() {
+            const overlay = document.getElementById('customModalOverlay');
+            if (overlay) {
+                overlay.style.animation = 'fadeOut 0.3s ease forwards';
+                setTimeout(() => overlay.remove(), 300);
+            }
+        }
+
+        // ===== AUTHENTICATION =====
+        function setupLogout() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (!logoutBtn) return;
+            
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('litlink_token');
+                localStorage.removeItem('litlink_user');
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '../Homepage/index.html';
+            });
+        }
+
+        function loadUserData() {
+            const user = JSON.parse(localStorage.getItem('litlink_user') || 'null');
+            if (user) {
+                const userAvatar = document.querySelector('.user-avatar');
+                const userName = document.querySelector('.user-name');
+                
+                if (userAvatar) {
+                    const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+                    userAvatar.textContent = initials;
+                }
+                
+                if (userName) {
+                    userName.textContent = user.name || user.email?.split('@')[0] || 'User';
+                }
+            }
+        }
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📖 Book page loaded');
+            
+            // Check authentication
+            const auth = checkAuth();
+            if (!auth) return;
+            
+            // Load user data
+            loadUserData();
+            
+            // Load book details
+            loadBookDetails();
+            
+            // Setup logout
+            setupLogout();
+        });
+
+        // Make functions global
+        window.switchTab = switchTab;
+        window.toggleDescription = toggleDescription;
+        window.addToLibrary = addToLibrary;
+        window.addToReadingList = addToReadingList;
+        window.shareBook = shareBook;
+        window.viewAuthor = viewAuthor;
+        window.loadBookDetails = loadBookDetails;
+        window.closeCustomModal = closeCustomModal;
+    </script>
+</body>
+</html>

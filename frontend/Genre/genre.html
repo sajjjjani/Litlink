@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LitLink – Genre</title>
+  <link rel="stylesheet" href="genre.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="../Homepage/index.html" class="nav-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span class="nav-brand">LitLink</span>
+      </a>
+
+      <div class="nav-links" id="navLinks">
+        <a href="../Dashboard/dashexplore.html" class="nav-link">Explore</a>
+        <a href="../Discussion%20Board/discussion.html" class="nav-link">Discussion Board</a>
+        <a href="../Chat/chat.html" class="nav-link">Voice Rooms</a>
+        <a href="../Chat/chat.html" class="nav-link">Chat</a>
+      </div>
+
+      <div class="nav-actions">
+        <button class="nav-icon-btn bell-btn" aria-label="Notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-dot"></span>
+        </button>
+        <button class="nav-icon-btn avatar-btn" aria-label="Profile" onclick="window.location.href='../Profile/profile.html'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+      </div>
+
+      <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+        <svg id="menuIconOpen" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg id="menuIconClose" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="../Dashboard/dashexplore.html" class="mobile-link">Explore</a>
+      <a href="../Discussion%20Board/discussion.html" class="mobile-link">Discussion Board</a>
+      <a href="../Chat/chat.html" class="mobile-link">Voice Rooms</a>
+      <a href="../Chat/chat.html" class="mobile-link">Chat</a>
+      <div class="mobile-divider"></div>
+      <div class="mobile-profile">
+        <button class="avatar-btn" onclick="window.location.href='../Profile/profile.html'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+        <span>Profile</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== HERO SECTION ===== -->
+  <section class="hero" id="heroSection">
+    <div class="hero-inner">
+      <div class="hero-content">
+        <h1 class="hero-title" id="genreTitle">Fantasy</h1>
+        <p class="hero-desc" id="genreDesc">Loading genre description...</p>
+        <div class="hero-count">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span id="bookCount">Loading...</span>
+        </div>
+        <button class="hero-btn" id="startDiscussionBtn">Start <span id="heroGenreLabel">Genre</span> Discussion</button>
+      </div>
+
+      <div class="hero-books">
+        <div class="hero-book-stack">
+          <div class="hbook hbook-left">
+            <div class="hbook-title" id="heroBookLeftTitle">Book One</div>
+            <div class="hbook-bar"></div>
+          </div>
+          <div class="hbook hbook-right">
+            <div class="hbook-title" id="heroBookRightTitle">Book Two</div>
+            <div class="hbook-bar"></div>
+          </div>
+          <div class="hbook hbook-center">
+            <div class="hbook-title" id="heroBookCenterTitle">Book Three</div>
+            <div class="hbook-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-bg-fade"></div>
+  </section>
+
+  <!-- ===== FILTER BAR ===== -->
+  <div class="filter-bar" id="filterBar">
+    <div class="filter-inner">
+      <div class="search-wrap">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search books..." />
+      </div>
+      <div class="filter-right">
+        <div class="sort-wrap">
+          <select id="sortSelect" class="sort-select">
+            <option value="popular">Sort by: Popular</option>
+            <option value="title-asc">Sort by: Title A-Z</option>
+            <option value="title-desc">Sort by: Title Z-A</option>
+            <option value="rating">Sort by: Highest Rated</option>
+          </select>
+          <svg class="sort-chevron" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" id="gridViewBtn" aria-label="Grid view">
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </button>
+          <button class="view-btn" id="listViewBtn" aria-label="List view">
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+    <div class="content-wrap">
+
+      <!-- Book Grid / List -->
+      <div class="books-section">
+        <div id="bookGrid" class="book-grid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+        <div id="emptyState" class="empty-state" style="display:none;">
+          <p>No books found matching your criteria.</p>
+        </div>
+        <div id="loadMoreWrap" class="load-more-wrap" style="display:none;">
+          <button id="loadMoreBtn" class="load-more-btn">
+            Load More Books
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-heading">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <h2>Trending Discussions</h2>
+          </div>
+          <ul class="discussion-list" id="discussionList">
+            <!-- populated by JS -->
+          </ul>
+          <a href="../Discussion%20Board/discussion.html" class="sidebar-view-all" id="viewAllDiscussions">View all discussions →</a>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-heading">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <h2>Active Readers</h2>
+          </div>
+          <div class="avatars-row" id="activeReaders">
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#f87171,#f97316)" title="Emma R."></div>
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#60a5fa,#6366f1)" title="James K."></div>
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#34d399,#14b8a6)" title="Sophia L."></div>
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#c084fc,#ec4899)" title="Oliver T."></div>
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#fbbf24,#eab308)" title="Mia W."></div>
+            <div class="avatar-bubble" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)" title="Noah P."></div>
+          </div>
+          <p class="active-readers-count" id="activeReadersCount">24 online now</p>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-heading">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <h2>Most Reviewed</h2>
+          </div>
+          <div class="reviewed-list" id="mostReviewedList">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-heading">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C89B3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <h2>Voice Rooms</h2>
+          </div>
+          <div class="voice-rooms-list" id="voiceRoomsList">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+
+  <script src="genre.js"></script>
+</body>
+</html>
