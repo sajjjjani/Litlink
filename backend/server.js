@@ -24,6 +24,7 @@ const adminRoutes = require('./routes/admin.routes');
 const miscRoutes = require('./routes/miscRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const discussionRoutes = require('./routes/discussionRoutes');
+const openLibraryRoutes = require('./routes/openLibraryRoutes'); 
 
 // Import WebSocket server
 const SocketServer = require('./socketServer');
@@ -102,6 +103,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/discussions', discussionRoutes);
+app.use('/api/openlibrary', openLibraryRoutes); 
 app.use('/api', miscRoutes);
 
 // Health check endpoint
