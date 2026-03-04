@@ -1,9 +1,9 @@
-// server.js - Complete updated version with fixed shutdown handling
+// server.js - Complete with Voice Room support
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const http = require('http'); // IMPORTANT: Added for Socket.IO
+const http = require('http');
 require('dotenv').config();
 
 // Import models
@@ -13,6 +13,8 @@ const Report = require('./models/Report');
 const DiscussionThread = require('./models/DiscussionThread');
 const Conversation = require('./models/Conversation');
 const Notification = require('./models/Notification');
+const VoiceRoom = require('./models/VoiceRoom');
+const RoomParticipant = require('./models/RoomParticipant');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -24,7 +26,8 @@ const adminRoutes = require('./routes/admin.routes');
 const miscRoutes = require('./routes/miscRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const discussionRoutes = require('./routes/discussionRoutes');
-const openLibraryRoutes = require('./routes/openLibraryRoutes'); 
+const openLibraryRoutes = require('./routes/openLibraryRoutes');
+const voiceRoomRoutes = require('./routes/voiceRoomRoutes');
 
 // Import WebSocket server
 const SocketServer = require('./socketServer');
@@ -73,6 +76,8 @@ const connectDB = async () => {
     const filterWordCount = await FilterWord.countDocuments();
     const reportCount = await Report.countDocuments();
     const conversationCount = await Conversation.countDocuments();
+    const voiceRoomCount = await VoiceRoom.countDocuments();
+    const activeVoiceRooms = await VoiceRoom.countDocuments({ status: 'live' });
     
     console.log('📊 Database Statistics:');
     console.log(`   Users: ${userCount}`);
@@ -80,6 +85,7 @@ const connectDB = async () => {
     console.log(`   Filter Words: ${filterWordCount}`);
     console.log(`   Reports: ${reportCount}`);
     console.log(`   Conversations: ${conversationCount}`);
+    console.log(`   Voice Rooms: ${voiceRoomCount} (${activeVoiceRooms} live)`);
     
     // Check for admin user
     const adminExists = await User.findOne({ email: 'admin@litlink.com' });
@@ -103,7 +109,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/discussions', discussionRoutes);
-app.use('/api/openlibrary', openLibraryRoutes); 
+app.use('/api/openlibrary', openLibraryRoutes);
+app.use('/api/voice-rooms', voiceRoomRoutes);
 app.use('/api', miscRoutes);
 
 // Health check endpoint
@@ -115,6 +122,10 @@ app.get('/health', (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     databaseState: mongoose.STATES[mongoose.connection.readyState],
     websocket: global.io ? 'enabled' : 'disabled',
+    voiceRooms: {
+      total: global.activeRooms ? global.activeRooms.size : 0,
+      active: global.activeRooms ? Array.from(global.activeRooms.keys()).length : 0
+    },
     memory: process.memoryUsage(),
     cpu: process.cpuUsage()
   });
@@ -135,6 +146,7 @@ app.get('/', (req, res) => {
       admin: '/api/admin',
       notifications: '/api/notifications',
       discussions: '/api/discussions',
+      voiceRooms: '/api/voice-rooms',
       health: '/health'
     },
     documentation: 'See README.md for detailed API documentation',
@@ -156,6 +168,7 @@ app.use((req, res) => {
       '/api/admin',
       '/api/notifications',
       '/api/discussions',
+      '/api/voice-rooms',
       '/health'
     ]
   });
@@ -222,9 +235,10 @@ const startServer = async () => {
     
     // Initialize WebSocket server with the HTTP server
     socketServer = new SocketServer(server);
-    global.io = socketServer; // Make accessible globally
+    global.io = socketServer.io; // Make accessible globally
+    global.activeRooms = socketServer.activeRooms; // For health checks
     
-    console.log('✅ WebSocket server initialized');
+    console.log('✅ WebSocket server initialized with voice room support');
     
     // Start listening
     server.listen(PORT, () => {
@@ -243,6 +257,14 @@ const startServer = async () => {
       console.log('   POST   /api/auth/forgot-password - Forgot password');
       console.log('   POST   /api/auth/reset-password - Reset password');
       console.log('   GET    /api/auth/me - Get current user');
+      console.log('='.repeat(70));
+      
+      console.log('📌 VOICE ROOM ENDPOINTS:');
+      console.log('   GET    /api/voice-rooms/rooms/live - Get all live rooms');
+      console.log('   GET    /api/voice-rooms/rooms/scheduled - Get scheduled rooms');
+      console.log('   GET    /api/voice-rooms/rooms/:roomId - Get room details');
+      console.log('   POST   /api/voice-rooms/rooms - Create new room');
+      console.log('   POST   /api/voice-rooms/rooms/:roomId/end - End room (host only)');
       console.log('='.repeat(70));
       
       console.log('📌 DISCUSSION ENDPOINTS:');
@@ -310,7 +332,7 @@ const startServer = async () => {
   }
 };
 
-// Graceful shutdown function - FIXED VERSION
+// Graceful shutdown function
 function gracefulShutdown() {
   console.log('\n🔄 Shutting down gracefully...');
   
@@ -336,6 +358,16 @@ function gracefulShutdown() {
   // Close WebSocket server
   if (socketServer && socketServer.io) {
     console.log('Closing WebSocket server...');
+    
+    // Notify all users in voice rooms
+    if (global.activeRooms) {
+      for (const [roomId, sockets] of global.activeRooms.entries()) {
+        socketServer.io.to(`room-${roomId}`).emit('server-shutdown', {
+          message: 'Server is shutting down. Rooms will be closed.'
+        });
+      }
+    }
+    
     socketServer.io.close(() => {
       console.log('✅ WebSocket server closed');
       webSocketClosed = true;
