@@ -16,6 +16,42 @@ const COVER_GRADIENTS = [
   ['#154360', '#0D2B3E'],
 ];
 
+// Navigation helper function
+function navigateTo(page, params = {}) {
+  let url = '';
+  
+  switch(page) {
+    case 'dashboard':
+      url = '../Dashboard/dashboard.html';
+      break;
+    case 'discussion':
+      url = '../Discussion Board/discussion.html';
+      break;
+    case 'discussion-thread':
+      url = '../Discussion Board/thread.html';
+      break;
+    case 'book':
+      url = 'book.html';
+      break;
+    case 'profile':
+      url = '../Profile/profile.html';
+      break;
+    case 'home':
+      url = '../Homepage/index.html';
+      break;
+    default:
+      url = page;
+  }
+  
+  // Add query parameters if any
+  const queryString = new URLSearchParams(params).toString();
+  if (queryString) {
+    url += '?' + queryString;
+  }
+  
+  window.location.href = url;
+}
+
 // ── Genre metadata: descriptions, discussion seeds, sidebar content
 const GENRE_META = {
   fantasy: {
@@ -195,6 +231,7 @@ const voiceRoomsList    = document.getElementById('voiceRoomsList');
 const activeReadersCount = document.getElementById('activeReadersCount');
 const startDiscussionBtn = document.getElementById('startDiscussionBtn');
 const viewAllDiscussions = document.getElementById('viewAllDiscussions');
+const logoLink          = document.getElementById('logoLink');
 
 // Mobile menu elements
 const mobileToggle      = document.getElementById('mobileToggle');
@@ -206,6 +243,14 @@ const menuIconClose     = document.getElementById('menuIconClose');
 //  INIT
 // ═══════════════════════════════════════════════════════════
 function init() {
+  // Fix logo navigation
+  if (logoLink) {
+    logoLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateTo('dashboard');
+    });
+  }
+
   // Read genre from URL query string
   const params = new URLSearchParams(window.location.search);
   genreKey = (params.get('type') || 'fantasy').toLowerCase();
@@ -279,34 +324,16 @@ function init() {
 function setupNavigation(meta) {
   if (startDiscussionBtn) {
     startDiscussionBtn.addEventListener('click', () => {
-      window.location.href = `discussion-board.html?genre=${genreKey}&new=true`;
+      navigateTo('discussion', { genre: genreKey, new: 'true' });
     });
   }
 
   if (viewAllDiscussions) {
-    viewAllDiscussions.href = `discussion-board.html?genre=${genreKey}`;
     viewAllDiscussions.addEventListener('click', (e) => {
       e.preventDefault();
-      window.location.href = `discussion-board.html?genre=${genreKey}`;
+      navigateTo('discussion', { genre: genreKey });
     });
   }
-
-  // Make discussion items clickable
-  document.querySelectorAll('.discussion-list li a').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const discussionId = link.dataset.id;
-      window.location.href = `discussion.html?id=${discussionId}&genre=${genreKey}`;
-    });
-  });
-
-  // Make voice room items clickable
-  document.querySelectorAll('.voice-room-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const roomId = item.dataset.id;
-      window.location.href = `voice-room.html?id=${roomId}&genre=${genreKey}`;
-    });
-  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -481,7 +508,7 @@ function buildGridCard(book, i) {
   // Add click to view book details
   card.addEventListener('click', (e) => {
     if (!e.target.classList.contains('btn-view') && !e.target.classList.contains('btn-add')) {
-      window.location.href = `book.html?id=${book.id}&genre=${genreKey}`;
+      navigateTo('book', { id: book.id, genre: genreKey });
     }
   });
 
@@ -521,7 +548,7 @@ function buildCompactCard(book, i) {
 
   card.addEventListener('click', (e) => {
     if (!e.target.classList.contains('btn-view') && !e.target.classList.contains('btn-add')) {
-      window.location.href = `book.html?id=${book.id}&genre=${genreKey}`;
+      navigateTo('book', { id: book.id, genre: genreKey });
     }
   });
 
@@ -534,28 +561,17 @@ function buildCompactCard(book, i) {
 function renderDiscussions(list) {
   discussionList.innerHTML = list.map(d => `
     <li>
-      <a href="#" data-id="${d.id}">
+      <a href="#" onclick="event.preventDefault(); navigateTo('discussion-thread', { id: ${d.id}, genre: '${genreKey}' });">
         <span>${escHtml(d.title)}</span>
         <span class="reply-badge">${d.replies}</span>
       </a>
     </li>
   `).join('');
-
-  // Add click handlers
-  setTimeout(() => {
-    document.querySelectorAll('.discussion-list li a').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const discussionId = link.dataset.id;
-        window.location.href = `discussion.html?id=${discussionId}&genre=${genreKey}`;
-      });
-    });
-  }, 100);
 }
 
 function renderMostReviewed(list) {
   mostReviewedList.innerHTML = list.map(b => `
-    <a href="#" class="reviewed-item" data-id="${b.id}">
+    <a href="#" class="reviewed-item" onclick="event.preventDefault(); navigateTo('book', { id: ${b.id}, genre: '${genreKey}' });">
       <div class="reviewed-cover" style="background:linear-gradient(135deg,${b.gradient[0]},${b.gradient[1]});"></div>
       <div class="reviewed-info">
         <h3>${escHtml(truncate(b.title, 25))}</h3>
@@ -569,24 +585,13 @@ function renderMostReviewed(list) {
       </div>
     </a>
   `).join('');
-
-  // Add click handlers
-  setTimeout(() => {
-    document.querySelectorAll('.reviewed-item').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const bookId = link.dataset.id;
-        window.location.href = `book.html?id=${bookId}&genre=${genreKey}`;
-      });
-    });
-  }, 100);
 }
 
 function renderVoiceRooms(rooms) {
   if (!voiceRoomsList) return;
 
   voiceRoomsList.innerHTML = rooms.map(room => `
-    <div class="voice-room-item" data-id="${room.id}">
+    <div class="voice-room-item" onclick="navigateTo('voice-room', { id: ${room.id}, genre: '${genreKey}' });">
       <div class="voice-room-icon">🎧</div>
       <div class="voice-room-info">
         <h4>${escHtml(room.name)}</h4>
@@ -594,23 +599,13 @@ function renderVoiceRooms(rooms) {
       </div>
     </div>
   `).join('');
-
-  // Add click handlers
-  setTimeout(() => {
-    document.querySelectorAll('.voice-room-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const roomId = item.dataset.id;
-        window.location.href = `voice-room.html?id=${roomId}&genre=${genreKey}`;
-      });
-    });
-  }, 100);
 }
 
 // ═══════════════════════════════════════════════════════════
 //  GLOBAL FUNCTIONS (for onclick handlers)
 // ═══════════════════════════════════════════════════════════
 window.viewBook = function(bookId, genre) {
-  window.location.href = `book.html?id=${bookId}&genre=${genre}`;
+  navigateTo('book', { id: bookId, genre: genre });
 };
 
 window.addToLibrary = function(bookId, genre) {
@@ -631,6 +626,8 @@ window.addToLibrary = function(bookId, genre) {
   // Here you would typically save to user's library
   // saveToUserLibrary(bookId, genre);
 };
+
+window.navigateTo = navigateTo;
 
 // ═══════════════════════════════════════════════════════════
 //  HELPERS

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Litlink — Room</title>
+  <link rel="stylesheet" href="voice.css"/>
+</head>
+<body>
+
+<div id="room-app">
+
+  <!-- HEADER -->
+  <header class="room-header">
+    <div class="room-hdr-left">
+      <a href="voice-rooms.html" class="back-btn" aria-label="Back to lobby">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </a>
+      <div>
+        <div class="room-hdr-name" id="hdr-name">Fantasy World Debate</div>
+        <div class="room-hdr-tags">
+          <span class="room-hdr-genre" id="hdr-genre">Fantasy</span>
+          <span class="room-hdr-live">
+            <span class="room-hdr-live-dot pulse-live"></span>
+            Live
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="room-hdr-participants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span id="hdr-count">8 participants</span>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="room-body">
+
+    <!-- STAGE -->
+    <div class="room-stage">
+      <div class="stage-content" id="stage-content">
+        <!-- Featured speaker + grid populated by JS -->
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="room-sidebar" id="room-sidebar">
+
+      <!-- Room Info Panel -->
+      <div id="info-panel" style="display:flex;flex-direction:column;height:100%">
+        <div class="rsb-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="rsb-header-title">Room Info</span>
+        </div>
+        <div class="rsb-body" id="rsb-body"></div>
+        <button class="rsb-chat-btn" id="open-chat-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Open Room Chat
+        </button>
+      </div>
+
+      <!-- Chat Panel (overlay) -->
+      <div class="chat-panel hidden" id="chat-panel">
+        <div class="chat-panel-hdr">
+          <button class="chat-back" id="chat-back-btn" aria-label="Back to room info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <span class="chat-panel-title">Room Chat</span>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-reactions" id="chat-reactions"></div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <input type="text" class="chat-input" id="chat-input" placeholder="Send a message…"/>
+            <button class="chat-send-btn" id="chat-send" disabled aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- BOTTOM CONTROLS -->
+  <div class="room-controls" id="room-controls">
+    <!-- Raise Hand -->
+    <button class="ctrl-btn ctrl-hand-off" id="ctrl-hand" aria-label="Raise hand" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+    </button>
+    <!-- Mic -->
+    <button class="ctrl-btn ctrl-mic-neutral" id="ctrl-mic" aria-label="Toggle microphone" aria-pressed="false">
+      <svg id="mic-off-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      <svg id="mic-on-svg" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <!-- Leave -->
+    <button class="ctrl-btn ctrl-leave" id="ctrl-leave" aria-label="Leave room">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18.36" y1="5.64" x2="5.64" y2="18.36"/><line x1="5.64" y1="5.64" x2="18.36" y2="18.36"/></svg>
+    </button>
+  </div>
+
+</div>
+
+<script src="room.js"></script>
+</body>
+</html>

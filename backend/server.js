@@ -1,4 +1,4 @@
-// server.js - Complete updated version with fixed Socket.IO
+// server.js - Complete updated version with fixed shutdown handling
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -209,15 +209,16 @@ app.use((err, req, res, next) => {
 // ===== START SERVER =====
 const PORT = process.env.PORT || 5002;
 
-// Keep reference to socket server
+// Keep references for graceful shutdown
 let socketServer = null;
+let server = null;
 
 const startServer = async () => {
   try {
     await connectDB();
     
     // IMPORTANT: Create HTTP server explicitly for Socket.IO
-    const server = http.createServer(app);
+    server = http.createServer(app);
     
     // Initialize WebSocket server with the HTTP server
     socketServer = new SocketServer(server);
@@ -309,30 +310,72 @@ const startServer = async () => {
   }
 };
 
-// Graceful shutdown
+// Graceful shutdown function - FIXED VERSION
 function gracefulShutdown() {
   console.log('\n🔄 Shutting down gracefully...');
+  
+  // Set a timeout to force shutdown if cleanup takes too long
+  const forceShutdownTimeout = setTimeout(() => {
+    console.error('❌ Could not close connections in time, forcing shutdown');
+    process.exit(1);
+  }, 10000);
+  
+  // Track completed operations
+  let webSocketClosed = false;
+  let httpServerClosed = false;
+  let mongoClosed = false;
+  
+  function checkAllClosed() {
+    if (webSocketClosed && httpServerClosed && mongoClosed) {
+      console.log('✅ All connections closed successfully');
+      clearTimeout(forceShutdownTimeout);
+      process.exit(0);
+    }
+  }
   
   // Close WebSocket server
   if (socketServer && socketServer.io) {
     console.log('Closing WebSocket server...');
     socketServer.io.close(() => {
       console.log('✅ WebSocket server closed');
+      webSocketClosed = true;
+      checkAllClosed();
     });
+  } else {
+    webSocketClosed = true;
+    checkAllClosed();
+  }
+  
+  // Close HTTP server
+  if (server) {
+    console.log('Closing HTTP server...');
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+      httpServerClosed = true;
+      checkAllClosed();
+    });
+    
+    // Also close all keep-alive connections
+    server.closeAllConnections?.();
+    server.closeIdleConnections?.();
+  } else {
+    httpServerClosed = true;
+    checkAllClosed();
   }
   
   // Close MongoDB connection
   console.log('Closing MongoDB connection...');
-  mongoose.connection.close(false, () => {
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
-  });
-  
-  // Force exit after 10 seconds
-  setTimeout(() => {
-    console.error('❌ Could not close connections in time, forcing shutdown');
-    process.exit(1);
-  }, 10000);
+  mongoose.connection.close()
+    .then(() => {
+      console.log('✅ MongoDB connection closed');
+      mongoClosed = true;
+      checkAllClosed();
+    })
+    .catch((err) => {
+      console.error('❌ Error closing MongoDB connection:', err);
+      mongoClosed = true;
+      checkAllClosed();
+    });
 }
 
 // Start the server
