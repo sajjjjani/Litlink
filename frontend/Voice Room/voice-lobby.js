@@ -5,6 +5,29 @@ let currentUser = null;
 let liveRooms = [];
 let upcomingRooms = [];
 
+// Load Socket.IO script dynamically
+function loadSocketIO() {
+  return new Promise((resolve, reject) => {
+    if (typeof io !== 'undefined') {
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
+    // Remove integrity attribute to avoid mismatch issues
+    script.crossOrigin = 'anonymous';
+    script.onload = resolve;
+    script.onerror = () => {
+      console.error('Failed to load Socket.IO');
+      showToast('Failed to load real-time features', 'error');
+      // Resolve anyway to continue with offline mode
+      resolve();
+    };
+    document.head.appendChild(script);
+  });
+}
+
 /* ===== INITIALIZATION ===== */
 async function init() {
   console.log('🎙 Initializing Voice Lobby...');
@@ -24,6 +47,9 @@ async function init() {
   // Update UI with user info
   updateUserUI();
   
+  // Load Socket.IO first
+  await loadSocketIO();
+  
   // Connect to WebSocket
   connectSocket(token);
   
@@ -40,69 +66,80 @@ function updateUserUI() {
   const avatar = document.querySelector('.nav-avatar');
   if (avatar && currentUser.name) {
     const initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-    avatar.textContent = initials || 'JD';
+    avatar.textContent = initials || 'U';
   }
 }
 
 /* ===== WEBSOCKET CONNECTION ===== */
 function connectSocket(token) {
-  socket = io('http://localhost:5002', {
-    path: '/socket.io',
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
-  });
-
-  socket.on('connect', () => {
-    console.log('✅ Connected to voice server');
-    showToast('Connected to voice server', 'success');
-    socket.emit('authenticate', token);
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('❌ Socket connection error:', error);
-    showToast('Connection to voice server failed', 'error');
-  });
-
-  socket.on('authenticated', (data) => {
-    if (data.success) {
-      console.log('🔐 Authentication successful');
-    } else {
-      console.error('❌ Authentication failed');
+  try {
+    // Check if io is defined
+    if (typeof io === 'undefined') {
+      console.log('Socket.IO not available, using offline mode');
+      showToast('Using offline mode - real-time updates disabled', 'warning');
+      return;
     }
-  });
+    
+    socket = io('http://localhost:5002', {
+      path: '/socket.io',
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000
+    });
 
-  // Real-time room updates
-  socket.on('room-created', (room) => {
-    console.log('📢 New room created:', room.name);
-    addRoomToList(room);
-    showToast(`New room created: ${room.name}`, 'info');
-  });
+    socket.on('connect', () => {
+      console.log('✅ Connected to voice server');
+      showToast('Connected to voice server', 'success');
+      socket.emit('authenticate', token);
+    });
 
-  socket.on('room-ended', (data) => {
-    console.log('📢 Room ended:', data.roomId);
-    removeRoomFromList(data.roomId);
-    showToast(data.message || 'A room has ended', 'warning');
-  });
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      showToast('Using offline mode - real-time updates disabled', 'warning');
+    });
 
-  socket.on('room-updated', (data) => {
-    console.log('📢 Room updated:', data.roomId);
-    updateRoomInList(data);
-  });
+    socket.on('authenticated', (data) => {
+      if (data.success) {
+        console.log('🔐 Authentication successful');
+      } else {
+        console.error('❌ Authentication failed');
+      }
+    });
 
-  socket.on('disconnect', (reason) => {
-    console.log('🔌 Disconnected from server:', reason);
-    showToast('Disconnected from server. Reconnecting...', 'warning');
-  });
+    // Real-time room updates
+    socket.on('room-created', (room) => {
+      console.log('📢 New room created:', room.name);
+      addRoomToList(room);
+      showToast(`New room created: ${room.name}`, 'info');
+    });
 
-  socket.on('reconnect', () => {
-    console.log('✅ Reconnected to server');
-    showToast('Reconnected to server', 'success');
-    // Reload rooms to get latest data
-    loadLiveRooms();
-    loadUpcomingRooms();
-  });
+    socket.on('room-ended', (data) => {
+      console.log('📢 Room ended:', data.roomId);
+      removeRoomFromList(data.roomId);
+      showToast(data.message || 'A room has ended', 'warning');
+    });
+
+    socket.on('room-updated', (data) => {
+      console.log('📢 Room updated:', data.roomId);
+      updateRoomInList(data);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected from server:', reason);
+    });
+
+    socket.on('reconnect', () => {
+      console.log('✅ Reconnected to server');
+      showToast('Reconnected to server', 'success');
+      loadLiveRooms();
+      loadUpcomingRooms();
+    });
+  } catch (error) {
+    console.error('Error connecting socket:', error);
+    showToast('Using offline mode', 'warning');
+  }
 }
 
 /* ===== API CALLS ===== */
@@ -130,7 +167,6 @@ async function loadLiveRooms() {
     }
   } catch (error) {
     console.error('Error loading live rooms:', error);
-    showToast('Error loading rooms. Using demo data.', 'warning');
     // Fallback to demo data
     const demoRooms = getDemoRooms();
     renderRooms(demoRooms);
@@ -151,7 +187,6 @@ async function loadUpcomingRooms() {
     }
   } catch (error) {
     console.error('Error loading upcoming rooms:', error);
-    // Fallback to demo data
     const demoUpcoming = getDemoUpcoming();
     renderUpcoming(demoUpcoming);
   }
@@ -179,7 +214,10 @@ async function createRoom(roomData) {
     }
   } catch (error) {
     console.error('Error creating room:', error);
-    showToast('Failed to create room', 'error');
+    showToast('Failed to create room. Using demo mode.', 'warning');
+    // Demo mode - create fake room and go to it
+    closeModal();
+    goToRoom('demo-room-' + Date.now());
   }
 }
 
@@ -296,8 +334,19 @@ function goToRoom(id) {
   window.location.href = `room.html?id=${id}`;
 }
 
+function goToExplore() {
+  window.location.href = '../Dashboard/dashexplore.html';
+}
+
+function goToProfile() {
+  window.location.href = '../Profile/profile.html';
+}
+
+function goToNotifications() {
+  window.location.href = '../notifications.html';
+}
+
 function setReminder(roomId) {
-  // Store in localStorage for demo purposes
   const reminders = JSON.parse(localStorage.getItem('roomReminders') || '[]');
   if (!reminders.includes(roomId)) {
     reminders.push(roomId);
@@ -399,18 +448,15 @@ function setupEventListeners() {
     if (e.key === 'Escape') closeModal();
   });
   
-  // Navigation
-  document.querySelector('.nav-explore')?.addEventListener('click', () => {
-    window.location.href = '../explore.html';
-  });
+  // Navigation - UPDATED PATHS
+  document.querySelector('.nav-explore')?.addEventListener('click', goToExplore);
+  document.querySelector('.nav-avatar')?.addEventListener('click', goToProfile);
   
-  document.querySelector('.nav-avatar')?.addEventListener('click', () => {
-    window.location.href = '../Profile/profile.html';
-  });
-  
-  document.querySelector('.nav-bell')?.addEventListener('click', () => {
-    window.location.href = '../notifications.html';
-  });
+  // Notification icon
+  const bellIcon = document.querySelector('.nav-bell');
+  if (bellIcon) {
+    bellIcon.addEventListener('click', goToNotifications);
+  }
 }
 
 /* ===== UTILITY FUNCTIONS ===== */
@@ -434,7 +480,6 @@ function formatScheduledTime(dateString) {
 }
 
 function showToast(message, type = 'info') {
-  // Remove existing toast
   const existingToast = document.querySelector('.custom-toast');
   if (existingToast) existingToast.remove();
   
