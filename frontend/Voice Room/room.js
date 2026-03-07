@@ -13,6 +13,49 @@ let audioContext = null;
 let analyser = null;
 let speakingInterval = null;
 
+// Load Socket.IO script dynamically
+function loadSocketIO() {
+  return new Promise((resolve, reject) => {
+    if (typeof io !== 'undefined') {
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
+    script.crossOrigin = 'anonymous';
+    script.onload = resolve;
+    script.onerror = () => {
+      console.error('Failed to load Socket.IO');
+      showToast('Failed to load real-time features', 'error');
+      // Resolve anyway to continue with offline mode
+      resolve();
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// Load SimplePeer for WebRTC
+function loadSimplePeer() {
+  return new Promise((resolve, reject) => {
+    if (typeof SimplePeer !== 'undefined') {
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js';
+    script.onload = resolve;
+    script.onerror = () => {
+      console.error('Failed to load SimplePeer');
+      showToast('Voice chat features limited', 'warning');
+      // Resolve anyway to continue with offline mode
+      resolve();
+    };
+    document.head.appendChild(script);
+  });
+}
+
 /* ===== INITIALIZATION ===== */
 async function init() {
   console.log('🎙 Initializing Voice Room...');
@@ -43,6 +86,10 @@ async function init() {
   // Update UI with user info
   updateUserUI();
   
+  // Load required libraries
+  await loadSocketIO();
+  await loadSimplePeer();
+  
   // Load room details
   await loadRoomDetails();
   
@@ -51,6 +98,9 @@ async function init() {
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Render chat reactions
+  renderChatReactions();
 }
 
 function updateUserUI() {
@@ -88,7 +138,7 @@ async function loadRoomDetails() {
     }
   } catch (error) {
     console.error('Error loading room details:', error);
-    showToast('Failed to load room details', 'error');
+    showToast('Using demo mode', 'info');
     
     // Use demo data as fallback
     roomData = {
@@ -115,172 +165,189 @@ function updateRoomUI(room) {
   // Check if current user is host
   const isHost = room.hostId === currentUser.id;
   if (isHost) {
-    // Add host controls if needed
     console.log('👑 You are the host');
   }
 }
 
 /* ===== WEBSOCKET CONNECTION ===== */
 function connectToRoom(token) {
-  socket = io('http://localhost:5002', {
-    path: '/socket.io',
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
-  });
-
-  socket.on('connect', () => {
-    console.log('✅ Connected to voice server');
-    showToast('Connected to voice server', 'success');
-    
-    // Authenticate
-    socket.emit('authenticate', token);
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('❌ Socket connection error:', error);
-    showToast('Connection to voice server failed', 'error');
-  });
-
-  socket.on('authenticated', (data) => {
-    if (data.success) {
-      console.log('🔐 Authentication successful');
-      
-      // Join room after authentication
-      setTimeout(() => {
-        socket.emit('join-voice-room', {
-          roomId,
-          userId: currentUser.id,
-          userName: currentUser.name
-        });
-      }, 500);
-    } else {
-      console.error('❌ Authentication failed');
-      showToast('Authentication failed', 'error');
-    }
-  });
-
-  // Room events
-  socket.on('room-joined', (data) => {
-    console.log('✅ Joined room:', data.roomName);
-    participants = data.participants || [];
-    renderParticipants();
-    showToast(`Joined ${data.roomName}`, 'success');
-    
-    // Initialize WebRTC with existing participants
-    initWebRTC(participants);
-  });
-
-  socket.on('user-joined', (data) => {
-    console.log('👤 User joined:', data.userName);
-    participants = data.participants || participants;
-    
-    // Add new participant to UI
-    addParticipantToUI(data);
-    
-    // Create peer connection for new user
-    if (data.userId !== currentUser.id) {
-      createPeerConnection(data.userId, true);
+  try {
+    // Check if io is defined
+    if (typeof io === 'undefined') {
+      console.log('Socket.IO not available, using offline mode');
+      showToast('Using offline mode', 'warning');
+      return;
     }
     
-    showToast(`${data.userName || 'Someone'} joined`, 'info');
-  });
-
-  socket.on('user-left', (data) => {
-    console.log('👋 User left:', data.userId);
-    
-    // Remove from UI
-    removeParticipantFromUI(data.userId);
-    
-    // Update participants list
-    participants = participants.filter(p => p.userId !== data.userId);
-    
-    // Close peer connection
-    if (peerConnections[data.userId]) {
-      peerConnections[data.userId].destroy();
-      delete peerConnections[data.userId];
-    }
-    
-    // Update participant count
-    document.getElementById('hdr-count').textContent = participants.length + ' participants';
-  });
-
-  // Audio events
-  socket.on('user-muted', (data) => {
-    updateParticipantMute(data.userId, data.isMuted);
-  });
-
-  socket.on('hand-raised', (data) => {
-    updateParticipantHand(data.userId, data.raised);
-  });
-
-  socket.on('user-speaking', (data) => {
-    updateParticipantSpeaking(data.userId, data.isSpeaking);
-  });
-
-  // Chat events
-  socket.on('new-message', (data) => {
-    addChatMessage(data);
-  });
-
-  // Room status events
-  socket.on('room-ended', (data) => {
-    console.log('📢 Room ended:', data.message);
-    showToast(data.message || 'Room has ended', 'warning');
-    
-    // Clean up
-    cleanupWebRTC();
-    
-    setTimeout(() => {
-      window.location.href = 'voice-rooms.html';
-    }, 3000);
-  });
-
-  socket.on('server-shutdown', (data) => {
-    console.log('🔌 Server shutdown:', data.message);
-    showToast(data.message || 'Server is shutting down', 'warning');
-    
-    cleanupWebRTC();
-    
-    setTimeout(() => {
-      window.location.href = 'voice-rooms.html';
-    }, 3000);
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('🔌 Disconnected from server:', reason);
-    showToast('Disconnected from server. Reconnecting...', 'warning');
-  });
-
-  socket.on('reconnect', () => {
-    console.log('✅ Reconnected to server');
-    showToast('Reconnected to server', 'success');
-    
-    // Rejoin room
-    socket.emit('join-voice-room', {
-      roomId,
-      userId: currentUser.id,
-      userName: currentUser.name
+    socket = io('http://localhost:5002', {
+      path: '/socket.io',
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
-  });
 
-  // WebRTC signaling
-  socket.on('signal', async (data) => {
-    const { from, signal } = data;
-    
-    try {
-      if (!peerConnections[from]) {
-        await createPeerConnection(from, false);
+    socket.on('connect', () => {
+      console.log('✅ Connected to voice server');
+      showToast('Connected to voice server', 'success');
+      
+      // Authenticate
+      socket.emit('authenticate', token);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      showToast('Using offline mode', 'warning');
+    });
+
+    socket.on('authenticated', (data) => {
+      if (data.success) {
+        console.log('🔐 Authentication successful');
+        
+        // Join room after authentication
+        setTimeout(() => {
+          socket.emit('join-voice-room', {
+            roomId,
+            userId: currentUser.id,
+            userName: currentUser.name
+          });
+        }, 500);
+      } else {
+        console.error('❌ Authentication failed');
+      }
+    });
+
+    // Room events
+    socket.on('room-joined', (data) => {
+      console.log('✅ Joined room:', data.roomName);
+      participants = data.participants || [];
+      renderParticipants();
+      showToast(`Joined ${data.roomName}`, 'success');
+      
+      // Initialize WebRTC with existing participants
+      if (typeof SimplePeer !== 'undefined') {
+        initWebRTC(participants);
+      } else {
+        console.log('SimplePeer not loaded, using demo mode');
+      }
+    });
+
+    socket.on('user-joined', (data) => {
+      console.log('👤 User joined:', data.userName);
+      participants = data.participants || participants;
+      
+      // Add new participant to UI
+      addParticipantToUI(data);
+      
+      // Create peer connection for new user
+      if (data.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
+        createPeerConnection(data.userId, true);
       }
       
-      if (peerConnections[from]) {
-        await peerConnections[from].signal(signal);
+      showToast(`${data.userName || 'Someone'} joined`, 'info');
+    });
+
+    socket.on('user-left', (data) => {
+      console.log('👋 User left:', data.userId);
+      
+      // Remove from UI
+      removeParticipantFromUI(data.userId);
+      
+      // Update participants list
+      participants = participants.filter(p => p.userId !== data.userId);
+      
+      // Close peer connection
+      if (peerConnections[data.userId]) {
+        try {
+          peerConnections[data.userId].destroy();
+        } catch (e) {}
+        delete peerConnections[data.userId];
       }
-    } catch (error) {
-      console.error('Error handling signal:', error);
-    }
-  });
+      
+      // Update participant count
+      document.getElementById('hdr-count').textContent = participants.length + ' participants';
+    });
+
+    // Audio events
+    socket.on('user-muted', (data) => {
+      updateParticipantMute(data.userId, data.isMuted);
+    });
+
+    socket.on('hand-raised', (data) => {
+      updateParticipantHand(data.userId, data.raised);
+    });
+
+    socket.on('user-speaking', (data) => {
+      updateParticipantSpeaking(data.userId, data.isSpeaking);
+    });
+
+    // Chat events
+    socket.on('new-message', (data) => {
+      addChatMessage(data);
+    });
+
+    // Room status events
+    socket.on('room-ended', (data) => {
+      console.log('📢 Room ended:', data.message);
+      showToast(data.message || 'Room has ended', 'warning');
+      
+      // Clean up
+      cleanupWebRTC();
+      
+      setTimeout(() => {
+        window.location.href = 'voice-rooms.html';
+      }, 3000);
+    });
+
+    socket.on('server-shutdown', (data) => {
+      console.log('🔌 Server shutdown:', data.message);
+      showToast(data.message || 'Server is shutting down', 'warning');
+      
+      cleanupWebRTC();
+      
+      setTimeout(() => {
+        window.location.href = 'voice-rooms.html';
+      }, 3000);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected from server:', reason);
+      showToast('Disconnected from server. Reconnecting...', 'warning');
+    });
+
+    socket.on('reconnect', () => {
+      console.log('✅ Reconnected to server');
+      showToast('Reconnected to server', 'success');
+      
+      // Rejoin room
+      socket.emit('join-voice-room', {
+        roomId,
+        userId: currentUser.id,
+        userName: currentUser.name
+      });
+    });
+
+    // WebRTC signaling
+    socket.on('signal', async (data) => {
+      const { from, signal } = data;
+      
+      try {
+        if (!peerConnections[from] && typeof SimplePeer !== 'undefined') {
+          await createPeerConnection(from, false);
+        }
+        
+        if (peerConnections[from]) {
+          await peerConnections[from].signal(signal);
+        }
+      } catch (error) {
+        console.error('Error handling signal:', error);
+      }
+    });
+
+  } catch (error) {
+    console.error('Error connecting socket:', error);
+    showToast('Using offline mode', 'warning');
+  }
 }
 
 /* ===== WEBRTC IMPLEMENTATION ===== */
@@ -305,7 +372,7 @@ async function initWebRTC(existingParticipants) {
     
     // Create peer connections for each existing participant
     for (const participant of existingParticipants) {
-      if (participant.userId !== currentUser.id) {
+      if (participant.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
         await createPeerConnection(participant.userId, true);
       }
     }
@@ -325,7 +392,6 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
       // Check if SimplePeer is available
       if (typeof SimplePeer === 'undefined') {
         console.error('SimplePeer not loaded');
-        showToast('WebRTC library not loaded', 'error');
         return reject('SimplePeer not available');
       }
       
@@ -336,16 +402,21 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
           ]
         }
       });
 
       peer.on('signal', (signal) => {
-        socket.emit('signal', {
-          to: targetUserId,
-          signal
-        });
+        if (socket && socket.connected) {
+          socket.emit('signal', {
+            to: targetUserId,
+            signal
+          });
+        }
       });
 
       peer.on('stream', (stream) => {
@@ -413,11 +484,13 @@ function initAudioAnalysis() {
       // Emit speaking status if changed
       if (window.lastSpeakingStatus !== isCurrentlySpeaking) {
         window.lastSpeakingStatus = isCurrentlySpeaking;
-        socket.emit('speaking', {
-          roomId,
-          userId: currentUser.id,
-          isSpeaking: isCurrentlySpeaking
-        });
+        if (socket && socket.connected) {
+          socket.emit('speaking', {
+            roomId,
+            userId: currentUser.id,
+            isSpeaking: isCurrentlySpeaking
+          });
+        }
         
         // Update own UI
         updateOwnSpeaking(isCurrentlySpeaking);
@@ -432,7 +505,6 @@ function initAudioAnalysis() {
 /* ===== UI RENDERING ===== */
 function renderParticipants() {
   if (!participants || participants.length === 0) {
-    // Use demo data if no participants
     participants = getDemoParticipants();
   }
   
@@ -442,7 +514,7 @@ function renderParticipants() {
   // Add current user to grid if not host/featured
   const currentUserParticipant = {
     userId: currentUser.id,
-    name: currentUser.name + ' (You)',
+    name: currentUser.name + (currentUser.id === roomData?.hostId ? ' (Host)' : ' (You)'),
     initials: getInitials(currentUser.name),
     isHost: roomData?.hostId === currentUser.id,
     isMuted: !isMicOn,
@@ -541,8 +613,9 @@ function renderSidebar() {
         <!-- Current user -->
         <div class="rsb-p-row">
           <div class="rsb-p-av ${window.lastSpeakingStatus ? 'speaking' : ''}">${getInitials(currentUser.name)}</div>
-          <span class="rsb-p-name">${escapeHtml(currentUser.name)} (You)</span>
+          <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${currentUser.id === roomData?.hostId ? '(Host)' : '(You)'}</span>
           ${roomData?.hostId === currentUser.id ? '<span class="rsb-p-icon crown">👑</span>' : ''}
+          ${isHandUp ? '<span class="rsb-p-icon" style="color: var(--accent-gold);">✋</span>' : ''}
         </div>
         
         ${participants.filter(p => p.userId !== currentUser.id).map(p => `
@@ -556,11 +629,6 @@ function renderSidebar() {
       </div>
     </div>
   `;
-}
-
-function renderChatMessages() {
-  // This would load from server or local state
-  // For now, keep your existing implementation
 }
 
 function renderChatReactions() {
@@ -585,7 +653,8 @@ function addParticipantToUI(data) {
     name: data.userName,
     isMuted: false,
     handRaised: false,
-    isSpeaking: false
+    isSpeaking: false,
+    color: getRandomColor()
   });
   
   // Re-render all participants
@@ -644,6 +713,9 @@ function updateParticipantHand(userId, raised) {
     } else if (!raised && card) {
       card.remove();
     }
+    
+    // Update sidebar
+    renderSidebar();
   }
 }
 
@@ -682,20 +754,26 @@ function updateOwnSpeaking(isSpeaking) {
   if (status) {
     status.textContent = isSpeaking ? 'Speaking' : (!isMicOn ? 'Muted' : 'Listening');
   }
+  
+  // Update sidebar
+  renderSidebar();
 }
 
 /* ===== CHAT FUNCTIONS ===== */
 function sendMessage(text) {
-  if (!text.trim() || !socket) return;
+  if (!text.trim()) return;
   
   const message = {
     roomId,
     message: text.trim(),
     userName: currentUser.name,
-    timestamp: new Date()
+    userId: currentUser.id,
+    timestamp: new Date().toISOString()
   };
   
-  socket.emit('room-message', message);
+  if (socket && socket.connected) {
+    socket.emit('room-message', message);
+  }
   
   // Add to local chat
   addChatMessage({
@@ -712,7 +790,7 @@ function addChatMessage(message) {
   const container = document.getElementById('chat-messages');
   if (!container) return;
   
-  const isOwn = message.userName === currentUser.name;
+  const isOwn = message.userName === currentUser.name || message.userId === currentUser.id;
   const initials = getInitials(message.userName);
   const colors = ['#A8D5BA', '#B4C7E8', '#D4B4E8', '#B4E8D4', '#E8C4B4'];
   const color = colors[Math.floor(Math.random() * colors.length)];
@@ -737,7 +815,10 @@ function addChatMessage(message) {
 
 /* ===== CONTROL FUNCTIONS ===== */
 function toggleMute() {
-  if (!localStream) return;
+  if (!localStream) {
+    showToast('Microphone not available', 'error');
+    return;
+  }
   
   const audioTracks = localStream.getAudioTracks();
   if (audioTracks && audioTracks.length > 0) {
@@ -763,8 +844,11 @@ function toggleMute() {
       status.textContent = !isMicOn ? 'Muted' : (window.lastSpeakingStatus ? 'Speaking' : 'Listening');
     }
     
+    // Update sidebar
+    renderSidebar();
+    
     // Notify server
-    if (socket) {
+    if (socket && socket.connected) {
       socket.emit('toggle-mute', {
         roomId,
         userId: currentUser.id,
@@ -796,8 +880,11 @@ function toggleHand() {
     }
   }
   
+  // Update sidebar
+  renderSidebar();
+  
   // Notify server
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('raise-hand', {
       roomId,
       userId: currentUser.id,
@@ -807,7 +894,7 @@ function toggleHand() {
 }
 
 function leaveRoom() {
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('leave-voice-room', {
       roomId,
       userId: currentUser.id
@@ -900,12 +987,28 @@ function setupEventListeners() {
     e.preventDefault();
     leaveRoom();
   });
+  
+  // Handle page unload
+  window.addEventListener('beforeunload', () => {
+    if (socket && socket.connected) {
+      socket.emit('leave-voice-room', {
+        roomId,
+        userId: currentUser.id
+      });
+    }
+    cleanupWebRTC();
+  });
 }
 
 /* ===== UTILITY FUNCTIONS ===== */
 function getInitials(name) {
   if (!name) return 'U';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+}
+
+function getRandomColor() {
+  const colors = ['#7A4030', '#5A3025', '#6B3828', '#5E3020', '#4F2A1A', '#8B4A35', '#9B5A40'];
+  return colors[Math.floor(Math.random() * colors.length)];
 }
 
 function escapeHtml(text) {
@@ -1000,6 +1103,7 @@ style.textContent = `
     font-size: 16px;
     color: var(--bg-primary, #3B1D14);
     animation: fadeInUp 0.2s ease;
+    z-index: 5;
   }
   .pc-crown {
     position: absolute;
@@ -1007,6 +1111,13 @@ style.textContent = `
     left: -4px;
     font-size: 20px;
     animation: fadeInUp 0.2s ease;
+    z-index: 5;
+  }
+  .pc-mic {
+    z-index: 5;
+  }
+  .room-toast {
+    z-index: 9999;
   }
 `;
 document.head.appendChild(style);
