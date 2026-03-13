@@ -9,7 +9,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <header class="header">
             <div class="logo">
                 <a href="../Dashboard/dashboard.html" style="text-decoration: none; color: inherit; display: block;">
@@ -30,7 +29,6 @@
             </div>
         </header>
 
-        <!-- Community Highlights -->
         <section class="highlights">
             <div class="section-header">
                 <h2 class="section-title">Community Highlights</h2>
@@ -38,6 +36,7 @@
             </div>
             
             <div class="highlight-grid">
+                <!-- Most Discussed Card -->
                 <div class="highlight-card">
                     <div class="card-icon">
                         <i class="fas fa-comments"></i>
@@ -52,6 +51,7 @@
                     </div>
                 </div>
 
+                <!-- Trending Card -->
                 <div class="highlight-card">
                     <div class="card-icon">
                         <i class="fas fa-chart-line"></i>
@@ -66,6 +66,7 @@
                     </div>
                 </div>
 
+                <!-- Active Genre Card -->
                 <div class="highlight-card">
                     <div class="card-icon">
                         <i class="fas fa-book-open"></i>
@@ -82,53 +83,183 @@
             </div>
         </section>
 
-        <!-- Main Content Area -->
+        <!-- ====================================
+             COMMUNITY ACTIVITY FEED
+             ==================================== -->
+        <section class="activity-feed">
+            <div class="feed-header">
+                <h3><i class="fas fa-bolt"></i> Community Pulse</h3>
+                <span class="live-indicator">🔴 LIVE</span>
+            </div>
+            <div class="feed-scroll">
+                <!-- Activity items will be populated by JavaScript -->
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anna" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">Anna W</span> replied in 
+                        <a href="#" class="feed-link">"Unreliable Narrators"</a>
+                        <span class="feed-time">2m ago</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">Marcus T</span> started a thread in 
+                        <a href="#" class="feed-link">Mystery</a>
+                        <span class="feed-time">15m ago</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lina" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">Lina K</span> joined 
+                        <a href="#" class="feed-link">Fantasy Readers</a>
+                        <span class="feed-time">24m ago</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eleanor" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">Eleanor P</span> liked a post in 
+                        <a href="#" class="feed-link">"Midnight Library"</a>
+                        <span class="feed-time">32m ago</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=David" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">David L</span> commented on 
+                        <a href="#" class="feed-link">"Classics Challenge"</a>
+                        <span class="feed-time">41m ago</span>
+                    </div>
+                </div>
+                <div class="feed-item">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" class="feed-avatar">
+                    <div class="feed-content">
+                        <span class="feed-user">Sarah J</span> shared 
+                        <a href="#" class="feed-link">"Mythology Retellings"</a>
+                        <span class="feed-time">53m ago</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================================
+             MAIN CONTENT AREA (Two Column Layout)
+             ==================================== -->
         <div class="main-content">
-            <!-- Left Column: Search & Filters -->
+            <!-- ====================================
+                 LEFT COLUMN - Circles & Community Features
+                 ==================================== -->
             <div class="left-column">
-                <!-- Search Section -->
-                <div class="search-container">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" class="search-bar" placeholder="Search discussions...">
-                        <button class="search-btn"><i class="fas fa-sliders-h"></i></button>
+                <!-- CIRCLE ACTIONS SECTION -->
+                <div class="circle-actions-section">
+                    <div class="section-badge">
+                        <i class="fas fa-users"></i> Your Reading Circles
+                    </div>
+                    
+                    <!-- Active Circle Selector -->
+                    <div class="active-circle-selector">
+                        <select class="circle-select" id="activeCircle">
+                            <option value="fantasy">📚 Fantasy Readers</option>
+                            <option value="mystery">🔍 Mystery Detectives</option>
+                            <option value="scifi">🚀 Sci-Fi Enthusiasts</option>
+                            <option value="classics">🏛️ Classics Club</option>
+                            <option value="romance">💕 Romance Readers</option>
+                            <option value="poetry">📜 Poetry Corner</option>
+                            <option value="historical">🏺 Historical Fiction</option>
+                            <option value="thriller">🔪 Thriller Addicts</option>
+                        </select>
+                    </div>
+
+                    <!-- CIRCLE THREAD BUTTON - Distinct for Circle Posts -->
+                    <button class="btn-circle-thread" id="createCircleThreadBtn">
+                        <div class="btn-content">
+                            <i class="fas fa-plus-circle"></i>
+                            <div class="btn-text">
+                                <span class="btn-main">Create New Circle Thread</span>
+                                <span class="btn-sub">Post to your active circle only</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-lock circle-lock"></i>
+                    </button>
+
+                    <!-- Circle Quick Actions -->
+                    <div class="circle-quick-actions">
+                        <button class="quick-action-btn" data-action="poll">
+                            <i class="fas fa-poll"></i>
+                            <span>Create Poll</span>
+                        </button>
+                        <button class="quick-action-btn" data-action="event">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Schedule Event</span>
+                        </button>
+                        <button class="quick-action-btn" data-action="book">
+                            <i class="fas fa-book"></i>
+                            <span>Suggest Book</span>
+                        </button>
+                    </div>
+
+                    <!-- Circle Members Preview -->
+                    <div class="circle-members-preview">
+                        <div class="members-header">
+                            <span>Members Online</span>
+                            <span class="online-count" id="onlineCount">24 online</span>
+                        </div>
+                        <div class="members-avatars">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Member1" class="member-avatar" alt="member">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Member2" class="member-avatar" alt="member">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Member3" class="member-avatar" alt="member">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Member4" class="member-avatar" alt="member">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Member5" class="member-avatar" alt="member">
+                            <span class="more-members">+12</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Filter Section -->
+                <!-- SEARCH SECTION -->
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-bar" id="searchBar" placeholder="Search discussions...">
+                        <button class="search-btn" id="searchBtn"><i class="fas fa-sliders-h"></i></button>
+                    </div>
+                </div>
+
+                <!-- FILTER SECTION -->
                 <div class="filter-section">
                     <h3><i class="fas fa-filter"></i> Filter Discussions</h3>
                     <div class="filter-options">
                         <label class="filter-option">
-                            <input type="radio" name="filter" checked>
+                            <input type="radio" name="filter" value="recent" checked>
                             <span class="filter-label">
                                 <i class="far fa-clock"></i>
                                 <span>Recent</span>
                             </span>
                         </label>
                         <label class="filter-option">
-                            <input type="radio" name="filter">
+                            <input type="radio" name="filter" value="most_replies">
                             <span class="filter-label">
                                 <i class="fas fa-comment-dots"></i>
                                 <span>Most Replies</span>
                             </span>
                         </label>
                         <label class="filter-option">
-                            <input type="radio" name="filter">
+                            <input type="radio" name="filter" value="community_picks">
                             <span class="filter-label">
                                 <i class="fas fa-star"></i>
                                 <span>Community Picks</span>
                             </span>
                         </label>
                         <label class="filter-option">
-                            <input type="radio" name="filter">
+                            <input type="radio" name="filter" value="my_threads">
                             <span class="filter-label">
                                 <i class="far fa-user"></i>
                                 <span>My Threads</span>
                             </span>
                         </label>
                         <label class="filter-option">
-                            <input type="radio" name="filter">
+                            <input type="radio" name="filter" value="bookmarked">
                             <span class="filter-label">
                                 <i class="far fa-bookmark"></i>
                                 <span>Bookmarked</span>
@@ -137,24 +268,153 @@
                     </div>
                 </div>
 
-                <!-- Genre Tags -->
+                <!-- GENRE TAGS -->
                 <div class="genre-section">
                     <h3><i class="fas fa-tags"></i> Browse by Genre</h3>
                     <div class="genre-tags">
-                        <button class="genre-tag active">All Genres</button>
-                        <button class="genre-tag">Fantasy</button>
-                        <button class="genre-tag">Mystery</button>
-                        <button class="genre-tag">Romance</button>
-                        <button class="genre-tag">Sci-Fi</button>
-                        <button class="genre-tag">Historical</button>
-                        <button class="genre-tag">Thriller</button>
-                        <button class="genre-tag">Non-Fiction</button>
-                        <button class="genre-tag">Literary</button>
-                        <button class="genre-tag">Poetry</button>
+                        <button class="genre-tag active" data-genre="all">All Genres</button>
+                        <button class="genre-tag" data-genre="fantasy">Fantasy</button>
+                        <button class="genre-tag" data-genre="mystery">Mystery</button>
+                        <button class="genre-tag" data-genre="romance">Romance</button>
+                        <button class="genre-tag" data-genre="scifi">Sci-Fi</button>
+                        <button class="genre-tag" data-genre="historical">Historical</button>
+                        <button class="genre-tag" data-genre="thriller">Thriller</button>
+                        <button class="genre-tag" data-genre="nonfiction">Non-Fiction</button>
+                        <button class="genre-tag" data-genre="literary">Literary</button>
+                        <button class="genre-tag" data-genre="poetry">Poetry</button>
                     </div>
                 </div>
 
-                <!-- Community Guidelines -->
+                <!-- ACTIVE READERS PANEL -->
+                <div class="community-card active-readers">
+                    <div class="card-header">
+                        <h3><i class="fas fa-users"></i> Active Readers</h3>
+                        <span class="live-badge">🔴 24 online</span>
+                    </div>
+                    <div class="active-readers-list">
+                        <div class="active-reader">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Maya" alt="Maya" class="avatar-img small">
+                            <div class="reader-info">
+                                <span class="reader-name">Maya R</span>
+                                <span class="reader-status">discussing <strong>Fantasy</strong></span>
+                            </div>
+                            <span class="reader-indicator"></span>
+                        </div>
+                        <div class="active-reader">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Daniel" alt="Daniel" class="avatar-img small">
+                            <div class="reader-info">
+                                <span class="reader-name">Daniel K</span>
+                                <span class="reader-status">replying in <strong>Mystery</strong></span>
+                            </div>
+                            <span class="reader-indicator"></span>
+                        </div>
+                        <div class="active-reader">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sara" alt="Sara" class="avatar-img small">
+                            <div class="reader-info">
+                                <span class="reader-name">Sara P</span>
+                                <span class="reader-status">reading <strong>Sci-Fi</strong></span>
+                            </div>
+                            <span class="reader-indicator"></span>
+                        </div>
+                        <div class="active-reader">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=James" alt="James" class="avatar-img small">
+                            <div class="reader-info">
+                                <span class="reader-name">James L</span>
+                                <span class="reader-status">viewing <strong>Historical</strong></span>
+                            </div>
+                            <span class="reader-indicator"></span>
+                        </div>
+                        <div class="active-reader">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Emma" alt="Emma" class="avatar-img small">
+                            <div class="reader-info">
+                                <span class="reader-name">Emma W</span>
+                                <span class="reader-status">writing in <strong>Poetry</strong></span>
+                            </div>
+                            <span class="reader-indicator"></span>
+                        </div>
+                    </div>
+                    <button class="view-all-link" id="viewAllReaders">View All Active Readers →</button>
+                </div>
+
+                <!-- COMMUNITY EVENTS -->
+                <div class="community-card events-card">
+                    <h3><i class="fas fa-calendar-alt"></i> Upcoming Events</h3>
+                    <div class="events-list">
+                        <div class="event-item">
+                            <div class="event-date-badge">
+                                <span class="event-day">TODAY</span>
+                                <span class="event-time">8PM</span>
+                            </div>
+                            <div class="event-details">
+                                <h4>Fantasy Book Club: Live Discussion</h4>
+                                <p><i class="fas fa-users"></i> 23 attending · <i class="fas fa-microphone"></i> Voice Chat</p>
+                                <button class="btn-join-event">Join</button>
+                            </div>
+                        </div>
+                        <div class="event-item">
+                            <div class="event-date-badge">
+                                <span class="event-day">TOMORROW</span>
+                                <span class="event-time">7PM</span>
+                            </div>
+                            <div class="event-details">
+                                <h4>Monthly Reading Challenge Kickoff</h4>
+                                <p><i class="fas fa-book"></i> "Classic Novels" · 56 participating</p>
+                                <button class="btn-join-event">Join</button>
+                            </div>
+                        </div>
+                        <div class="event-item">
+                            <div class="event-date-badge">
+                                <span class="event-day">SAT</span>
+                                <span class="event-time">3PM</span>
+                            </div>
+                            <div class="event-details">
+                                <h4>Mystery Writers: Plot Workshop</h4>
+                                <p><i class="fas fa-users"></i> 12 spots left · Hosted by Marcus T</p>
+                                <button class="btn-join-event">Reserve</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="view-all-link" id="viewAllEvents">View Calendar →</button>
+                </div>
+
+                <!-- TOP CONTRIBUTORS -->
+                <div class="community-card contributors-card">
+                    <h3><i class="fas fa-crown"></i> Top Contributors</h3>
+                    <div class="contributors-list">
+                        <div class="contributor">
+                            <span class="rank">🥇</span>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" class="avatar-img small">
+                            <span class="contributor-name">Marcus T</span>
+                            <span class="contributor-stats">1,247 posts</span>
+                        </div>
+                        <div class="contributor">
+                            <span class="rank">🥈</span>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anna" class="avatar-img small">
+                            <span class="contributor-name">Anna W</span>
+                            <span class="contributor-stats">982 posts</span>
+                        </div>
+                        <div class="contributor">
+                            <span class="rank">🥉</span>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eleanor" class="avatar-img small">
+                            <span class="contributor-name">Eleanor P</span>
+                            <span class="contributor-stats">856 posts</span>
+                        </div>
+                        <div class="contributor">
+                            <span class="rank">4</span>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" class="avatar-img small">
+                            <span class="contributor-name">Sarah J</span>
+                            <span class="contributor-stats">743 posts</span>
+                        </div>
+                        <div class="contributor">
+                            <span class="rank">5</span>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=David" class="avatar-img small">
+                            <span class="contributor-name">David L</span>
+                            <span class="contributor-stats">621 posts</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMMUNITY GUIDELINES -->
                 <div class="guidelines-card">
                     <div class="guidelines-header">
                         <i class="fas fa-info-circle"></i>
@@ -172,83 +432,219 @@
                 </div>
             </div>
 
-            <!-- Right Column: Discussion Threads -->
             <div class="right-column">
+                <!-- PUBLIC DISCUSSION BUTTON -->
+                <div class="public-discussion-section">
+                    <button class="btn-public-discussion" id="createPublicDiscussionBtn">
+                        <div class="btn-content">
+                            <i class="fas fa-globe-americas"></i>
+                            <div class="btn-text">
+                                <span class="btn-main">Start Public Discussion</span>
+                                <span class="btn-sub">Visible to all Litlink members</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-unlock-alt public-unlock"></i>
+                    </button>
+                </div>
+
+                <!-- FEED TOGGLE -->
+                <div class="feed-toggle">
+                    <button class="toggle-btn active" data-feed="circle" id="toggleCircle">
+                        <i class="fas fa-users"></i> My Circles
+                    </button>
+                    <button class="toggle-btn" data-feed="public" id="togglePublic">
+                        <i class="fas fa-globe"></i> Public
+                    </button>
+                    <button class="toggle-btn" data-feed="all" id="toggleAll">
+                        <i class="fas fa-stream"></i> All Activity
+                    </button>
+                </div>
+
+                <!-- THREADS HEADER -->
                 <div class="threads-header">
-                    <h2>Recent Discussions</h2>
+                    <h2 id="feedTitle">Fantasy Readers Circle</h2>
                     <div class="threads-sort">
                         <span>Sort by:</span>
-                        <select class="sort-select">
-                            <option>Latest Activity</option>
-                            <option>Most Replies</option>
-                            <option>Most Views</option>
-                            <option>Most Likes</option>
+                        <select class="sort-select" id="sortSelect">
+                            <option value="latest">Latest Activity</option>
+                            <option value="replies">Most Replies</option>
+                            <option value="views">Most Views</option>
+                            <option value="likes">Most Likes</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Discussion Threads -->
-                <div class="threads-container">
-                    <div class="thread-card featured">
-                        <div class="thread-badge">
-                            <i class="fas fa-crown"></i> Community Pick
+                <!-- THREADS CONTAINER -->
+                <div class="threads-container" id="threadsContainer">
+                    <!-- CIRCLE THREAD - Fantasy Readers -->
+                    <div class="thread-card circle-thread" data-circle="fantasy" data-thread-id="1">
+                        <div class="thread-context-badge circle-badge">
+                            <i class="fas fa-users"></i> Fantasy Readers · Members Only
                         </div>
                         <div class="thread-header">
                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eleanor" alt="Eleanor P" class="avatar-img">
                             <div class="thread-info">
-                                <h3>Thoughts on the ambiguous ending of 'The Midnight Library'?</h3>
+                                <h3>What's everyone reading this week? 📖</h3>
                                 <div class="thread-meta">
                                     <span class="author"><i class="far fa-user"></i> Eleanor P</span>
                                     <span class="time"><i class="far fa-clock"></i> 2 hours ago</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> The Midnight Library</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Ending</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Philosophy</span>
+                                    <span class="circle-indicator">
+                                        <i class="fas fa-lock"></i> Circle Thread
+                                    </span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> fantasy</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> reading</span>
                                 </div>
                             </div>
                         </div>
                         <div class="thread-excerpt">
-                            <p>Just finished reading and I can't stop thinking about the ending. What did Nora's final choice mean to you? Was it about acceptance or something else entirely?</p>
+                            <p>Just started "The Way of Kings" - anyone want to read along? Let's discuss Part 1 this week! I'm loving the worldbuilding so far.</p>
                         </div>
                         <div class="thread-footer">
                             <div class="thread-stats">
-                                <span class="stat"><i class="fas fa-comment"></i> 45 replies</span>
-                                <span class="stat"><i class="fas fa-eye"></i> 892 views</span>
-                                <span class="stat"><i class="fas fa-heart"></i> 124 likes</span>
+                                <span class="stat"><i class="fas fa-comment"></i> 23 replies</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 45 likes</span>
+                                <span class="stat"><i class="fas fa-users"></i> 12 online now</span>
                             </div>
-                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                            <div class="thread-actions">
+                                <button class="btn-circle-reply" onclick="viewThread('1')">Reply in Circle</button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="thread-card">
+                    <!-- CIRCLE POLL - Mystery Detectives -->
+                    <div class="thread-card circle-thread" data-circle="mystery" data-thread-id="2">
+                        <div class="thread-context-badge circle-badge">
+                            <i class="fas fa-users"></i> Mystery Detectives · Members Only
+                        </div>
+                        <div class="thread-header">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus T" class="avatar-img">
+                            <div class="thread-info">
+                                <h3>📊 POLL: Best mystery novel of the year?</h3>
+                                <div class="thread-meta">
+                                    <span class="author"><i class="far fa-user"></i> Marcus T</span>
+                                    <span class="time"><i class="far fa-clock"></i> 5 hours ago</span>
+                                    <span class="poll-indicator">
+                                        <i class="fas fa-chart-bar"></i> Active Poll
+                                    </span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> mystery</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> poll</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="poll-preview">
+                            <h4>Which mystery novel deserves book of the year?</h4>
+                            <div class="poll-option">
+                                <span class="poll-label">"The Last Devil to Die"</span>
+                                <div class="poll-bar-container">
+                                    <div class="poll-bar" style="width: 45%"></div>
+                                    <span class="poll-percentage">45%</span>
+                                </div>
+                            </div>
+                            <div class="poll-option">
+                                <span class="poll-label">"The Running Grave"</span>
+                                <div class="poll-bar-container">
+                                    <div class="poll-bar" style="width: 32%"></div>
+                                    <span class="poll-percentage">32%</span>
+                                </div>
+                            </div>
+                            <div class="poll-option">
+                                <span class="poll-label">"Small Mercies"</span>
+                                <div class="poll-bar-container">
+                                    <div class="poll-bar" style="width: 23%"></div>
+                                    <span class="poll-percentage">23%</span>
+                                </div>
+                            </div>
+                            <div class="poll-footer">
+                                <span>56 votes</span>
+                                <button class="btn-vote" onclick="voteInPoll('2')">Vote</button>
+                            </div>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 18 comments</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 34 likes</span>
+                                <span class="stat"><i class="fas fa-vote-yea"></i> 56 votes</span>
+                            </div>
+                            <div class="thread-actions">
+                                <button class="btn-circle-reply" onclick="viewThread('2')">View Poll</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PUBLIC DISCUSSION -->
+                    <div class="thread-card public-thread" data-thread-id="3">
+                        <div class="thread-context-badge public-badge">
+                            <i class="fas fa-globe"></i> Public Discussion
+                        </div>
                         <div class="thread-header">
                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anna" alt="Anna W" class="avatar-img">
                             <div class="thread-info">
-                                <h3>Monthly Challenge: Classics we actually enjoy reading</h3>
+                                <h3>The evolution of mystery novels in the 21st century</h3>
                                 <div class="thread-meta">
                                     <span class="author"><i class="far fa-user"></i> Anna W</span>
-                                    <span class="time"><i class="far fa-clock"></i> 5 hours ago</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Classics</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Book Club</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Challenge</span>
+                                    <span class="time"><i class="far fa-clock"></i> 8 hours ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> literary-analysis</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> mystery</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> discussion</span>
                                 </div>
                             </div>
                         </div>
                         <div class="thread-excerpt">
-                            <p>This month's community challenge is to read and discuss one classic novel. What classics have surprised you with how enjoyable they are to read?</p>
+                            <p>How have mystery novels changed with modern technology and social issues? Let's analyze the trends from traditional whodunits to modern psychological thrillers...</p>
                         </div>
                         <div class="thread-footer">
                             <div class="thread-stats">
-                                <span class="stat"><i class="fas fa-comment"></i> 113 replies</span>
+                                <span class="stat"><i class="fas fa-comment"></i> 89 replies</span>
                                 <span class="stat"><i class="fas fa-eye"></i> 1.2k views</span>
-                                <span class="stat"><i class="fas fa-heart"></i> 267 likes</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 234 likes</span>
                             </div>
-                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                            <div class="thread-actions">
+                                <button class="btn-join-discussion" onclick="viewThread('3')">Join Discussion</button>
+                                <button class="btn-share"><i class="fas fa-share"></i></button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="thread-card featured">
+                    <!-- CIRCLE EVENT - Fantasy Readers -->
+                    <div class="thread-card circle-thread" data-circle="fantasy" data-thread-id="4">
+                        <div class="thread-context-badge event-badge">
+                            <i class="fas fa-calendar-alt"></i> Circle Event · Fantasy Readers
+                        </div>
+                        <div class="event-preview">
+                            <div class="event-date-large">
+                                <span class="event-month">MAR</span>
+                                <span class="event-day">15</span>
+                            </div>
+                            <div class="event-details-large">
+                                <h3>📖 Fantasy Book Club: Live Voice Discussion</h3>
+                                <p>Discussing "The Name of the Wind" - Part 1 (Chapters 1-25)</p>
+                                <div class="event-meta">
+                                    <span><i class="fas fa-clock"></i> 8:00 PM EST</span>
+                                    <span><i class="fas fa-users"></i> 34 attending</span>
+                                    <span><i class="fas fa-microphone"></i> Voice Chat</span>
+                                </div>
+                                <button class="btn-rsvp" onclick="rsvpToEvent('4')">RSVP</button>
+                            </div>
+                        </div>
+                        <div class="thread-footer">
+                            <div class="thread-stats">
+                                <span class="stat"><i class="fas fa-comment"></i> 12 comments</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 28 likes</span>
+                                <span class="stat"><i class="fas fa-users"></i> 34 attending</span>
+                            </div>
+                            <div class="thread-actions">
+                                <button class="btn-circle-reply" onclick="viewThread('4')">View Event</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FEATURED PUBLIC DISCUSSION -->
+                    <div class="thread-card public-thread featured" data-thread-id="5">
                         <div class="thread-badge">
                             <i class="fas fa-crown"></i> Community Pick
+                        </div>
+                        <div class="thread-context-badge public-badge">
+                            <i class="fas fa-globe"></i> Public Discussion
                         </div>
                         <div class="thread-header">
                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Erin" alt="Erin R" class="avatar-img">
@@ -256,15 +652,15 @@
                                 <h3>The subtle art of describing food in literature</h3>
                                 <div class="thread-meta">
                                     <span class="author"><i class="far fa-user"></i> Erin R</span>
-                                    <span class="time"><i class="far fa-clock"></i> 8 hours ago</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Crying in H Mart</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Non-fiction</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Food Writing</span>
+                                    <span class="time"><i class="far fa-clock"></i> 1 day ago</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> literary-analysis</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> food-writing</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> discussion</span>
                                 </div>
                             </div>
                         </div>
                         <div class="thread-excerpt">
-                            <p>How do authors use food descriptions to convey emotion, culture, and memory? Let's discuss memorable food scenes in literature and their deeper meanings.</p>
+                            <p>How do authors use food descriptions to convey emotion, culture, and memory? From Proust's madeleines to the feasts in Harry Potter...</p>
                         </div>
                         <div class="thread-footer">
                             <div class="thread-stats">
@@ -272,83 +668,66 @@
                                 <span class="stat"><i class="fas fa-eye"></i> 945 views</span>
                                 <span class="stat"><i class="fas fa-heart"></i> 189 likes</span>
                             </div>
-                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                            <div class="thread-actions">
+                                <button class="btn-join-discussion" onclick="viewThread('5')">Join Discussion</button>
+                                <button class="btn-share"><i class="fas fa-share"></i></button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="thread-card">
+                    <!-- CIRCLE THREAD - Sci-Fi Enthusiasts -->
+                    <div class="thread-card circle-thread" data-circle="scifi" data-thread-id="6">
+                        <div class="thread-context-badge circle-badge">
+                            <i class="fas fa-users"></i> Sci-Fi Enthusiasts · Members Only
+                        </div>
                         <div class="thread-header">
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus T" class="avatar-img">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=David" alt="David L" class="avatar-img">
                             <div class="thread-info">
-                                <h3>Why do we love unreliable narrators so much?</h3>
+                                <h3>Recommendations for hard sci-fi beginners?</h3>
                                 <div class="thread-meta">
-                                    <span class="author"><i class="far fa-user"></i> Marcus T</span>
-                                    <span class="time"><i class="far fa-clock"></i> 1 day ago</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Literary Analysis</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Narration</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Psychology</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="thread-excerpt">
-                            <p>From 'Gone Girl' to 'The Murder of Roger Ackroyd', unreliable narrators keep us guessing. What makes this literary device so compelling?</p>
-                        </div>
-                        <div class="thread-footer">
-                            <div class="thread-stats">
-                                <span class="stat"><i class="fas fa-comment"></i> 56 replies</span>
-                                <span class="stat"><i class="fas fa-eye"></i> 734 views</span>
-                                <span class="stat"><i class="fas fa-heart"></i> 142 likes</span>
-                            </div>
-                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
-                        </div>
-                    </div>
-
-                    <div class="thread-card">
-                        <div class="thread-header">
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Sarah J" class="avatar-img">
-                            <div class="thread-info">
-                                <h3>Modern retellings of classic mythology: Yay or nay?</h3>
-                                <div class="thread-meta">
-                                    <span class="author"><i class="far fa-user"></i> Sarah J</span>
+                                    <span class="author"><i class="far fa-user"></i> David L</span>
                                     <span class="time"><i class="far fa-clock"></i> 2 days ago</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Mythology</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Retellings</span>
-                                    <span class="tag"><i class="fas fa-hashtag"></i> Contemporary</span>
+                                    <span class="circle-indicator">
+                                        <i class="fas fa-lock"></i> Circle Thread
+                                    </span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> scifi</span>
+                                    <span class="tag"><i class="fas fa-hashtag"></i> recommendations</span>
                                 </div>
                             </div>
                         </div>
                         <div class="thread-excerpt">
-                            <p>With so many modern adaptations of Greek, Norse, and other mythologies, are we seeing creative innovation or cultural dilution? Let's discuss!</p>
+                            <p>I've read some classic sci-fi but want to get into harder sci-fi. Where should I start? Looking for books with accurate science but still accessible...</p>
                         </div>
                         <div class="thread-footer">
                             <div class="thread-stats">
-                                <span class="stat"><i class="fas fa-comment"></i> 89 replies</span>
-                                <span class="stat"><i class="fas fa-eye"></i> 1.1k views</span>
-                                <span class="stat"><i class="fas fa-heart"></i> 203 likes</span>
+                                <span class="stat"><i class="fas fa-comment"></i> 45 replies</span>
+                                <span class="stat"><i class="fas fa-heart"></i> 67 likes</span>
+                                <span class="stat"><i class="fas fa-users"></i> 8 online now</span>
                             </div>
-                            <button class="join-discussion"><i class="fas fa-reply"></i> Join Discussion</button>
+                            <div class="thread-actions">
+                                <button class="btn-circle-reply" onclick="viewThread('6')">Reply in Circle</button>
+                            </div>
                         </div>
                     </div>
 
-                    <button class="load-more">
+                    <!-- LOAD MORE BUTTON -->
+                    <button class="load-more" id="loadMoreBtn">
                         <i class="fas fa-sync-alt"></i> Load More Discussions
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Start Thread CTA -->
         <div class="cta-section">
             <div class="cta-content">
                 <h2><i class="fas fa-lightbulb"></i> Have something to discuss?</h2>
                 <p>Start a conversation with fellow book lovers. Share your insights, ask questions, or start a book club discussion.</p>
-                <button class="btn-primary start-thread-btn">
+                <button class="btn-primary start-thread-btn" id="startThreadBtn">
                     <i class="fas fa-plus"></i> Start a New Thread
                 </button>
             </div>
         </div>
     </div>
-
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="discussion.js"></script>
