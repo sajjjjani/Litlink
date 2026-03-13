@@ -1,4 +1,4 @@
-// server.js - Complete with Voice Room support
+// server.js - Complete with Voice Room and Circle support
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -253,10 +253,25 @@ const startServer = async () => {
       console.log('📌 MAIN ENDPOINTS:');
       console.log('   POST   /api/auth/signup - Register new user');
       console.log('   POST   /api/auth/login - Login user');
-      console.log('   POST   /api/auth/verify-email - Verify email');
-      console.log('   POST   /api/auth/forgot-password - Forgot password');
-      console.log('   POST   /api/auth/reset-password - Reset password');
       console.log('   GET    /api/auth/me - Get current user');
+      console.log('='.repeat(70));
+      
+      console.log('📌 DISCUSSION ENDPOINTS:');
+      console.log('   GET    /api/discussions/threads - Get all threads');
+      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
+      console.log('   POST   /api/discussions/threads - Create public discussion');
+      console.log('   GET    /api/discussions/public - Get public discussions');
+      console.log('   GET    /api/discussions/all - Get all activity');
+      console.log('   GET    /api/discussions/highlights - Get community highlights');
+      console.log('   POST   /api/discussions/threads/:threadId/like - Like thread');
+      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
+      console.log('   GET    /api/discussions/stats/genres - Genre statistics');
+      console.log('='.repeat(70));
+      
+      console.log('📌 CIRCLE ENDPOINTS:');
+      console.log('   GET    /api/discussions/circles/:circleId/threads - Get circle threads');
+      console.log('   POST   /api/discussions/circles/threads - Create circle thread');
+      console.log('   POST   /api/discussions/circles/polls - Create circle poll');
       console.log('='.repeat(70));
       
       console.log('📌 VOICE ROOM ENDPOINTS:');
@@ -264,52 +279,22 @@ const startServer = async () => {
       console.log('   GET    /api/voice-rooms/rooms/scheduled - Get scheduled rooms');
       console.log('   GET    /api/voice-rooms/rooms/:roomId - Get room details');
       console.log('   POST   /api/voice-rooms/rooms - Create new room');
-      console.log('   POST   /api/voice-rooms/rooms/:roomId/end - End room (host only)');
-      console.log('='.repeat(70));
-      
-      console.log('📌 DISCUSSION ENDPOINTS:');
-      console.log('   GET    /api/discussions/threads - Get all threads (with filters)');
-      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
-      console.log('   POST   /api/discussions/threads - Create new thread');
-      console.log('   PUT    /api/discussions/threads/:threadId - Update thread');
-      console.log('   DELETE /api/discussions/threads/:threadId - Delete thread');
-      console.log('   POST   /api/discussions/threads/:threadId/like - Like/unlike thread');
-      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
-      console.log('   POST   /api/discussions/threads/:threadId/comments/:commentId/like - Like comment');
-      console.log('   DELETE /api/discussions/threads/:threadId/comments/:commentId - Delete comment');
-      console.log('   GET    /api/discussions/stats/genres - Get genre statistics');
-      console.log('   GET    /api/discussions/user/:userId/threads - Get user threads');
       console.log('='.repeat(70));
       
       console.log('📌 ADMIN ENDPOINTS:');
       console.log('   GET    /api/admin/dashboard/stats - Dashboard statistics');
       console.log('   GET    /api/admin/users - List all users');
-      console.log('   GET    /api/admin/users/:userId - Get user details');
-      console.log('   POST   /api/admin/users/:userId/ban - Ban user');
-      console.log('   POST   /api/admin/users/:userId/unban - Unban user');
-      console.log('   POST   /api/admin/users/:userId/suspend - Suspend user');
-      console.log('   POST   /api/admin/users/:userId/warn - Warn user');
       console.log('   GET    /api/admin/filter-words - List filter words');
-      console.log('   POST   /api/admin/filter-words - Add filter word');
       console.log('   GET    /api/admin/reports - List reports');
-      console.log('   GET    /api/admin/system/info - System information');
-      console.log('   GET    /api/admin/me - Get admin info');
-      console.log('   POST   /api/admin/test-socket - Test WebSocket');
       console.log('='.repeat(70));
       
       console.log('📌 OTHER ENDPOINTS:');
       console.log('   GET    /api/books/search - Search books');
-      console.log('   GET    /api/books/popular/:genre - Popular books by genre');
-      console.log('   GET    /api/books/details/:bookId - Book details');
       console.log('   GET    /api/dashboard/:userId - User dashboard');
       console.log('   GET    /api/notifications - User notifications');
       console.log('   GET    /health - Health check');
-      console.log('   GET    / - API information');
       console.log('='.repeat(70));
       
-      console.log('💡 Tip: Make sure you have an admin user created');
-      console.log('   Use: node seed-admin.js to create admin account');
-      console.log('='.repeat(70));
       console.log(`🕐 Server started at: ${new Date().toLocaleString()}`);
       console.log('='.repeat(70));
     });
