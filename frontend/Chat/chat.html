@@ -6,78 +6,6 @@
     <title>Litlink - Book Chat</title>
     <link rel="stylesheet" href="chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* Additional styles for sidebar content */
-        .sidebar-content {
-            padding: 1rem;
-        }
-        
-        .sidebar-stats {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 1rem;
-            border-radius: 8px;
-        }
-        
-        .stat-item {
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--accent-brown);
-        }
-        
-        .stat-label {
-            font-size: 0.8rem;
-            color: rgba(245, 240, 232, 0.7);
-        }
-        
-        .quick-actions {
-            margin-top: 1.5rem;
-        }
-        
-        .quick-action-btn {
-            width: 100%;
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            border-radius: 8px;
-            color: var(--background);
-            text-align: left;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: background 0.2s;
-        }
-        
-        .quick-action-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        /* Fix for profile icon in header */
-        .profile-icon-btn {
-            background: none;
-            border: none;
-            color: var(--background);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-        
-        .profile-icon-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-    </style>
 </head>
 <body>
     <!-- Navigation Bar for Mobile -->
@@ -107,7 +35,7 @@
                     <span>Litlink</span>
                 </div>
                 <div class="header-icons">
-                    <button class="icon-btn" id="menuToggle" onclick="toggleSidebar()">
+                    <button class="icon-btn" id="menuToggle">
                         <i class="fas fa-bars"></i>
                     </button>
                     <button class="profile-icon-btn" onclick="window.location.href='../Profile/profile.html'">
@@ -119,13 +47,13 @@
 
             <div class="sidebar-content">
                 <!-- User Info -->
-                <div class="user-info" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
-                    <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="user-info">
+                    <div class="user-info-content">
                         <img id="sidebarUserAvatar" src="https://ui-avatars.com/api/?name=User&background=E0B973&color=3B1D14&size=60" 
-                             alt="User" style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--accent-brown);">
-                        <div>
-                            <h3 id="sidebarUserName" style="margin: 0; color: var(--background);">Loading...</h3>
-                            <p id="sidebarUserGenre" style="margin: 0; color: var(--accent-brown); font-size: 0.9rem;">Reader</p>
+                             alt="User">
+                        <div class="user-info-details">
+                            <h3 id="sidebarUserName">Loading...</h3>
+                            <p id="sidebarUserGenre">Reader</p>
                         </div>
                     </div>
                 </div>
@@ -148,7 +76,7 @@
 
                 <!-- Quick Actions -->
                 <div class="quick-actions">
-                    <h4 style="color: var(--background); margin-bottom: 1rem; font-size: 1rem;">Quick Actions</h4>
+                    <h4>Quick Actions</h4>
                     <button class="quick-action-btn" onclick="window.location.href='../Dashboard/dashboard.html'">
                         <i class="fas fa-home"></i>
                         <span>Dashboard</span>
@@ -178,13 +106,13 @@
         <!-- Main Chat Area -->
         <main class="chat-area">
             <header class="chat-header">
-                <button class="icon-btn mobile-only" id="sidebarToggle" onclick="toggleSidebar()">
+                <button class="icon-btn mobile-only" id="sidebarToggle">
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="chat-user-info">
                     <div class="avatar-wrapper">
-                        <img id="currentAvatar" src="https://i.pravatar.cc/150?img=45" alt="Eleanor Vance" class="avatar">
-                        <span class="status-indicator online"></span>
+                        <img id="currentAvatar" src="https://ui-avatars.com/api/?name=Select&background=E0B973&color=3B1D14&size=48" alt="Select a match" class="avatar">
+                        <span class="status-indicator offline" id="currentStatus"></span>
                     </div>
                     <div>
                         <h2 class="chat-user-name" id="currentUserName">Select a match to chat</h2>
@@ -195,27 +123,25 @@
                     <button class="icon-btn" onclick="window.location.href='../Profile/profile.html'">
                         <i class="fas fa-user"></i>
                     </button>
-                    <button class="icon-btn" onclick="refreshMatches()">
+                    <button class="icon-btn" onclick="LitlinkChat.refreshMatches()">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button class="icon-btn" onclick="showSettings()">
+                    <button class="icon-btn" onclick="LitlinkChat.showSettings()">
                         <i class="fas fa-cog"></i>
                     </button>
                 </div>
             </header>
 
             <!-- Welcome/Empty State -->
-            <div class="welcome-state" id="welcomeState" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70%; padding: 2rem; text-align: center;">
-                <div style="font-size: 4rem; margin-bottom: 1rem;">💬</div>
-                <h2 style="color: var(--text-primary); margin-bottom: 1rem;">Welcome to Litlink Chat</h2>
-                <p style="color: var(--text-secondary); max-width: 500px; margin-bottom: 2rem;">
-                    Connect with readers who share your interests. Select a match from the sidebar to start chatting about books, recommendations, and more!
-                </p>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div class="welcome-state" id="welcomeState">
+                <div class="welcome-icon">💬</div>
+                <h2>Welcome to Litlink Chat</h2>
+                <p>Connect with readers who share your interests. Select a match from the sidebar to start chatting about books, recommendations, and more!</p>
+                <div class="welcome-actions">
                     <button class="action-btn" onclick="window.location.href='../Profile/profile.html'">
                         <i class="fas fa-user-edit"></i> Complete Your Profile
                     </button>
-                    <button class="action-btn" onclick="window.location.href='../Dashboard/dashexplore.html'">
+                    <button class="action-btn secondary" onclick="window.location.href='../Dashboard/dashexplore.html'">
                         <i class="fas fa-compass"></i> Explore Readers
                     </button>
                 </div>
@@ -228,10 +154,10 @@
 
             <!-- Message Input (hidden by default) -->
             <div class="message-input-wrapper" id="messageInputWrapper" style="display: none;">
-                <button class="icon-btn" onclick="toggleEmojiPicker()">
+                <button class="icon-btn" id="emojiBtn">
                     <i class="fas fa-smile"></i>
                 </button>
-                <button class="icon-btn" onclick="attachFile()">
+                <button class="icon-btn" id="attachBtn">
                     <i class="fas fa-paperclip"></i>
                 </button>
                 <input 
@@ -239,15 +165,16 @@
                     class="message-input" 
                     id="messageInput"
                     placeholder="Type your message here..."
+                    autocomplete="off"
                 >
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                <button class="send-btn" id="sendBtn">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
         </main>
     </div>
 
-    <!-- Simple Authentication Check -->
+    <!-- Authentication Check -->
     <script>
     (function() {
         const token = localStorage.getItem('litlink_token');
@@ -257,83 +184,24 @@
         
         if (!token || !userStr) {
             console.log('User not authenticated, showing message...');
-            // Don't redirect, just show message
             const welcomeState = document.getElementById('welcomeState');
             if (welcomeState) {
                 welcomeState.innerHTML = `
-                    <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
-                    <h2 style="color: var(--text-primary); margin-bottom: 1rem;">Please Login</h2>
-                    <p style="color: var(--text-secondary); max-width: 500px; margin-bottom: 2rem;">
-                        You need to login to use the chat feature. Please login to continue.
-                    </p>
-                    <div style="display: flex; gap: 1rem;">
-                        <button onclick="window.location.href='../Homepage/index.html'" style="
-                            background: var(--accent-brown);
-                            color: var(--text-primary);
-                            border: none;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-size: 16px;
-                            font-weight: 600;
-                        ">
+                    <div class="welcome-icon">🔒</div>
+                    <h2>Please Login</h2>
+                    <p>You need to login to use the chat feature. Please login to continue.</p>
+                    <div class="welcome-actions">
+                        <button onclick="window.location.href='../Homepage/index.html'" class="action-btn">
                             <i class="fas fa-sign-in-alt"></i> Login
                         </button>
                     </div>
                 `;
-            }
-        } else {
-            console.log('User authenticated');
-            // Load user info in sidebar
-            try {
-                const user = JSON.parse(userStr);
-                document.getElementById('sidebarUserName').textContent = user.name || 'User';
-                document.getElementById('sidebarUserGenre').textContent = 
-                    user.favoriteGenres && user.favoriteGenres.length > 0 
-                    ? user.favoriteGenres[0] 
-                    : 'Reader';
-                
-                // Set avatar
-                const avatar = document.getElementById('sidebarUserAvatar');
-                if (user.profilePicture) {
-                    avatar.src = user.profilePicture;
-                } else {
-                    const name = user.name || 'User';
-                    avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E0B973&color=3B1D14&size=60`;
-                }
-            } catch (e) {
-                console.error('Error parsing user data:', e);
             }
         }
     })();
     </script>
 
     <script src="chat.js"></script>
-    
-    <script>
-    // Global functions for navigation
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('open');
-    }
-    
-    function refreshMatches() {
-        alert('Refreshing matches...');
-        // In a real app, this would fetch new matches
-    }
-    
-    function showSettings() {
-        alert('Chat settings would open here');
-    }
-    
-    function toggleEmojiPicker() {
-        alert('Emoji picker would open here');
-    }
-    
-    function attachFile() {
-        alert('File attachment dialog would open here');
-    }
-    </script>
     <script src="../utils/modal.js"></script>
 </body>
 </html>
