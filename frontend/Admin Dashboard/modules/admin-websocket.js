@@ -1,114 +1,158 @@
-// Admin Dashboard – WebSocket for real-time notifications
-(function () {
-  'use strict';
-
-  var adminSocket = null;
-  var adminSocketReconnectTimer = null;
-  var adminSocketPingTimer = null;
-  var callbacks = null;
-
-  function init(opts) {
-    callbacks = opts || {};
-    var authToken = window.authToken || opts.authToken;
-    if (!authToken) {
-      console.warn('No authToken available for WebSocket auth');
-      return;
-    }
-    var protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    var host = opts.wsHost || 'localhost:5002';
-    var wsUrl = protocol + '://' + host + '?token=' + encodeURIComponent(authToken);
-    try {
-      console.log('🔌 Connecting to admin WebSocket:', wsUrl);
-      adminSocket = new WebSocket(wsUrl);
-
-      adminSocket.onopen = function () {
-        console.log('✅ Admin WebSocket connected');
-        setTimeout(function () {
-          if (adminSocket && adminSocket.readyState === WebSocket.OPEN) {
-            try {
-              adminSocket.send(JSON.stringify({ type: 'get-unread-count' }));
-            } catch (e) {
-              console.error('Error sending get-unread-count:', e);
-            }
-          }
-        }, 100);
-        if (adminSocketPingTimer) clearInterval(adminSocketPingTimer);
-        adminSocketPingTimer = setInterval(function () {
-          if (adminSocket && adminSocket.readyState === WebSocket.OPEN) {
-            try {
-              adminSocket.send(JSON.stringify({ type: 'ping' }));
-            } catch (e) {}
-          }
-        }, 25000);
-      };
-
-      adminSocket.onmessage = function (event) {
+(function() {
+    'use strict';
+    
+    let ws = null;
+    let reconnectTimer = null;
+    let pingInterval = null;
+    let callbacks = {};
+    let isConnecting = false;
+    
+    function init(options) {
+        callbacks = options || {};
+        const authToken = window.authToken || options.authToken;
+        
+        if (!authToken) {
+            console.warn('No authToken for WebSocket');
+            return;
+        }
+        
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+            console.log('WebSocket already connected or connecting');
+            return;
+        }
+        
+        if (isConnecting) return;
+        isConnecting = true;
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const host = options.wsHost || 'localhost:5002';
+        const wsUrl = `${protocol}://${host}?token=${encodeURIComponent(authToken)}`;
+        
+        console.log('🔌 Connecting to WebSocket:', wsUrl);
+        
         try {
-          var data = JSON.parse(event.data);
-          handleMessage(data);
-        } catch (e) {
-          console.error('Error parsing WebSocket message:', e, event.data);
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('✅ WebSocket connected');
+                isConnecting = false;
+                
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 25000);
+                
+                // Request unread count
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'get-unread-count' }));
+                    }
+                }, 500);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                isConnecting = false;
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                isConnecting = false;
+                if (pingInterval) clearInterval(pingInterval);
+                scheduleReconnect();
+            };
+            
+        } catch (error) {
+            console.error('Failed to create WebSocket:', error);
+            isConnecting = false;
+            scheduleReconnect();
         }
-      };
-
-      adminSocket.onclose = function (event) {
-        if (adminSocketPingTimer) {
-          clearInterval(adminSocketPingTimer);
-          adminSocketPingTimer = null;
-        }
-        console.warn('Admin WebSocket closed:', event.code, event.reason);
-        scheduleReconnect();
-      };
-
-      adminSocket.onerror = function (error) {
-        console.error('Admin WebSocket error:', error);
-      };
-    } catch (error) {
-      console.error('Failed to open admin WebSocket:', error);
-      scheduleReconnect();
     }
-  }
-
-  function scheduleReconnect() {
-    if (adminSocketReconnectTimer) return;
-    adminSocketReconnectTimer = setTimeout(function () {
-      adminSocketReconnectTimer = null;
-      if (window.authToken) {
-        console.log('🔄 Reconnecting admin WebSocket...');
-        init({ authToken: window.authToken, wsHost: 'localhost:5002' });
-      }
-    }, 5000);
-  }
-
-  function handleMessage(data) {
-    if (!data || !data.type) return;
-    var cb = callbacks;
-    switch (data.type) {
-      case 'admin-authenticated':
-        console.log('Admin WebSocket authenticated as:', data.userName);
-        if (typeof cb.updateStatusIndicator === 'function' && typeof data.connectedAdmins === 'number') {
-          cb.updateStatusIndicator(data.connectedAdmins);
-        }
-        break;
-      case 'notification-count':
-        if (typeof cb.updateNotificationBadge === 'function' && typeof data.unreadCount === 'number') {
-          cb.updateNotificationBadge(data.unreadCount);
-        }
-        break;
-      case 'admin-notification':
-        if (typeof cb.showNotificationToast === 'function') cb.showNotificationToast(data);
-        if (typeof cb.updateNotificationBadge === 'function') cb.updateNotificationBadge('+1');
-        break;
-      case 'pong':
-      case 'test-response':
-        console.log('WebSocket heartbeat/test:', data);
-        break;
-      default:
-        console.log('Admin WebSocket message:', data);
+    
+    function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            if (window.authToken) {
+                console.log('🔄 Reconnecting WebSocket...');
+                init({ authToken: window.authToken, wsHost: 'localhost:5002' });
+            }
+        }, 5000);
     }
-  }
-
-  window.AdminWebSocket = window.AdminWebSocket || {};
-  window.AdminWebSocket.init = init;
-  window.AdminWebSocket.scheduleReconnect = scheduleReconnect;
+    
+    function handleMessage(data) {
+        if (!data || !data.type) return;
+        
+        switch(data.type) {
+            case 'admin-authenticated':
+                console.log('WebSocket authenticated as:', data.userName);
+                if (callbacks.updateStatusIndicator && typeof data.connectedAdmins === 'number') {
+                    callbacks.updateStatusIndicator(data.connectedAdmins);
+                }
+                break;
+                
+            case 'notification-count':
+                if (callbacks.updateNotificationBadge && typeof data.unreadCount === 'number') {
+                    callbacks.updateNotificationBadge(data.unreadCount);
+                }
+                break;
+                
+            case 'admin-notification':
+                if (callbacks.showNotificationToast) {
+                    callbacks.showNotificationToast(data);
+                }
+                if (callbacks.updateNotificationBadge) {
+                    callbacks.updateNotificationBadge('+1');
+                }
+                break;
+                
+            case 'pong':
+                // Heartbeat response
+                break;
+                
+            default:
+                console.log('WebSocket message:', data);
+        }
+    }
+    
+    function send(data) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(data));
+        } else {
+            console.warn('WebSocket not connected');
+        }
+    }
+    
+    function disconnect() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+        }
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        isConnecting = false;
+    }
+    
+    window.AdminWebSocket = window.AdminWebSocket || {};
+    window.AdminWebSocket.init = init;
+    window.AdminWebSocket.send = send;
+    window.AdminWebSocket.disconnect = disconnect;
+    window.AdminWebSocket.scheduleReconnect = scheduleReconnect;
 })();
