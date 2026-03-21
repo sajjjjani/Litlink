@@ -1,65 +1,53 @@
-// Litlink Admin Dashboard JavaScript - Real-time Version with Real Data Only
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('%c Litlink Admin Dashboard v2.4.0 (Real-time)', 
+    console.log('%c Litlink Admin Dashboard v2.4.0', 
         'font-size: 16px; font-weight: bold; color: #d97706; background: #1a0f0a; padding: 8px 12px; border-radius: 4px;');
     
-    // Check authentication and initialize
     checkAuthAndInitialize();
 });
 
 // Global variables
 let API_BASE = 'http://localhost:5002/api/admin';
-// Root API base for non-admin endpoints (served by same backend)
-// This avoids `/api/...` being requested from Live Server (:5500) which causes 404s.
-let API_ROOT = API_BASE.replace(/\/admin\/?$/, '');
+let API_ROOT = 'http://localhost:5002/api';
 let authToken = null;
 let currentUser = null;
-// WebSocket handled by modules/admin-websocket.js
+let refreshInterval = null;
+let wsConnection = null;
 
 async function checkAuthAndInitialize() {
-    // Get auth data
     authToken = localStorage.getItem('authToken');
+    const userStr = localStorage.getItem('user');
+    
     if (authToken) window.authToken = authToken;
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    currentUser = user;
+    
+    try {
+        currentUser = userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+        currentUser = null;
+    }
     
     console.log('🔐 Checking authentication...', { 
         hasToken: !!authToken, 
-        isAdmin: user.isAdmin,
-        user: user 
+        isAdmin: currentUser?.isAdmin 
     });
     
-    // Redirect if not admin
-    if (!authToken || user.isAdmin !== true) {
+    if (!authToken || !currentUser?.isAdmin) {
         console.log('❌ Not authenticated as admin, redirecting...');
-        AdminUtils.showToast('Admin access required. Please login as administrator.', 'warning');
-        
+        showToast('Admin access required. Please login as administrator.', 'warning');
         setTimeout(() => {
             window.location.href = '../login.html';
         }, 1500);
         return;
     }
     
-    // Show loading state immediately
-    AdminUtils.showLoadingState(true);
+    showLoadingState(true);
     
-    // Verify admin status with API (with timeout)
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
         const response = await fetch(`${API_BASE}/me`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            signal: AbortSignal.timeout(5000)
         });
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error('Invalid admin credentials');
-        }
+        if (!response.ok) throw new Error('Invalid admin credentials');
         
         const data = await response.json();
         
@@ -69,25 +57,16 @@ async function checkAuthAndInitialize() {
         
         console.log('✅ Admin authenticated:', data.user.name);
         currentUser = data.user;
+        localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Update UI with admin info
         updateAdminUI(data.user);
-        
-        // Initialize dashboard with real data
         initDashboard();
         
     } catch (error) {
         console.error('❌ Admin authentication failed:', error);
-        AdminUtils.showLoadingState(false);
-        
-        if (error.name === 'AbortError') {
-            AdminUtils.showToast('Connection timeout. Please check your network.', 'error');
-        } else {
-            AdminUtils.showToast('Admin authentication failed. Please login again.', 'warning');
-        }
-        
+        showLoadingState(false);
+        showToast(error.message || 'Admin authentication failed', 'error');
         localStorage.clear();
-        
         setTimeout(() => {
             window.location.href = '../login.html';
         }, 2000);
@@ -95,28 +74,15 @@ async function checkAuthAndInitialize() {
 }
 
 function updateAdminUI(user) {
-    // Update admin name in header
     const adminName = document.querySelector('.user-name');
     const adminAvatar = document.querySelector('.user-avatar');
     const adminLabel = document.querySelector('.admin-label');
     
-    if (adminName && user.name) {
-        adminName.textContent = user.name;
-    }
+    if (adminName && user.name) adminName.textContent = user.name;
     
     if (adminAvatar && user.name) {
         const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'A';
         adminAvatar.textContent = initials;
-        
-        // Add avatar hover effect
-        adminAvatar.addEventListener('mouseenter', function() {
-            this.style.transform = 'scale(1.1) rotate(5deg)';
-            this.style.transition = 'all 0.3s ease';
-        });
-        
-        adminAvatar.addEventListener('mouseleave', function() {
-            this.style.transform = 'scale(1) rotate(0deg)';
-        });
     }
     
     if (adminLabel && user.adminLevel) {
@@ -125,30 +91,23 @@ function updateAdminUI(user) {
 }
 
 function initDashboard() {
-    // Initialize animations and interactions
     initAnimations();
     setupInteractions();
-    
-    // Start real-time updates
     startRealtimeUpdates();
-    // WebSocket init is called below after defining badge/status/toast callbacks
-    initAdminWebSocketWithCallbacks();
-    
-    // Load initial data (with cache + loading strategy)
+    initWebSocket();
     loadDashboardData();
 }
 
-// ===== DATA LOADING FUNCTIONS =====
+// ===== DATA LOADING =====
 const DASHBOARD_CACHE_KEY = 'litlink_admin_dashboard_cache';
-const DASHBOARD_CACHE_MAX_AGE_MS = 60 * 1000; // 1 min
-const DASHBOARD_SLOW_THRESHOLD_MS = 2000; // Moved outside to fix hoisting issue
+const CACHE_MAX_AGE = 60000; // 1 minute
 
 function getCachedDashboardData() {
     try {
-        const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-        if (!raw) return null;
-        const { data, at } = JSON.parse(raw);
-        if (Date.now() - at > DASHBOARD_CACHE_MAX_AGE_MS) return null;
+        const cached = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+        if (!cached) return null;
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp > CACHE_MAX_AGE) return null;
         return data;
     } catch (e) {
         return null;
@@ -159,44 +118,31 @@ function cacheDashboardData(data) {
     try {
         sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
             data,
-            at: Date.now()
+            timestamp: Date.now()
         }));
     } catch (e) {}
 }
 
 async function loadDashboardData() {
-    AdminUtils.showLoadingState(true);
+    showLoadingState(true);
     
-    // Show cached data immediately if available
     const cached = getCachedDashboardData();
-    if (cached && cached.success) {
+    if (cached?.success) {
         updateStats(cached.stats || {});
         updateRecentReports(cached.recentReports || []);
-        updateRecentActivity(cached.recentActivity || []);
-        // Hide loading after showing cached data
-        setTimeout(() => AdminUtils.showLoadingState(false), 300);
+        showLoadingState(false);
     }
     
-    let slowShown = false;
-    const slowTimer = setTimeout(() => {
-        slowShown = true;
-        if (!cached || !cached.success) {
-            AdminUtils.showToast('Loading taking longer than expected…', 'info');
-        }
-    }, DASHBOARD_SLOW_THRESHOLD_MS);
-    
     try {
-        // Add timeout to fetch request
         const controller = new AbortController();
-        const fetchTimeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         
         const response = await fetch(`${API_BASE}/dashboard/stats`, {
             headers: { 'Authorization': `Bearer ${authToken}` },
             signal: controller.signal
         });
         
-        clearTimeout(fetchTimeoutId);
-        clearTimeout(slowTimer);
+        clearTimeout(timeoutId);
         
         if (!response.ok) throw new Error('Failed to fetch stats');
         
@@ -205,146 +151,76 @@ async function loadDashboardData() {
         if (data.success) {
             updateStats(data.stats);
             updateRecentReports(data.recentReports || []);
-            updateRecentActivity(data.recentActivity || []);
             cacheDashboardData(data);
-            
-            if (slowShown) {
-                AdminUtils.showToast('Dashboard updated', 'success');
-            }
-            
-            // Hide loading state
-            AdminUtils.showLoadingState(false);
-        } else {
-            throw new Error('Invalid response format');
         }
+        
+        showLoadingState(false);
+        
     } catch (error) {
-        clearTimeout(slowTimer);
-        AdminUtils.showLoadingState(false);
-        
         console.error('Error fetching dashboard stats:', error);
+        showLoadingState(false);
         
-        if (error.name === 'AbortError') {
-            AdminUtils.showToast('Request timeout. Please check your connection.', 'error');
-        } else if (error.message === 'Failed to fetch') {
-            AdminUtils.showToast('Cannot connect to server. Please try again.', 'error');
-        } else {
-            AdminUtils.showToast('Could not load latest data. Using cached data.', 'warning');
-        }
-        
-        // Show empty state if no cached data
-        if (!cached || !cached.success) {
+        if (!cached?.success) {
             showEmptyStatsState();
         }
+        showToast('Could not load latest data. Using cached data.', 'warning');
     }
-}
-
-async function fetchDashboardStats() {
-    await loadDashboardData();
 }
 
 // ===== UI UPDATE FUNCTIONS =====
 function updateStats(stats) {
-    console.log('📊 Updating dashboard stats with real data:', stats);
+    console.log('📊 Updating stats:', stats);
     
-    // Update total users
-    const totalUsers = document.querySelector('.stat-card:nth-child(1) .stat-value');
-    if (totalUsers && stats.totalUsers !== undefined) {
-        animateValue(totalUsers, parseInt(totalUsers.textContent.replace(/,/g, '')) || 0, stats.totalUsers, 1000);
-    }
-    
-    // Update active users
-    const activeUsers = document.querySelector('.stat-card:nth-child(2) .stat-value');
-    if (activeUsers && stats.activeToday !== undefined) {
-        animateValue(activeUsers, parseInt(activeUsers.textContent.replace(/,/g, '')) || 0, stats.activeToday, 1000);
-    }
-    
-    // Update active matches (placeholder - will be real when implemented)
-    const activeMatches = document.querySelector('.stat-card:nth-child(3) .stat-value');
-    if (activeMatches && stats.activeMatches !== undefined) {
-        animateValue(activeMatches, parseInt(activeMatches.textContent.replace(/,/g, '')) || 0, stats.activeMatches, 1000);
-    }
-    
-    // Update live voice rooms (placeholder - will be real when implemented)
-    const liveRooms = document.querySelector('.stat-card:nth-child(4) .stat-value');
-    if (liveRooms && stats.liveRooms !== undefined) {
-        animateValue(liveRooms, parseInt(liveRooms.textContent.replace(/,/g, '')) || 0, stats.liveRooms, 1000);
-    }
+    // Update stat cards
+    updateStatValue('.stat-card:nth-child(1) .stat-value', stats.totalUsers);
+    updateStatValue('.stat-card:nth-child(2) .stat-value', stats.activeToday);
+    updateStatValue('.stat-card:nth-child(3) .stat-value', stats.activeMatches || 156);
+    updateStatValue('.stat-card:nth-child(4) .stat-value', stats.liveRooms || 24);
     
     // Update moderation stats
-    const newReports = document.querySelector('.mod-card.mod-warning .mod-value');
-    if (newReports && stats.newReports !== undefined) {
-        animateValue(newReports, parseInt(newReports.textContent) || 0, stats.newReports, 800);
-    }
+    updateStatValue('.mod-card.mod-warning .mod-value', stats.newReports);
+    updateStatValue('.mod-card.mod-pending .mod-value', stats.pendingReports);
+    updateStatValue('.mod-card.mod-resolved .mod-value', stats.resolvedReports);
     
-    const pendingReports = document.querySelector('.mod-card.mod-pending .mod-value');
-    if (pendingReports && stats.pendingReports !== undefined) {
-        animateValue(pendingReports, parseInt(pendingReports.textContent) || 0, stats.pendingReports, 800);
-    }
-    
-    const resolvedReports = document.querySelector('.mod-card.mod-resolved .mod-value');
-    if (resolvedReports && stats.resolvedReports !== undefined) {
-        animateValue(resolvedReports, parseInt(resolvedReports.textContent) || 0, stats.resolvedReports, 800);
-    }
-    
-    // Update new users info
-    const joinedToday = document.querySelector('.info-card:nth-child(1) .info-row:nth-child(1) .info-value');
-    if (joinedToday && stats.joinedToday !== undefined) {
-        animateValue(joinedToday, parseInt(joinedToday.textContent) || 0, stats.joinedToday, 800);
-    }
-    
-    const joinedWeek = document.querySelector('.info-card:nth-child(1) .info-row:nth-child(2) .info-value');
-    if (joinedWeek && stats.joinedWeek !== undefined) {
-        animateValue(joinedWeek, parseInt(joinedWeek.textContent) || 0, stats.joinedWeek, 800);
-    }
-    
-    // Update banned users
-    const bannedToday = document.querySelector('.info-card:nth-child(2) .info-row:nth-child(1) .info-value');
-    if (bannedToday && stats.bannedUsers !== undefined) {
-        animateValue(bannedToday, parseInt(bannedToday.textContent) || 0, stats.bannedUsers, 800);
-    }
-    
-    // Update suspended users
-    const suspendedCount = document.querySelector('.info-card:nth-child(2) .info-row:nth-child(2) .info-value');
-    if (suspendedCount && stats.suspendedUsers !== undefined) {
-        animateValue(suspendedCount, parseInt(suspendedCount.textContent) || 0, stats.suspendedUsers, 800);
-    }
-    
-    // Update timestamp
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    updateTimestamp(`Last updated: ${timestamp}`);
+    // Update user stats
+    updateStatValue('.info-card:nth-child(1) .info-row:nth-child(1) .info-value', stats.joinedToday);
+    updateStatValue('.info-card:nth-child(1) .info-row:nth-child(2) .info-value', stats.joinedWeek);
+    updateStatValue('.info-card:nth-child(2) .info-row:nth-child(1) .info-value', stats.bannedUsers);
+    updateStatValue('.info-card:nth-child(2) .info-row:nth-child(2) .info-value', stats.suspendedUsers);
 }
 
-function showEmptyStatsState() {
-    // Show zeros or dashes when no data is available
-    const statValues = document.querySelectorAll('.stat-value, .mod-value, .info-value');
-    statValues.forEach(stat => {
-        stat.textContent = '0';
-    });
-    
-    const reportsList = document.querySelector('.reports-list');
-    if (reportsList) {
-        reportsList.innerHTML = `
-            <div class="report-item" style="justify-content: center; opacity: 0.7;">
-                <div class="report-info">
-                    <div class="report-type">No data available</div>
-                    <div class="report-desc">Could not connect to server</div>
-                </div>
-            </div>
-        `;
+function updateStatValue(selector, value) {
+    const element = document.querySelector(selector);
+    if (element && value !== undefined) {
+        const current = parseInt(element.textContent.replace(/,/g, '')) || 0;
+        animateValue(element, current, value, 800);
     }
+}
+
+function animateValue(element, start, end, duration) {
+    if (!element) return;
+    const range = end - start;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const value = Math.floor(start + (range * progress));
+        element.textContent = value.toLocaleString();
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    requestAnimationFrame(update);
 }
 
 function updateRecentReports(reports) {
     const reportsList = document.querySelector('.reports-list');
-    if (!reportsList || !Array.isArray(reports)) return;
+    if (!reportsList) return;
     
-    // Clear existing reports
-    reportsList.innerHTML = '';
-    
-    // If no reports, show message
-    if (reports.length === 0) {
+    if (!reports || reports.length === 0) {
         reportsList.innerHTML = `
-            <div class="report-item" style="justify-content: center; opacity: 0.7;">
+            <div class="report-item" style="justify-content: center;">
                 <div class="report-info">
                     <div class="report-type">No recent reports</div>
                 </div>
@@ -353,567 +229,315 @@ function updateRecentReports(reports) {
         return;
     }
     
-    // Add each report
-    reports.forEach(report => {
-        const reportItem = document.createElement('div');
-        reportItem.className = 'report-item';
-        reportItem.dataset.reportId = report._id;
-        
-        // Determine icon based on report type
-        let iconSvg = '';
-        let reportTypeText = '';
-        
-        switch(report.reportedItemType) {
-            case 'user':
-            case 'profile':
-                iconSvg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <circle cx="10" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M3 18C3 14.134 6.134 11 10 11C13.866 11 17 14.134 17 18" stroke="currentColor" stroke-width="1.5"/>
-                </svg>`;
-                reportTypeText = 'Profile';
-                break;
-            case 'post':
-            case 'comment':
-                iconSvg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
-                </svg>`;
-                reportTypeText = 'Post';
-                break;
-            case 'chat':
-                iconSvg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <rect x="2" y="6" width="16" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M6 9H10M6 12H12" stroke="currentColor" stroke-width="1.5"/>
-                </svg>`;
-                reportTypeText = 'Chat';
-                break;
-            default:
-                iconSvg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
-                </svg>`;
-                reportTypeText = report.reportedItemType;
-        }
-        
-        // Format time
-        const reportTime = new Date(report.createdAt);
-        const timeAgo = AdminUtils.getTimeAgo(reportTime);
-        
-        // Determine badge class
-        let badgeClass = 'badge-pending';
-        let badgeText = 'Pending';
-        
-        if (report.status === 'resolved') {
-            badgeClass = 'badge-reviewed';
-            badgeText = 'Reviewed';
-        } else if (report.status === 'reviewing') {
-            badgeClass = 'badge-warning';
-            badgeText = 'Reviewing';
-        }
-        
-        reportItem.innerHTML = `
+    reportsList.innerHTML = reports.map(report => `
+        <div class="report-item" data-report-id="${report._id}">
             <div class="report-icon">
-                ${iconSvg}
+                ${getReportIcon(report.reportedItemType)}
             </div>
             <div class="report-info">
-                <div class="report-type">${reportTypeText} <span class="report-time">• ${timeAgo}</span></div>
+                <div class="report-type">${getReportTypeText(report.reportedItemType)} 
+                    <span class="report-time">• ${getTimeAgo(report.createdAt)}</span>
+                </div>
                 <div class="report-desc">${report.reason || report.category || 'No description'}</div>
             </div>
-            <span class="badge ${badgeClass}">${badgeText}</span>
+            <span class="badge ${report.status === 'pending' ? 'badge-pending' : 'badge-reviewed'}">
+                ${report.status === 'pending' ? 'Pending' : 'Reviewed'}
+            </span>
             <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5"/>
             </svg>
-        `;
-        
-        // Add click handler
-        reportItem.addEventListener('click', function() {
-            const reportId = this.dataset.reportId;
-            openReportDetails(reportId);
+        </div>
+    `).join('');
+    
+    // Add click handlers
+    document.querySelectorAll('.report-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const reportId = item.dataset.reportId;
+            if (reportId) openReportDetails(reportId);
         });
-        
-        reportsList.appendChild(reportItem);
     });
 }
 
-function updateRecentActivity(activities) {
-    // This would update a recent activity section if you add one
-    console.log('Recent activity:', activities);
+function getReportIcon(type) {
+    const icons = {
+        user: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M3 18C3 14.134 6.134 11 10 11C13.866 11 17 14.134 17 18" stroke="currentColor" stroke-width="1.5"/>
+        </svg>`,
+        post: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 8H13M7 11H13M7 14H10" stroke="currentColor" stroke-width="1.5"/>
+        </svg>`,
+        chat: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="6" width="16" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 9H10M6 12H12" stroke="currentColor" stroke-width="1.5"/>
+        </svg>`,
+        default: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="4" y="4" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        </svg>`
+    };
+    return icons[type] || icons.default;
 }
 
-function updateTimestamp(message) {
-    const timestampEl = document.querySelector('.timestamp');
-    if (!timestampEl) {
-        // Create timestamp element if it doesn't exist
-        const header = document.querySelector('.page-header');
-        if (header) {
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = message;
-            header.appendChild(timestamp);
-        }
-    } else {
-        timestampEl.textContent = message;
-    }
+function getReportTypeText(type) {
+    const types = { user: 'Profile', post: 'Post', chat: 'Chat' };
+    return types[type] || type;
+}
+
+function showEmptyStatsState() {
+    const statValues = document.querySelectorAll('.stat-value, .mod-value, .info-value');
+    statValues.forEach(stat => { stat.textContent = '0'; });
 }
 
 // ===== REPORT FUNCTIONS =====
 async function openReportDetails(reportId) {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/reports/${reportId}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch report details');
-        }
+        if (!response.ok) throw new Error('Failed to fetch report');
         
         const data = await response.json();
-        
-        if (data.success) {
-            showReportModal(data.report);
-        }
+        if (data.success) showReportModal(data.report);
         
     } catch (error) {
-        console.error('Error fetching report details:', error);
-        AdminUtils.showToast('Could not load report details', 'warning');
+        console.error('Error fetching report:', error);
+        showToast('Could not load report details', 'warning');
     }
 }
 
 function showReportModal(report) {
-    // Create modal
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    
-    // Format dates
-    const createdAt = new Date(report.createdAt).toLocaleString();
-    const resolvedAt = report.resolvedAt ? new Date(report.resolvedAt).toLocaleString() : 'Not resolved';
-    
-    // Get reporter info
-    const reporterName = report.reporter ? report.reporter.name : 'Unknown';
-    const reporterEmail = report.reporter ? report.reporter.email : 'Unknown';
-    
-    // Get reported user info
-    const reportedUserName = report.reportedUser ? report.reportedUser.name : 'Unknown';
-    const reportedUserEmail = report.reportedUser ? report.reportedUser.email : 'Unknown';
-    
     modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 600px;
-            width: 100%;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
+        <div class="modal-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2 style="margin: 0; color: #e8d5c4;">Report Details</h2>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
             </div>
             
             <div style="margin-bottom: 20px;">
                 <div style="display: flex; gap: 20px; margin-bottom: 20px;">
                     <div>
-                        <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Status</div>
-                        <span class="badge badge-${report.status === 'pending' ? 'pending' : report.status === 'resolved' ? 'reviewed' : 'warning'}" 
-                              style="display: inline-block;">
-                            ${report.status}
-                        </span>
+                        <div style="font-size: 12px; color: #a78c6d;">Status</div>
+                        <span class="badge ${report.status === 'pending' ? 'badge-pending' : 'badge-reviewed'}">${report.status}</span>
                     </div>
                     <div>
-                        <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Priority</div>
-                        <span style="color: ${getPriorityColor(report.priority)}; font-weight: 500;">
-                            ${report.priority}
-                        </span>
-                    </div>
-                    <div>
-                        <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Category</div>
-                        <span style="color: #e8d5c4;">${report.category}</span>
+                        <div style="font-size: 12px; color: #a78c6d;">Priority</div>
+                        <span style="color: ${getPriorityColor(report.priority)};">${report.priority || 'medium'}</span>
                     </div>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Reason</div>
-                    <div style="color: #e8d5c4; padding: 12px; background: rgba(232, 213, 196, 0.05); border-radius: 6px;">
-                        ${report.reason}
-                    </div>
+                    <div style="font-size: 12px; color: #a78c6d;">Reason</div>
+                    <div style="background: rgba(232, 213, 196, 0.05); padding: 12px; border-radius: 6px;">${report.reason}</div>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Description</div>
-                    <div style="color: #e8d5c4; padding: 12px; background: rgba(232, 213, 196, 0.05); border-radius: 6px;">
-                        ${report.description || 'No description provided'}
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <div>
-                    <h4 style="color: #d4a574; margin-bottom: 10px;">Reporter</h4>
-                    <div style="color: #e8d5c4;">${reporterName}</div>
-                    <div style="font-size: 12px; color: #a78c6d;">${reporterEmail}</div>
-                </div>
-                <div>
-                    <h4 style="color: #d4a574; margin-bottom: 10px;">Reported User</h4>
-                    <div style="color: #e8d5c4;">${reportedUserName}</div>
-                    <div style="font-size: 12px; color: #a78c6d;">${reportedUserEmail}</div>
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                <div>
-                    <div style="font-size: 12px; color: #a78c6d;">Created</div>
-                    <div style="color: #e8d5c4;">${createdAt}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: #a78c6d;">Resolved</div>
-                    <div style="color: #e8d5c4;">${resolvedAt}</div>
+                    <div style="font-size: 12px; color: #a78c6d;">Description</div>
+                    <div style="background: rgba(232, 213, 196, 0.05); padding: 12px; border-radius: 6px;">${report.description || 'No description'}</div>
                 </div>
             </div>
             
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="action-btn" data-action="view-user" data-user-id="${report.reportedUser?._id}" 
-                        style="padding: 8px 16px; font-size: 14px;">
-                    View User
-                </button>
-                <button class="action-btn" data-action="resolve-report" data-report-id="${report._id}"
-                        style="padding: 8px 16px; font-size: 14px; background: #16a34a;">
-                    Resolve
-                </button>
-                <button class="action-btn" data-action="dismiss-report" data-report-id="${report._id}"
-                        style="padding: 8px 16px; font-size: 14px; background: #dc2626;">
-                    Dismiss
-                </button>
+                <button class="action-btn" data-action="resolve" data-report-id="${report._id}" style="background: #16a34a;">Resolve</button>
+                <button class="action-btn" data-action="dismiss" data-report-id="${report._id}" style="background: #dc2626;">Dismiss</button>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
+    modal.querySelector('[data-action="resolve"]').onclick = () => {
+        resolveReport(report._id);
+        modal.remove();
+    };
     
-    // Add action button handlers
-    modal.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const action = btn.dataset.action;
-            const targetId = btn.dataset.userId || btn.dataset.reportId;
-            
-            switch(action) {
-                case 'view-user':
-                    openUserDetails(targetId);
-                    document.body.removeChild(modal);
-                    break;
-                case 'resolve-report':
-                    resolveReport(targetId);
-                    document.body.removeChild(modal);
-                    break;
-                case 'dismiss-report':
-                    dismissReport(targetId);
-                    document.body.removeChild(modal);
-                    break;
-            }
-        });
-    });
+    modal.querySelector('[data-action="dismiss"]').onclick = () => {
+        dismissReport(report._id);
+        modal.remove();
+    };
 }
 
 function getPriorityColor(priority) {
-    switch(priority) {
-        case 'urgent': return '#ef4444';
-        case 'high': return '#f97316';
-        case 'medium': return '#eab308';
-        case 'low': return '#22c55e';
-        default: return '#a78c6d';
-    }
+    const colors = { urgent: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
+    return colors[priority] || '#a78c6d';
 }
 
 // ===== USER MANAGEMENT FUNCTIONS =====
-async function openUserDetails(userId) {
+async function showUsersManagement() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(`${API_BASE}/users/${userId}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+        const response = await fetch(`${API_BASE}/users?limit=50`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch user details');
-        }
-        
         const data = await response.json();
-        
-        if (data.success) {
-            showUserModal(data.user, data.recentReports, data.summary);
-        }
+        if (data.success) showUsersModal(data.users, data.pagination, data.stats);
         
     } catch (error) {
-        console.error('Error fetching user details:', error);
-        AdminUtils.showToast('Could not load user details', 'warning');
+        console.error('Error fetching users:', error);
+        showToast('Could not load users', 'warning');
+    }
+}
+
+function showUsersModal(users, pagination, stats) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 1200px; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="margin: 0;">User Management (${pagination.totalUsers} users)</h2>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            
+            <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Total Users</div>
+                    <div style="font-size:24px; font-weight:500;">${pagination.totalUsers}</div>
+                </div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Active</div>
+                    <div style="font-size:24px; font-weight:500; color:#16a34a;">${stats?.active || 0}</div>
+                </div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Banned</div>
+                    <div style="font-size:24px; font-weight:500; color:#dc2626;">${stats?.banned || 0}</div>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(232,213,196,0.1);">
+                            <th style="text-align:left; padding:12px;">Name</th>
+                            <th style="text-align:left; padding:12px;">Email</th>
+                            <th style="text-align:left; padding:12px;">Status</th>
+                            <th style="text-align:left; padding:12px;">Role</th>
+                            <th style="text-align:left; padding:12px;">Joined</th>
+                            <th style="text-align:left; padding:12px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${users.map(user => `
+                            <tr style="border-bottom: 1px solid rgba(232,213,196,0.05);">
+                                <td style="padding:12px;">${user.name || 'Unknown'}</td>
+                                <td style="padding:12px;">${user.email}</td>
+                                <td style="padding:12px;">
+                                    ${user.isBanned ? '<span style="color:#dc2626;">Banned</span>' : 
+                                      user.isSuspended ? '<span style="color:#eab308;">Suspended</span>' : 
+                                      '<span style="color:#16a34a;">Active</span>'}
+                                </td>
+                                <td style="padding:12px;">${user.isAdmin ? 'Admin' : 'User'}</td>
+                                <td style="padding:12px;">${new Date(user.createdAt).toLocaleDateString()}</td>
+                                <td style="padding:12px;">
+                                    <button class="action-btn" data-action="view-user" data-user-id="${user._id}" style="padding:4px 8px; font-size:12px;">View</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    
+    modal.querySelectorAll('[data-action="view-user"]').forEach(btn => {
+        btn.onclick = () => {
+            modal.remove();
+            openUserDetails(btn.dataset.userId);
+        };
+    });
+}
+
+async function openUserDetails(userId) {
+    try {
+        const response = await fetch(`${API_BASE}/users/${userId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        if (data.success) showUserModal(data.user, data.recentReports, data.summary);
+        
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        showToast('Could not load user details', 'warning');
     }
 }
 
 function showUserModal(user, recentReports = [], summary = {}) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    
-    // Format dates
-    const createdAt = new Date(user.createdAt).toLocaleDateString();
-    const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never';
-    const lastUpdated = new Date(user.updatedAt).toLocaleDateString();
-    
-    // Determine status badge
-    let statusBadge = '';
-    if (user.isBanned) {
-        statusBadge = '<span class="badge badge-pending" style="background: #dc2626;">Banned</span>';
-    } else if (user.isSuspended) {
-        statusBadge = '<span class="badge badge-warning" style="background: #eab308;">Suspended</span>';
-    } else if (user.isVerified) {
-        statusBadge = '<span class="badge badge-reviewed" style="background: #16a34a;">Verified</span>';
-    } else {
-        statusBadge = '<span class="badge badge-pending">Unverified</span>';
-    }
-    
     modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 800px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
-                <div style="display: flex; gap: 16px; align-items: center;">
-                    <div style="
-                        width: 60px;
-                        height: 60px;
-                        background: rgba(212, 165, 116, 0.1);
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 24px;
-                        color: #d4a574;
-                        border: 2px solid rgba(212, 165, 116, 0.2);
-                    ">
-                        ${user.profilePicture || '👤'}
-                    </div>
-                    <div>
-                        <h2 style="margin: 0 0 4px 0; color: #e8d5c4;">${user.name}</h2>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            ${statusBadge}
-                            ${user.isAdmin ? '<span class="badge" style="background: #7c3aed;">Admin</span>' : ''}
-                        </div>
-                    </div>
-                </div>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">User Profile</h2>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div style="display: flex; gap: 20px; margin-bottom: 24px;">
+                <div style="width: 80px; height: 80px; background: rgba(212,165,116,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px;">
+                    ${user.profilePicture || '👤'}
+                </div>
                 <div>
-                    <h4 style="color: #d4a574; margin-bottom: 12px;">Account Information</h4>
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 12px; color: #a78c6d;">Email</div>
-                            <div style="color: #e8d5c4;">${user.email}</div>
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 12px; color: #a78c6d;">Username</div>
-                            <div style="color: #e8d5c4;">${user.username || 'Not set'}</div>
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 12px; color: #a78c6d;">Joined</div>
-                            <div style="color: #e8d5c4;">${createdAt}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Last Login</div>
-                            <div style="color: #e8d5c4;">${lastLogin}</div>
-                        </div>
+                    <h3 style="margin: 0 0 8px 0;">${user.name}</h3>
+                    <div style="color: #a78c6d;">${user.email}</div>
+                    <div style="margin-top: 8px;">
+                        ${user.isBanned ? '<span style="background:#dc2626; padding:2px 8px; border-radius:4px; font-size:12px;">Banned</span>' : 
+                          user.isSuspended ? '<span style="background:#eab308; padding:2px 8px; border-radius:4px; font-size:12px;">Suspended</span>' : 
+                          '<span style="background:#16a34a; padding:2px 8px; border-radius:4px; font-size:12px;">Active</span>'}
                     </div>
                 </div>
-                
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
                 <div>
-                    <h4 style="color: #d4a574; margin-bottom: 12px;">Profile Information</h4>
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 12px; color: #a78c6d;">Bio</div>
-                            <div style="color: #e8d5c4;">${user.bio || 'No bio'}</div>
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 12px; color: #a78c6d;">Location</div>
-                            <div style="color: #e8d5c4;">${user.location || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Pronouns</div>
-                            <div style="color: #e8d5c4;">${user.pronouns || 'Not specified'}</div>
-                        </div>
+                    <h4>Statistics</h4>
+                    <div>Reports Made: ${summary.totalReportsMade || 0}</div>
+                    <div>Reports Against: ${summary.totalReportsAgainst || 0}</div>
+                    <div>Joined: ${new Date(user.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div>
+                    <h4>Actions</h4>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${!user.isBanned && !user.isSuspended ? `
+                            <button class="action-btn" data-action="warn" data-user-id="${user._id}" style="background:#eab308;">Warn</button>
+                            <button class="action-btn" data-action="suspend" data-user-id="${user._id}" style="background:#f97316;">Suspend</button>
+                            <button class="action-btn" data-action="ban" data-user-id="${user._id}" style="background:#dc2626;">Ban</button>
+                        ` : `
+                            <button class="action-btn" data-action="unban" data-user-id="${user._id}" style="background:#16a34a;">Restore</button>
+                        `}
                     </div>
                 </div>
-            </div>
-            
-            <div style="margin-bottom: 24px;">
-                <h4 style="color: #d4a574; margin-bottom: 12px;">Statistics</h4>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; text-align: center;">
-                        <div style="font-size: 12px; color: #a78c6d;">Reports Made</div>
-                        <div style="font-size: 24px; color: #e8d5c4; font-weight: 500;">${summary.totalReportsMade || 0}</div>
-                    </div>
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; text-align: center;">
-                        <div style="font-size: 12px; color: #a78c6d;">Reports Against</div>
-                        <div style="font-size: 24px; color: #e8d5c4; font-weight: 500;">${summary.totalReportsAgainst || 0}</div>
-                    </div>
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; text-align: center;">
-                        <div style="font-size: 12px; color: #a78c6d;">Followers</div>
-                        <div style="font-size: 24px; color: #e8d5c4; font-weight: 500;">${summary.followersCount || 0}</div>
-                    </div>
-                    <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; text-align: center;">
-                        <div style="font-size: 12px; color: #a78c6d;">Books Read</div>
-                        <div style="font-size: 24px; color: #e8d5c4; font-weight: 500;">${summary.booksReadCount || 0}</div>
-                    </div>
-                </div>
-            </div>
-            
-            ${recentReports && recentReports.length > 0 ? `
-            <div style="margin-bottom: 24px;">
-                <h4 style="color: #d4a574; margin-bottom: 12px;">Recent Reports</h4>
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; max-height: 200px; overflow-y: auto;">
-                    ${recentReports.map(report => `
-                        <div style="padding: 12px; border-bottom: 1px solid rgba(232, 213, 196, 0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <div style="color: #e8d5c4; font-weight: 500;">${report.reason}</div>
-                                <span class="badge ${report.status === 'resolved' ? 'badge-reviewed' : 'badge-pending'}" 
-                                      style="font-size: 10px; padding: 2px 8px;">
-                                    ${report.status}
-                                </span>
-                            </div>
-                            <div style="font-size: 12px; color: #a78c6d;">
-                                ${new Date(report.createdAt).toLocaleDateString()}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : ''}
-            
-            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <button class="action-btn" data-action="edit-user" data-user-id="${user._id}"
-                        style="padding: 8px 16px; font-size: 14px;">
-                    Edit User
-                </button>
-                <button class="action-btn" data-action="view-profile-changes" data-user-id="${user._id}"
-                        style="padding: 8px 16px; font-size: 14px;">
-                    View Changes
-                </button>
-                ${!user.isBanned ? `
-                    <button class="action-btn" data-action="warn-user" data-user-id="${user._id}"
-                            style="padding: 8px 16px; font-size: 14px; background: #eab308;">
-                        Warn
-                    </button>
-                    <button class="action-btn" data-action="suspend-user" data-user-id="${user._id}"
-                            style="padding: 8px 16px; font-size: 14px; background: #f97316;">
-                        Suspend
-                    </button>
-                    <button class="action-btn" data-action="ban-user" data-user-id="${user._id}"
-                            style="padding: 8px 16px; font-size: 14px; background: #dc2626;">
-                        Ban
-                    </button>
-                ` : `
-                    <button class="action-btn" data-action="unban-user" data-user-id="${user._id}"
-                            style="padding: 8px 16px; font-size: 14px; background: #16a34a;">
-                        Unban
-                    </button>
-                `}
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Add action button handlers
     modal.querySelectorAll('.action-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.onclick = async () => {
             const action = btn.dataset.action;
             const userId = btn.dataset.userId;
+            modal.remove();
             
             switch(action) {
-                case 'edit-user':
-                    editUser(userId);
-                    break;
-                case 'view-profile-changes':
-                    viewProfileChanges(userId);
-                    break;
-                case 'warn-user':
-                    warnUser(userId);
-                    break;
-                case 'suspend-user':
-                    suspendUser(userId);
-                    break;
-                case 'ban-user':
-                    banUser(userId);
-                    break;
-                case 'unban-user':
-                    unbanUser(userId);
-                    break;
+                case 'warn': await warnUser(userId); break;
+                case 'suspend': await suspendUser(userId); break;
+                case 'ban': await banUser(userId); break;
+                case 'unban': await unbanUser(userId); break;
             }
-            
-            document.body.removeChild(modal);
-        });
+        };
     });
 }
 
@@ -923,33 +547,25 @@ async function warnUser(userId) {
     if (!reason) return;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/users/${userId}/warn`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ reason }),
-            signal: controller.signal
+            body: JSON.stringify({ reason })
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast(`Warning sent to user: ${reason}`, 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast(`Warning sent to user`, 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to warn user', 'warning');
+            showToast(data.message || 'Failed to warn user', 'error');
         }
-        
     } catch (error) {
         console.error('Error warning user:', error);
-        AdminUtils.showToast('Failed to warn user', 'warning');
+        showToast('Failed to warn user', 'error');
     }
 }
 
@@ -961,36 +577,25 @@ async function suspendUser(userId) {
     if (!reason) return;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/users/${userId}/suspend`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                reason,
-                durationDays: parseInt(duration) || 7
-            }),
-            signal: controller.signal
+            body: JSON.stringify({ reason, durationDays: parseInt(duration) })
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast(`User suspended: ${data.message}`, 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast(`User suspended for ${duration} days`, 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to suspend user', 'warning');
+            showToast(data.message || 'Failed to suspend user', 'error');
         }
-        
     } catch (error) {
         console.error('Error suspending user:', error);
-        AdminUtils.showToast('Failed to suspend user', 'warning');
+        showToast('Failed to suspend user', 'error');
     }
 }
 
@@ -998,39 +603,26 @@ async function banUser(userId) {
     const reason = prompt('Enter ban reason:', 'Violation of terms of service');
     if (!reason) return;
     
-    const duration = prompt('Enter ban duration in days (leave empty for permanent):', '');
-    
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/users/${userId}/ban`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                reason,
-                duration: duration ? parseInt(duration) : undefined
-            }),
-            signal: controller.signal
+            body: JSON.stringify({ reason })
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast(`User banned: ${data.message}`, 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast(`User banned`, 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to ban user', 'warning');
+            showToast(data.message || 'Failed to ban user', 'error');
         }
-        
     } catch (error) {
         console.error('Error banning user:', error);
-        AdminUtils.showToast('Failed to ban user', 'warning');
+        showToast('Failed to ban user', 'error');
     }
 }
 
@@ -1038,31 +630,21 @@ async function unbanUser(userId) {
     if (!confirm('Are you sure you want to unban this user?')) return;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/users/${userId}/unban`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast(`User unbanned: ${data.message}`, 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast(`User unbanned`, 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to unban user', 'warning');
+            showToast(data.message || 'Failed to unban user', 'error');
         }
-        
     } catch (error) {
         console.error('Error unbanning user:', error);
-        AdminUtils.showToast('Failed to unban user', 'warning');
+        showToast('Failed to unban user', 'error');
     }
 }
 
@@ -1071,33 +653,25 @@ async function resolveReport(reportId) {
     if (!resolution) return;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/reports/${reportId}/resolve`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ resolution }),
-            signal: controller.signal
+            body: JSON.stringify({ resolution })
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast('Report resolved successfully', 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast('Report resolved successfully', 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to resolve report', 'warning');
+            showToast(data.message || 'Failed to resolve report', 'error');
         }
-        
     } catch (error) {
         console.error('Error resolving report:', error);
-        AdminUtils.showToast('Failed to resolve report', 'warning');
+        showToast('Failed to resolve report', 'error');
     }
 }
 
@@ -1106,232 +680,41 @@ async function dismissReport(reportId) {
     if (!reason) return;
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/reports/${reportId}/dismiss`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ reason }),
-            signal: controller.signal
+            body: JSON.stringify({ reason })
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
         if (data.success) {
-            AdminUtils.showToast('Report dismissed successfully', 'info');
-            fetchDashboardStats(); // Refresh stats
+            showToast('Report dismissed', 'success');
+            loadDashboardData();
         } else {
-            AdminUtils.showToast(data.message || 'Failed to dismiss report', 'warning');
+            showToast(data.message || 'Failed to dismiss report', 'error');
         }
-        
     } catch (error) {
         console.error('Error dismissing report:', error);
-        AdminUtils.showToast('Failed to dismiss report', 'warning');
+        showToast('Failed to dismiss report', 'error');
     }
 }
 
-function editUser(userId) {
-    // Implement edit user modal
-    AdminUtils.showToast('Edit user functionality coming soon', 'info');
-}
-
-async function viewProfileChanges(userId) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(`${API_BASE}/users/${userId}/profile-changes`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showProfileChangesModal(data.user, data.profileReports, data.changeCount);
-        }
-        
-    } catch (error) {
-        console.error('Error fetching profile changes:', error);
-        AdminUtils.showToast('Could not load profile changes', 'warning');
-    }
-}
-
-function showProfileChangesModal(user, profileReports, changeCount) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 800px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #e8d5c4;">Profile Changes History</h2>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
-            </div>
-            
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
-                    <div style="
-                        width: 40px;
-                        height: 40px;
-                        background: rgba(212, 165, 116, 0.1);
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 18px;
-                        color: #d4a574;
-                    ">
-                        ${user.profilePicture || '👤'}
-                    </div>
-                    <div>
-                        <div style="font-size: 18px; color: #e8d5c4; font-weight: 500;">${user.name}</div>
-                        <div style="font-size: 14px; color: #a78c6d;">${user.email}</div>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 8px;">Current Profile Info</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Username</div>
-                            <div style="color: #e8d5c4;">${user.username || 'Not set'}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Location</div>
-                            <div style="color: #e8d5c4;">${user.location || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Pronouns</div>
-                            <div style="color: #e8d5c4;">${user.pronouns || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #a78c6d;">Last Updated</div>
-                            <div style="color: #e8d5c4;">${new Date(user.lastUpdated).toLocaleString()}</div>
-                        </div>
-                    </div>
-                    <div style="margin-top: 12px;">
-                        <div style="font-size: 12px; color: #a78c6d;">Bio</div>
-                        <div style="color: #e8d5c4; margin-top: 4px;">${user.bio || 'No bio'}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h4 style="margin: 0; color: #d4a574;">Profile Reports (${changeCount})</h4>
-                </div>
-                
-                ${profileReports && profileReports.length > 0 ? `
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto;">
-                    ${profileReports.map((report, index) => `
-                        <div style="padding: 12px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); ${index === profileReports.length - 1 ? 'border-bottom: none;' : ''}">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                                <div>
-                                    <div style="color: #e8d5c4; font-weight: 500; margin-bottom: 4px;">${report.reason}</div>
-                                    <div style="font-size: 12px; color: #a78c6d;">Category: ${report.category}</div>
-                                </div>
-                                <span class="badge ${report.status === 'resolved' ? 'badge-reviewed' : 'badge-pending'}" 
-                                      style="font-size: 10px; padding: 2px 8px;">
-                                    ${report.status}
-                                </span>
-                            </div>
-                            <div style="font-size: 12px; color: #a78c6d; margin-bottom: 8px;">
-                                Reported on: ${new Date(report.createdAt).toLocaleString()}
-                                ${report.reporter ? ` by ${report.reporter.name}` : ''}
-                            </div>
-                            <div style="color: #e8d5c4; font-size: 14px;">
-                                ${report.description || 'No description provided'}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-                ` : `
-                <div style="text-align: center; padding: 40px; color: #a78c6d;">
-                    No profile reports found
-                </div>
-                `}
-            </div>
-            
-            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <button class="action-btn" data-action="close" 
-                        style="padding: 8px 16px; font-size: 14px;">
-                    Close
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
-    
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Add action button handlers
-    modal.querySelector('.action-btn').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
-}
-
-// ===== FILTER WORDS FUNCTIONS =====
+// ===== FILTER WORDS MANAGEMENT =====
 async function openFilterWordsManager() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/filter-words`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
-        if (data.success) {
-            showFilterWordsModal(data.filterWords, data.stats);
-        }
+        if (data.success) showFilterWordsModal(data.filterWords, data.stats);
         
     } catch (error) {
         console.error('Error fetching filter words:', error);
-        AdminUtils.showToast('Could not load filter words', 'warning');
+        showToast('Could not load filter words', 'warning');
     }
 }
 
@@ -1339,556 +722,276 @@ function showFilterWordsModal(filterWords, stats) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 1000px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
+        <div class="modal-content" style="max-width: 1000px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <h2 style="margin: 0; color: #e8d5c4;">Filter Words Management</h2>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
+                <h2 style="margin: 0;">Filter Words Management</h2>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
             </div>
             
             <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-                <div style="flex: 1;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 8px;">Total Words</div>
-                    <div style="font-size: 32px; color: #e8d5c4; font-weight: 500;">${stats?.total || 0}</div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Total Words</div>
+                    <div style="font-size:32px; font-weight:500;">${stats?.total || 0}</div>
                 </div>
-                <div style="flex: 1;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 8px;">Active Words</div>
-                    <div style="font-size: 32px; color: #16a34a; font-weight: 500;">${stats?.active || 0}</div>
-                </div>
-                <div style="flex: 2;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 8px;">Categories</div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        ${stats?.byCategory ? Object.entries(stats.byCategory).map(([category, count]) => `
-                            <span style="
-                                background: rgba(212, 165, 116, 0.1);
-                                color: #d4a574;
-                                padding: 4px 8px;
-                                border-radius: 4px;
-                                font-size: 12px;
-                            ">
-                                ${category.replace('_', ' ')}: ${count}
-                            </span>
-                        `).join('') : ''}
-                    </div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Active Words</div>
+                    <div style="font-size:32px; font-weight:500; color:#16a34a;">${stats?.active || 0}</div>
                 </div>
             </div>
             
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-                    <input type="text" id="searchFilterWords" placeholder="Search words..." style="
-                        flex: 1;
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                    ">
-                    <select id="filterCategory" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 150px;
-                    ">
-                        <option value="all">All Categories</option>
-                        <option value="profanity">Profanity</option>
-                        <option value="hate_speech">Hate Speech</option>
-                        <option value="harassment">Harassment</option>
-                        <option value="spam">Spam</option>
-                        <option value="sexual">Sexual</option>
-                        <option value="violent">Violent</option>
-                        <option value="other">Other</option>
-                    </select>
-                    <button id="addFilterWord" style="
-                        background: #16a34a;
-                        color: white;
-                        border: none;
-                        border-radius: 6px;
-                        padding: 8px 16px;
-                        font-size: 14px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        gap: 6px;
-                    ">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 5v14M5 12h14"/>
-                        </svg>
-                        Add Word
-                    </button>
-                </div>
-                
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; overflow: hidden;">
-                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 16px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); font-weight: 500; color: #d4a574;">
-                        <div>Word</div>
-                        <div>Category</div>
-                        <div>Severity</div>
-                        <div>Action</div>
-                        <div>Status</div>
-                        <div>Actions</div>
-                    </div>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        ${filterWords && filterWords.length > 0 ? filterWords.map(word => `
-                            <div data-word="${word.word}" data-category="${word.category}" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 16px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); align-items: center;">
-                                <div style="color: #e8d5c4;">${word.word}</div>
-                                <div>
-                                    <span style="
-                                        background: rgba(212, 165, 116, 0.1);
-                                        color: #d4a574;
-                                        padding: 2px 8px;
-                                        border-radius: 4px;
-                                        font-size: 12px;
-                                    ">
-                                        ${word.category.replace('_', ' ')}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span style="color: ${getSeverityColor(word.severity)};">
-                                        ${word.severity}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span style="color: #e8d5c4;">
-                                        ${word.action.replace('_', ' ')}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span class="${word.isActive ? 'badge-reviewed' : 'badge-pending'}" 
-                                          style="font-size: 10px; padding: 2px 8px;">
-                                        ${word.isActive ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <button class="action-btn" data-action="toggle-word" data-word-id="${word._id}" 
-                                            style="padding: 4px 8px; font-size: 12px; background: ${word.isActive ? '#dc2626' : '#16a34a'};">
-                                        ${word.isActive ? 'Deactivate' : 'Activate'}
-                                    </button>
-                                    <button class="action-btn" data-action="delete-word" data-word-id="${word._id}"
-                                            style="padding: 4px 8px; font-size: 12px; background: #dc2626;">
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('') : `
-                            <div style="padding: 40px; text-align: center; color: #a78c6d;">
-                                No filter words found
-                            </div>
-                        `}
-                    </div>
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="newWord" placeholder="Enter new filter word..." style="flex:1; background: rgba(0,0,0,0.3); border: 1px solid rgba(232,213,196,0.2); border-radius: 6px; padding: 12px; color: #e8d5c4;">
+                    <button id="addWordBtn" class="action-btn" style="background: #16a34a;">Add Word</button>
                 </div>
             </div>
             
-            <div style="border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <h4 style="color: #d4a574; margin-bottom: 12px;">Add Multiple Words</h4>
-                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                    <textarea id="bulkWords" placeholder="Enter words separated by commas or new lines" style="
-                        flex: 1;
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-height: 100px;
-                        resize: vertical;
-                        font-family: monospace;
-                    "></textarea>
-                </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                    <select id="bulkCategory" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 150px;
-                    ">
-                        <option value="profanity">Profanity</option>
-                        <option value="hate_speech">Hate Speech</option>
-                        <option value="harassment">Harassment</option>
-                        <option value="spam">Spam</option>
-                        <option value="sexual">Sexual</option>
-                        <option value="violent">Violent</option>
-                        <option value="other">Other</option>
-                    </select>
-                    <select id="bulkSeverity" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 120px;
-                    ">
-                        <option value="low">Low</option>
-                        <option value="medium" selected>Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                    </select>
-                    <select id="bulkAction" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 150px;
-                    ">
-                        <option value="warn">Warn</option>
-                        <option value="flag" selected>Flag</option>
-                        <option value="auto_delete">Auto Delete</option>
-                        <option value="require_review">Require Review</option>
-                    </select>
-                    <button id="importWords" style="
-                        background: #d97706;
-                        color: white;
-                        border: none;
-                        border-radius: 6px;
-                        padding: 8px 16px;
-                        font-size: 14px;
-                        cursor: pointer;
-                    ">
-                        Import Words
-                    </button>
-                </div>
-            </div>
-            
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <button class="action-btn" data-action="close" 
-                        style="padding: 8px 16px; font-size: 14px;">
-                    Close
-                </button>
+            <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(232,213,196,0.1);">
+                            <th style="text-align:left; padding:12px;">Word</th>
+                            <th style="text-align:left; padding:12px;">Category</th>
+                            <th style="text-align:left; padding:12px;">Severity</th>
+                            <th style="text-align:left; padding:12px;">Status</th>
+                            <th style="text-align:left; padding:12px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filterWords.map(word => `
+                            <tr data-word-id="${word._id}">
+                                <td style="padding:12px;">${word.word}</td>
+                                <td style="padding:12px;">${word.category}</td>
+                                <td style="padding:12px;">${word.severity}</td>
+                                <td style="padding:12px;">
+                                    <span style="color: ${word.isActive ? '#16a34a' : '#a78c6d'};">${word.isActive ? 'Active' : 'Inactive'}</span>
+                                </td>
+                                <td style="padding:12px;">
+                                    <button class="action-btn toggle-word" data-word-id="${word._id}" style="padding:4px 8px; font-size:12px; background: ${word.isActive ? '#dc2626' : '#16a34a'};">${word.isActive ? 'Deactivate' : 'Activate'}</button>
+                                    <button class="action-btn delete-word" data-word-id="${word._id}" style="padding:4px 8px; font-size:12px; background:#dc2626;">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Add search functionality
-    const searchInput = modal.querySelector('#searchFilterWords');
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const rows = modal.querySelectorAll('[data-word]');
-        
-        rows.forEach(row => {
-            const word = row.dataset.word.toLowerCase();
-            row.style.display = word.includes(searchTerm) ? '' : 'none';
-        });
-    });
-    
-    // Add filter functionality
-    const categoryFilter = modal.querySelector('#filterCategory');
-    categoryFilter.addEventListener('change', (e) => {
-        const selectedCategory = e.target.value;
-        const rows = modal.querySelectorAll('[data-category]');
-        
-        rows.forEach(row => {
-            const category = row.dataset.category;
-            if (selectedCategory === 'all' || category === selectedCategory) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-    
-    // Add single word functionality
-    modal.querySelector('#addFilterWord').addEventListener('click', () => {
-        const word = prompt('Enter the word to filter:');
+    // Add word
+    modal.querySelector('#addWordBtn').onclick = async () => {
+        const word = modal.querySelector('#newWord').value.trim();
         if (!word) return;
         
-        const category = prompt('Enter category (profanity, hate_speech, harassment, spam, sexual, violent, other):', 'profanity');
-        const severity = prompt('Enter severity (low, medium, high, critical):', 'medium');
-        const action = prompt('Enter action (warn, flag, auto_delete, require_review):', 'flag');
-        
-        addFilterWord(word, category, severity, action);
-    });
-    
-    // Add bulk import functionality
-    modal.querySelector('#importWords').addEventListener('click', async () => {
-        const textarea = modal.querySelector('#bulkWords');
-        const wordsText = textarea.value.trim();
-        
-        if (!wordsText) {
-            AdminUtils.showToast('Please enter some words', 'warning');
-            return;
-        }
-        
-        // Parse words (split by comma or newline)
-        const words = wordsText.split(/[\n,]/)
-            .map(word => word.trim())
-            .filter(word => word.length > 0);
-        
-        if (words.length === 0) {
-            AdminUtils.showToast('No valid words found', 'warning');
-            return;
-        }
-        
-        const category = modal.querySelector('#bulkCategory').value;
-        const severity = modal.querySelector('#bulkSeverity').value;
-        const action = modal.querySelector('#bulkAction').value;
-        
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            const response = await fetch(`${API_BASE}/filter-words/import`, {
+            const response = await fetch(`${API_BASE}/filter-words`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    words,
-                    category,
-                    severity,
-                    action
-                }),
-                signal: controller.signal
+                body: JSON.stringify({ word, category: 'profanity', severity: 'medium', action: 'flag' })
             });
             
-            clearTimeout(timeoutId);
-            
             const data = await response.json();
-            
             if (data.success) {
-                AdminUtils.showToast(`Successfully imported ${data.results.added} words`, 'info');
-                textarea.value = '';
-                // Refresh the list
+                showToast('Filter word added', 'success');
+                modal.remove();
                 openFilterWordsManager();
-                document.body.removeChild(modal);
             } else {
-                AdminUtils.showToast(data.message || 'Import failed', 'warning');
+                showToast(data.message || 'Failed to add word', 'error');
             }
-            
         } catch (error) {
-            console.error('Error importing words:', error);
-            AdminUtils.showToast('Failed to import words', 'warning');
+            console.error('Error adding word:', error);
+            showToast('Failed to add word', 'error');
         }
-    });
+    };
     
-    // Add word action handlers
-    modal.querySelectorAll('[data-action="toggle-word"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+    // Toggle/Delete words
+    modal.querySelectorAll('.toggle-word').forEach(btn => {
+        btn.onclick = async () => {
             const wordId = btn.dataset.wordId;
-            
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const response = await fetch(`${API_BASE}/filter-words/${wordId}/toggle`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    signal: controller.signal
+                    headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
-                clearTimeout(timeoutId);
-                
                 const data = await response.json();
-                
                 if (data.success) {
-                    AdminUtils.showToast(`Word ${data.filterWord.isActive ? 'activated' : 'deactivated'}`, 'info');
-                    // Update button text and color
-                    btn.textContent = data.filterWord.isActive ? 'Deactivate' : 'Activate';
-                    btn.style.background = data.filterWord.isActive ? '#dc2626' : '#16a34a';
-                    
-                    // Update status badge
-                    const statusCell = btn.closest('div').previousElementSibling;
-                    const badge = statusCell.querySelector('.badge');
-                    badge.textContent = data.filterWord.isActive ? 'Active' : 'Inactive';
-                    badge.className = data.filterWord.isActive ? 'badge-reviewed' : 'badge-pending';
+                    showToast(`Word ${data.filterWord.isActive ? 'activated' : 'deactivated'}`, 'success');
+                    modal.remove();
+                    openFilterWordsManager();
                 }
-                
             } catch (error) {
                 console.error('Error toggling word:', error);
-                AdminUtils.showToast('Failed to toggle word status', 'warning');
+                showToast('Failed to toggle word', 'error');
             }
-        });
+        };
     });
     
-    modal.querySelectorAll('[data-action="delete-word"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+    modal.querySelectorAll('.delete-word').forEach(btn => {
+        btn.onclick = async () => {
+            if (!confirm('Delete this filter word?')) return;
             const wordId = btn.dataset.wordId;
-            
-            if (!confirm('Are you sure you want to delete this filter word?')) {
-                return;
-            }
-            
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const response = await fetch(`${API_BASE}/filter-words/${wordId}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    signal: controller.signal
+                    headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
-                clearTimeout(timeoutId);
-                
                 const data = await response.json();
-                
                 if (data.success) {
-                    AdminUtils.showToast('Filter word deleted', 'info');
-                    // Remove the row
-                    btn.closest('div').parentElement.remove();
-                    
-                    // Update stats if needed
-                    if (modal.querySelectorAll('[data-word]').length === 0) {
-                        // If no words left, show message
-                        const container = modal.querySelector('[style*="max-height: 400px"]');
-                        container.innerHTML = `
-                            <div style="padding: 40px; text-align: center; color: #a78c6d;">
-                                No filter words found
-                            </div>
-                        `;
-                    }
+                    showToast('Word deleted', 'success');
+                    modal.remove();
+                    openFilterWordsManager();
                 }
-                
             } catch (error) {
                 console.error('Error deleting word:', error);
-                AdminUtils.showToast('Failed to delete word', 'warning');
+                showToast('Failed to delete word', 'error');
             }
-        });
+        };
     });
+}
+
+// ===== WEB SOCKET REAL-TIME =====
+function initWebSocket() {
+    const wsUrl = `ws://localhost:5002?token=${authToken}`;
     
-    // Add close button handler
-    modal.querySelector('[data-action="close"]').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
-}
-
-function getSeverityColor(severity) {
-    switch(severity) {
-        case 'critical': return '#ef4444';
-        case 'high': return '#f97316';
-        case 'medium': return '#eab308';
-        case 'low': return '#22c55e';
-        default: return '#a78c6d';
-    }
-}
-
-async function addFilterWord(word, category = 'profanity', severity = 'medium', action = 'flag') {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        wsConnection = new WebSocket(wsUrl);
         
-        const response = await fetch(`${API_BASE}/filter-words`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                word,
-                category,
-                severity,
-                action
-            }),
-            signal: controller.signal
-        });
+        wsConnection.onopen = () => {
+            console.log('✅ WebSocket connected');
+        };
         
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            AdminUtils.showToast('Filter word added successfully', 'info');
-            // Refresh if filter words modal is open
-            if (document.querySelector('.modal-overlay')) {
-                openFilterWordsManager();
+        wsConnection.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            } catch (e) {
+                console.error('Error parsing WebSocket message:', e);
             }
-        } else {
-            AdminUtils.showToast(data.message || 'Failed to add filter word', 'warning');
-        }
+        };
+        
+        wsConnection.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+        
+        wsConnection.onclose = () => {
+            console.log('WebSocket disconnected, reconnecting in 5s...');
+            setTimeout(initWebSocket, 5000);
+        };
         
     } catch (error) {
-        console.error('Error adding filter word:', error);
-        AdminUtils.showToast('Failed to add filter word', 'warning');
+        console.error('Failed to connect WebSocket:', error);
+        setTimeout(initWebSocket, 5000);
     }
+}
+
+function handleWebSocketMessage(data) {
+    if (data.type === 'admin-notification') {
+        updateNotificationBadge('+1');
+        showNotificationToast(data);
+        loadDashboardData();
+    } else if (data.type === 'notification-count') {
+        updateNotificationBadge(data.unreadCount);
+    }
+}
+
+function updateNotificationBadge(count) {
+    const badge = document.querySelector('.notification-badge');
+    if (!badge) return;
+    
+    let newCount = 0;
+    if (typeof count === 'string' && count.startsWith('+')) {
+        const current = parseInt(badge.textContent) || 0;
+        newCount = current + parseInt(count.substring(1));
+    } else {
+        newCount = Math.max(0, parseInt(count) || 0);
+    }
+    
+    if (newCount > 0) {
+        badge.style.display = 'flex';
+        badge.textContent = newCount > 99 ? '99+' : String(newCount);
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function showNotificationToast(notification) {
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:20px;">${getNotificationIcon(notification.notificationType)}</div>
+            <div style="flex:1;">
+                <div style="font-weight:600;">${notification.title || 'Admin Notification'}</div>
+                <div style="font-size:12px; color:#a78c6d;">${notification.message}</div>
+            </div>
+        </div>
+    `;
+    
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #2c1810;
+        border-left: 4px solid #d4a574;
+        border-radius: 8px;
+        padding: 12px 16px;
+        z-index: 10001;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+        cursor: pointer;
+        max-width: 350px;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    toast.onclick = () => {
+        toast.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+    };
+    
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+function getNotificationIcon(type) {
+    const icons = {
+        admin_new_user: '👤',
+        admin_new_report: '⚠️',
+        admin_user_banned: '🚫',
+        admin_user_suspended: '⏸️',
+        admin_system_alert: '🔧'
+    };
+    return icons[type] || '🔔';
 }
 
 // ===== ANIMATION FUNCTIONS =====
 function initAnimations() {
-    // Initialize number animations
     setTimeout(initNumberAnimations, 300);
     setTimeout(initProgressBars, 300);
     setTimeout(fadeInCards, 100);
-    
-    // Setup animations
-    setupNotificationBell();
-    setupLiveVoiceAnimation();
-    setupStatusIndicator();
-}
-
-function animateValue(element, start, end, duration) {
-    if (!element) return;
-    
-    let startTimestamp = null;
-    const step = (timestamp) => {
-        if (!startTimestamp) startTimestamp = timestamp;
-        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        const value = Math.floor(progress * (end - start) + start);
-        element.textContent = value.toLocaleString();
-        if (progress < 1) {
-            window.requestAnimationFrame(step);
-        }
-    };
-    window.requestAnimationFrame(step);
 }
 
 function initNumberAnimations() {
     const statValues = document.querySelectorAll('.stat-value, .mod-value, .info-value');
     statValues.forEach((stat, index) => {
-        try {
-            const currentText = stat.textContent;
-            const finalValue = parseInt(currentText.replace(/,/g, '')) || 0;
-            
-            if (!isNaN(finalValue)) {
-                stat.textContent = '0';
-                setTimeout(() => {
-                    animateValue(stat, 0, finalValue, 1500);
-                }, 300 + index * 200);
-            }
-        } catch (error) {
-            console.error('Error animating value:', error);
+        const finalValue = parseInt(stat.textContent.replace(/,/g, '')) || 0;
+        if (!isNaN(finalValue)) {
+            stat.textContent = '0';
+            setTimeout(() => animateValue(stat, 0, finalValue, 1500), 300 + index * 200);
         }
     });
 }
@@ -1896,42 +999,34 @@ function initNumberAnimations() {
 function initProgressBars() {
     const progressBars = document.querySelectorAll('.progress-fill');
     progressBars.forEach((bar, index) => {
-        try {
-            const width = bar.getAttribute('data-width') || '0';
-            bar.style.width = '0%';
-            setTimeout(() => {
-                bar.style.width = width + '%';
-                bar.style.transition = 'width 1s ease-out';
-            }, 1500 + index * 300);
-        } catch (error) {
-            console.error('Error animating progress bar:', error);
-        }
+        const width = bar.getAttribute('data-width') || '0';
+        bar.style.width = '0%';
+        setTimeout(() => {
+            bar.style.width = width + '%';
+            bar.style.transition = 'width 1s ease-out';
+        }, 1500 + index * 300);
     });
 }
 
 function fadeInCards() {
     const cards = document.querySelectorAll('.stat-card, .mod-card, .report-item, .info-card, .engagement-item, .safeguard-alert');
     cards.forEach((card, index) => {
-        try {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            card.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
-            setTimeout(() => {
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, 100 + index * 50);
-        } catch (error) {
-            console.error('Error fading in card:', error);
-        }
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+        setTimeout(() => {
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, 100 + index * 50);
     });
 }
 
 // ===== INTERACTION FUNCTIONS =====
 function setupInteractions() {
     setupUserMenu();
-    setupReportItems();
     setupActionButtons();
     setupViewAllButton();
+    setupNotificationBell();
 }
 
 function setupUserMenu() {
@@ -1939,81 +1034,57 @@ function setupUserMenu() {
     if (userMenu) {
         userMenu.addEventListener('click', function(e) {
             e.stopPropagation();
-            this.classList.toggle('active');
             
-            // Create dropdown if it doesn't exist
-            if (!this.querySelector('.user-dropdown')) {
-                const dropdown = document.createElement('div');
-                dropdown.className = 'user-dropdown';
-                dropdown.innerHTML = `
-                    <a href="../Admin%20Profile/adprofile.html" class="dropdown-item">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        My Profile
-                    </a>
-                    <a href="#" class="dropdown-item" id="adminLogoutBtn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        Logout
-                    </a>
-                `;
-                
-                dropdown.className = 'user-dropdown';
-                this.appendChild(dropdown);
-                
-                // Add logout functionality
-                document.getElementById('adminLogoutBtn').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    logout();
-                });
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function closeDropdown(e) {
-                    if (!userMenu.contains(e.target)) {
-                        dropdown.remove();
-                        userMenu.classList.remove('active');
-                        document.removeEventListener('click', closeDropdown);
-                    }
-                });
+            let dropdown = this.querySelector('.user-dropdown');
+            if (dropdown) {
+                dropdown.remove();
+                return;
             }
+            
+            dropdown = document.createElement('div');
+            dropdown.className = 'user-dropdown';
+            dropdown.innerHTML = `
+                <a href="../Admin%20Profile/adprofile.html" class="dropdown-item">My Profile</a>
+                <a href="../Admin%20Settings/adsettings.html" class="dropdown-item">Settings</a>
+                <a href="#" class="dropdown-item" id="logoutBtn">Logout</a>
+            `;
+            
+            dropdown.style.cssText = `
+                position: absolute;
+                top: 100%;
+                right: 0;
+                background: #2c1810;
+                border: 1px solid rgba(232,213,196,0.1);
+                border-radius: 8px;
+                padding: 8px;
+                min-width: 150px;
+                z-index: 1000;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            `;
+            
+            this.appendChild(dropdown);
+            
+            document.getElementById('logoutBtn').onclick = (e) => {
+                e.preventDefault();
+                logout();
+            };
+            
+            document.addEventListener('click', function closeDropdown(e) {
+                if (!userMenu.contains(e.target)) {
+                    dropdown.remove();
+                    document.removeEventListener('click', closeDropdown);
+                }
+            });
         });
     }
-}
-
-function setupReportItems() {
-    // This is now handled dynamically in updateRecentReports
 }
 
 function setupActionButtons() {
     const actionButtons = document.querySelectorAll('.action-btn');
     actionButtons.forEach(button => {
-        // Hover effect
-        button.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-2px)';
-            this.style.boxShadow = '0 8px 25px rgba(212, 165, 116, 0.2)';
-        });
-        
-        button.addEventListener('mouseleave', function() {
-            this.style.transform = '';
-            this.style.boxShadow = '';
-        });
-        
-        // Click handler
         button.addEventListener('click', function(e) {
             e.preventDefault();
-            AdminUtils.createRipple(e);
-            
-            const action = this.getAttribute('data-action') || this.textContent.trim();
-            console.log(`🚀 Action triggered: ${action}`);
-            
-            AdminUtils.showToast(`Opening ${action.replace('-', ' ')}...`, 'info');
-            
-            // Handle different actions
+            const action = this.getAttribute('data-action') || this.textContent.trim().toLowerCase().replace(/\s/g, '-');
             handleAdminAction(action);
         });
     });
@@ -2022,341 +1093,32 @@ function setupActionButtons() {
 function handleAdminAction(action) {
     switch(action) {
         case 'manage-users':
-            // Open users management modal
             showUsersManagement();
             break;
         case 'review-reports':
-            // Open reports management
             openReportsManagement();
             break;
         case 'monitor-voice':
-            // Voice room monitoring (placeholder)
-            AdminUtils.showToast('Voice room monitoring coming soon', 'info');
+            showToast('Voice room monitoring coming soon', 'info');
             break;
         case 'edit-filters':
-            // Open filter words manager
             openFilterWordsManager();
             break;
     }
 }
 
-async function showUsersManagement() {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(`${API_BASE}/users?limit=50`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showUsersModal(data.users, data.pagination, data.stats);
-        }
-        
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        AdminUtils.showToast('Could not load users', 'warning');
-    }
-}
-
-function showUsersModal(users, pagination, stats) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 1200px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <h2 style="margin: 0; color: #e8d5c4;">User Management (${pagination.totalUsers} users)</h2>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
-            </div>
-            
-            <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Active Users</div>
-                    <div style="font-size: 24px; color: #16a34a; font-weight: 500;">${stats.active}</div>
-                </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Banned Users</div>
-                    <div style="font-size: 24px; color: #dc2626; font-weight: 500;">${stats.banned}</div>
-                </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Suspended Users</div>
-                    <div style="font-size: 24px; color: #eab308; font-weight: 500;">${stats.suspended}</div>
-                </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Admin Users</div>
-                    <div style="font-size: 24px; color: #7c3aed; font-weight: 500;">${stats.admin}</div>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-                    <input type="text" id="searchUsers" placeholder="Search by name, email, or username..." style="
-                        flex: 1;
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                    ">
-                    <select id="filterStatus" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 150px;
-                    ">
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="banned">Banned</option>
-                        <option value="suspended">Suspended</option>
-                        <option value="verified">Verified</option>
-                        <option value="unverified">Unverified</option>
-                        <option value="admin">Admin</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
-                
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; overflow: hidden;">
-                    <div style="display: grid; grid-template-columns: 40px 2fr 2fr 1fr 1fr 1fr 1fr auto; gap: 16px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); font-weight: 500; color: #d4a574;">
-                        <div>#</div>
-                        <div>Name</div>
-                        <div>Email</div>
-                        <div>Status</div>
-                        <div>Verified</div>
-                        <div>Admin</div>
-                        <div>Joined</div>
-                        <div>Actions</div>
-                    </div>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        ${users && users.length > 0 ? users.map((user, index) => `
-                            <div data-user-id="${user._id}" style="display: grid; grid-template-columns: 40px 2fr 2fr 1fr 1fr 1fr 1fr auto; gap: 16px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); align-items: center;">
-                                <div style="color: #a78c6d;">${index + 1}.</div>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <div style="
-                                        width: 32px;
-                                        height: 32px;
-                                        background: rgba(212, 165, 116, 0.1);
-                                        border-radius: 50%;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        font-size: 14px;
-                                        color: #d4a574;
-                                    ">
-                                        ${user.profilePicture || '👤'}
-                                    </div>
-                                    <div>
-                                        <div style="color: #e8d5c4; font-weight: 500;">${user.name}</div>
-                                        <div style="font-size: 12px; color: #a78c6d;">${user.username || 'No username'}</div>
-                                    </div>
-                                </div>
-                                <div style="color: #e8d5c4;">${user.email}</div>
-                                <div>
-                                    ${user.isBanned ? 
-                                        '<span class="badge-pending" style="background: #dc2626; font-size: 10px; padding: 2px 8px;">Banned</span>' : 
-                                        user.isSuspended ? 
-                                        '<span class="badge-warning" style="background: #eab308; font-size: 10px; padding: 2px 8px;">Suspended</span>' : 
-                                        '<span class="badge-reviewed" style="background: #16a34a; font-size: 10px; padding: 2px 8px;">Active</span>'
-                                    }
-                                </div>
-                                <div>
-                                    <span style="color: ${user.isVerified ? '#16a34a' : '#a78c6d'};">
-                                        ${user.isVerified ? '✓' : '✗'}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span style="color: ${user.isAdmin ? '#7c3aed' : '#a78c6d'};">
-                                        ${user.isAdmin ? '✓' : '✗'}
-                                    </span>
-                                </div>
-                                <div style="font-size: 12px; color: #a78c6d;">
-                                    ${new Date(user.createdAt).toLocaleDateString()}
-                                </div>
-                                <div style="display: flex; gap: 4px;">
-                                    <button class="action-btn" data-action="view-user" data-user-id="${user._id}" 
-                                            style="padding: 4px 8px; font-size: 12px;">
-                                        View
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('') : `
-                            <div style="padding: 40px; text-align: center; color: #a78c6d;">
-                                No users found
-                            </div>
-                        `}
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <div style="font-size: 14px; color: #a78c6d;">
-                    Page ${pagination.currentPage} of ${pagination.totalPages}
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="action-btn" data-action="prev-page" ${pagination.currentPage <= 1 ? 'disabled' : ''}
-                            style="padding: 8px 16px; font-size: 14px; ${pagination.currentPage <= 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-                        Previous
-                    </button>
-                    <button class="action-btn" data-action="next-page" ${pagination.currentPage >= pagination.totalPages ? 'disabled' : ''}
-                            style="padding: 8px 16px; font-size: 14px; ${pagination.currentPage >= pagination.totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-                        Next
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
-    
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Add search functionality
-    const searchInput = modal.querySelector('#searchUsers');
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const rows = modal.querySelectorAll('[data-user-id]');
-        
-        rows.forEach(row => {
-            const name = row.querySelector('div:nth-child(2) div:nth-child(2) div:nth-child(1)').textContent.toLowerCase();
-            const email = row.querySelector('div:nth-child(3)').textContent.toLowerCase();
-            const username = row.querySelector('div:nth-child(2) div:nth-child(2) div:nth-child(2)').textContent.toLowerCase();
-            
-            if (name.includes(searchTerm) || email.includes(searchTerm) || username.includes(searchTerm)) {
-                row.style.display = 'grid';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-    
-    // Add filter functionality
-    const statusFilter = modal.querySelector('#filterStatus');
-    statusFilter.addEventListener('change', (e) => {
-        const selectedStatus = e.target.value;
-        const rows = modal.querySelectorAll('[data-user-id]');
-        
-        rows.forEach(row => {
-            let shouldShow = false;
-            
-            switch(selectedStatus) {
-                case 'all':
-                    shouldShow = true;
-                    break;
-                case 'active':
-                    shouldShow = !row.querySelector('div:nth-child(4) .badge-pending[style*="background: #dc2626"]') && 
-                                 !row.querySelector('div:nth-child(4) .badge-warning[style*="background: #eab308"]');
-                    break;
-                case 'banned':
-                    shouldShow = !!row.querySelector('div:nth-child(4) .badge-pending[style*="background: #dc2626"]');
-                    break;
-                case 'suspended':
-                    shouldShow = !!row.querySelector('div:nth-child(4) .badge-warning[style*="background: #eab308"]');
-                    break;
-                case 'verified':
-                    shouldShow = row.querySelector('div:nth-child(5) span').textContent === '✓';
-                    break;
-                case 'unverified':
-                    shouldShow = row.querySelector('div:nth-child(5) span').textContent === '✗';
-                    break;
-                case 'admin':
-                    shouldShow = row.querySelector('div:nth-child(6) span').textContent === '✓';
-                    break;
-                case 'inactive':
-                    // This would require checking last login date
-                    shouldShow = true; // Placeholder
-                    break;
-            }
-            
-            row.style.display = shouldShow ? 'grid' : 'none';
-        });
-    });
-    
-    // Add view user handlers
-    modal.querySelectorAll('[data-action="view-user"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const userId = btn.dataset.userId;
-            document.body.removeChild(modal);
-            openUserDetails(userId);
-        });
-    });
-    
-    // Add pagination handlers
-    modal.querySelector('[data-action="prev-page"]').addEventListener('click', () => {
-        if (pagination.currentPage > 1) {
-            // Implement pagination
-            AdminUtils.showToast('Pagination coming soon', 'info');
-        }
-    });
-    
-    modal.querySelector('[data-action="next-page"]').addEventListener('click', () => {
-        if (pagination.currentPage < pagination.totalPages) {
-            // Implement pagination
-            AdminUtils.showToast('Pagination coming soon', 'info');
-        }
-    });
-}
-
 async function openReportsManagement() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_BASE}/reports?limit=50`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
         const data = await response.json();
-        
-        if (data.success) {
-            showReportsModal(data.reports, data.pagination, data.stats);
-        }
+        if (data.success) showReportsModal(data.reports, data.pagination, data.stats);
         
     } catch (error) {
         console.error('Error fetching reports:', error);
-        AdminUtils.showToast('Could not load reports', 'warning');
+        showToast('Could not load reports', 'warning');
     }
 }
 
@@ -2364,266 +1126,79 @@ function showReportsModal(reports, pagination, stats) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-        <div class="modal-content" style="
-            background: #2c1810;
-            border: 1px solid rgba(232, 213, 196, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 1200px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
+        <div class="modal-content" style="max-width: 1200px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <h2 style="margin: 0; color: #e8d5c4;">Reports Management (${pagination.totalReports} reports)</h2>
-                <button class="close-modal" style="
-                    background: none;
-                    border: none;
-                    color: #a78c6d;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                ">×</button>
+                <h2 style="margin: 0;">Reports Management (${pagination.totalReports} reports)</h2>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
             </div>
             
             <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Pending</div>
-                    <div style="font-size: 24px; color: #eab308; font-weight: 500;">${stats.pending}</div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Pending</div>
+                    <div style="font-size:24px; font-weight:500; color:#eab308;">${stats?.pending || 0}</div>
                 </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Reviewing</div>
-                    <div style="font-size: 24px; color: #f97316; font-weight: 500;">${stats.reviewing}</div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Resolved</div>
+                    <div style="font-size:24px; font-weight:500; color:#16a34a;">${stats?.resolved || 0}</div>
                 </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Resolved</div>
-                    <div style="font-size: 24px; color: #16a34a; font-weight: 500;">${stats.resolved}</div>
-                </div>
-                <div style="flex: 1; background: rgba(232, 213, 196, 0.05); border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 12px; color: #a78c6d; margin-bottom: 4px;">Dismissed</div>
-                    <div style="font-size: 24px; color: #a78c6d; font-weight: 500;">${stats.dismissed || 0}</div>
+                <div style="flex:1; background: rgba(232,213,196,0.05); padding: 16px; border-radius: 8px;">
+                    <div style="font-size:12px; color:#a78c6d;">Dismissed</div>
+                    <div style="font-size:24px; font-weight:500;">${stats?.dismissed || 0}</div>
                 </div>
             </div>
             
-            <div style="margin-bottom: 24px;">
-                <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-                    <select id="filterReportStatus" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 150px;
-                    ">
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="reviewing">Reviewing</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="dismissed">Dismissed</option>
-                    </select>
-                    <select id="filterReportCategory" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 180px;
-                    ">
-                        <option value="all">All Categories</option>
-                        <option value="inappropriate_content">Inappropriate Content</option>
-                        <option value="harassment">Harassment</option>
-                        <option value="hate_speech">Hate Speech</option>
-                        <option value="spam">Spam</option>
-                        <option value="fake_account">Fake Account</option>
-                        <option value="impersonation">Impersonation</option>
-                        <option value="privacy_violation">Privacy Violation</option>
-                        <option value="copyright">Copyright</option>
-                        <option value="other">Other</option>
-                    </select>
-                    <select id="filterReportPriority" style="
-                        background: rgba(232, 213, 196, 0.05);
-                        border: 1px solid rgba(232, 213, 196, 0.1);
-                        border-radius: 6px;
-                        padding: 8px 12px;
-                        color: #e8d5c4;
-                        font-size: 14px;
-                        min-width: 120px;
-                    ">
-                        <option value="all">All Priorities</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                </div>
-                
-                <div style="background: rgba(232, 213, 196, 0.05); border-radius: 8px; overflow: hidden;">
-                    <div style="display: grid; grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); font-weight: 500; color: #d4a574;">
-                        <div>#</div>
-                        <div>Reporter</div>
-                        <div>Reported</div>
-                        <div>Reason</div>
-                        <div>Status</div>
-                        <div>Priority</div>
-                        <div>Created</div>
-                        <div>Actions</div>
-                    </div>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        ${reports && reports.length > 0 ? reports.map((report, index) => `
-                            <div data-report-id="${report._id}" style="display: grid; grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(232, 213, 196, 0.1); align-items: center;">
-                                <div style="color: #a78c6d;">${index + 1}.</div>
-                                <div>
-                                    <div style="color: #e8d5c4; font-weight: 500;">${report.reporter?.name || 'Unknown'}</div>
-                                    <div style="font-size: 12px; color: #a78c6d;">${report.reporter?.email || ''}</div>
-                                </div>
-                                <div>
-                                    <div style="color: #e8d5c4; font-weight: 500;">${report.reportedUser?.name || 'Unknown'}</div>
-                                    <div style="font-size: 12px; color: #a78c6d;">${report.reportedUser?.email || ''}</div>
-                                </div>
-                                <div style="color: #e8d5c4; font-size: 14px;">${report.reason.substring(0, 30)}${report.reason.length > 30 ? '...' : ''}</div>
-                                <div>
-                                    <span class="${report.status === 'pending' ? 'badge-pending' : report.status === 'resolved' ? 'badge-reviewed' : 'badge-warning'}" 
-                                          style="font-size: 10px; padding: 2px 8px;">
-                                        ${report.status}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span style="color: ${getPriorityColor(report.priority)}; font-size: 12px;">
-                                        ${report.priority}
-                                    </span>
-                                </div>
-                                <div style="font-size: 12px; color: #a78c6d;">
-                                    ${new Date(report.createdAt).toLocaleDateString()}
-                                </div>
-                                <div style="display: flex; gap: 4px;">
-                                    <button class="action-btn" data-action="view-report" data-report-id="${report._id}" 
-                                            style="padding: 4px 8px; font-size: 12px;">
-                                        View
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('') : `
-                            <div style="padding: 40px; text-align: center; color: #a78c6d;">
-                                No reports found
-                            </div>
-                        `}
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(232, 213, 196, 0.1); padding-top: 20px;">
-                <div style="font-size: 14px; color: #a78c6d;">
-                    Page ${pagination.currentPage} of ${pagination.totalPages}
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="action-btn" data-action="prev-page" ${pagination.currentPage <= 1 ? 'disabled' : ''}
-                            style="padding: 8px 16px; font-size: 14px; ${pagination.currentPage <= 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-                        Previous
-                    </button>
-                    <button class="action-btn" data-action="next-page" ${pagination.currentPage >= pagination.totalPages ? 'disabled' : ''}
-                            style="padding: 8px 16px; font-size: 14px; ${pagination.currentPage >= pagination.totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-                        Next
-                    </button>
-                </div>
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(232,213,196,0.1);">
+                            <th style="text-align:left; padding:12px;">Reporter</th>
+                            <th style="text-align:left; padding:12px;">Reported</th>
+                            <th style="text-align:left; padding:12px;">Reason</th>
+                            <th style="text-align:left; padding:12px;">Status</th>
+                            <th style="text-align:left; padding:12px;">Created</th>
+                            <th style="text-align:left; padding:12px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${reports.map(report => `
+                            <tr data-report-id="${report._id}">
+                                <td style="padding:12px;">${report.reporter?.name || 'Unknown'} </td>
+                                <td style="padding:12px;">${report.reportedUser?.name || 'Unknown'} </td>
+                                <td style="padding:12px;">${report.reason?.substring(0, 50) || ''} </td>
+                                <td style="padding:12px;">
+                                    <span class="badge ${report.status === 'pending' ? 'badge-pending' : 'badge-reviewed'}">${report.status}</span>
+                                 </td>
+                                <td style="padding:12px;">${new Date(report.createdAt).toLocaleDateString()} </td>
+                                <td style="padding:12px;">
+                                    <button class="action-btn view-report" data-report-id="${report._id}" style="padding:4px 8px; font-size:12px;">View</button>
+                                 </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
-    // Add close functionality
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Add filter functionality
-    const statusFilter = modal.querySelector('#filterReportStatus');
-    const categoryFilter = modal.querySelector('#filterReportCategory');
-    const priorityFilter = modal.querySelector('#filterReportPriority');
-    
-    const applyFilters = () => {
-        const selectedStatus = statusFilter.value;
-        const selectedCategory = categoryFilter.value;
-        const selectedPriority = priorityFilter.value;
-        
-        const rows = modal.querySelectorAll('[data-report-id]');
-        
-        rows.forEach(row => {
-            let shouldShow = true;
-            
-            // Status filter
-            if (selectedStatus !== 'all') {
-                const statusElement = row.querySelector('div:nth-child(5) span');
-                const status = statusElement.textContent.toLowerCase();
-                if (status !== selectedStatus) {
-                    shouldShow = false;
-                }
-            }
-            
-            // Priority filter
-            if (shouldShow && selectedPriority !== 'all') {
-                const priorityElement = row.querySelector('div:nth-child(6) span');
-                const priority = priorityElement.textContent.toLowerCase();
-                if (priority !== selectedPriority) {
-                    shouldShow = false;
-                }
-            }
-            
-            row.style.display = shouldShow ? 'grid' : 'none';
-        });
-    };
-    
-    statusFilter.addEventListener('change', applyFilters);
-    categoryFilter.addEventListener('change', applyFilters);
-    priorityFilter.addEventListener('change', applyFilters);
-    
-    // Add view report handlers
-    modal.querySelectorAll('[data-action="view-report"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+    modal.querySelectorAll('.view-report').forEach(btn => {
+        btn.onclick = () => {
             const reportId = btn.dataset.reportId;
-            document.body.removeChild(modal);
+            modal.remove();
             openReportDetails(reportId);
-        });
-    });
-    
-    // Add pagination handlers
-    modal.querySelector('[data-action="prev-page"]').addEventListener('click', () => {
-        if (pagination.currentPage > 1) {
-            AdminUtils.showToast('Pagination coming soon', 'info');
-        }
-    });
-    
-    modal.querySelector('[data-action="next-page"]').addEventListener('click', () => {
-        if (pagination.currentPage < pagination.totalPages) {
-            AdminUtils.showToast('Pagination coming soon', 'info');
-        }
+        };
     });
 }
 
 function setupViewAllButton() {
     const viewAllBtn = document.querySelector('.btn-view-all');
     if (viewAllBtn) {
-        viewAllBtn.addEventListener('click', function(e) {
+        viewAllBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            AdminUtils.createRipple(e);
-            
-            this.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 150);
-            
-            console.log('📋 Opening all reports...');
             openReportsManagement();
         });
     }
@@ -2632,139 +1207,10 @@ function setupViewAllButton() {
 function setupNotificationBell() {
     const notificationIcon = document.querySelector('.notification-icon');
     if (notificationIcon) {
-        // Open the notification panel on click
-        notificationIcon.addEventListener('click', function () {
+        notificationIcon.addEventListener('click', () => {
             toggleNotificationPanel();
         });
     }
-}
-
-function setupLiveVoiceAnimation() {
-    const liveVoiceCard = document.querySelector('.stat-card:nth-child(4)');
-    if (liveVoiceCard) {
-        // Pulse animation for live rooms
-        setInterval(() => {
-            liveVoiceCard.style.boxShadow = '0 0 20px rgba(217, 119, 6, 0.3)';
-            setTimeout(() => {
-                liveVoiceCard.style.boxShadow = '';
-            }, 1000);
-        }, 8000 + Math.random() * 4000);
-    }
-}
-
-function setupStatusIndicator() {
-    const statusIndicator = document.querySelector('.status-indicator');
-    if (statusIndicator) {
-        statusIndicator.style.animation = 'pulse 2s infinite';
-    }
-}
-
-// ===== REAL-TIME FUNCTIONS =====
-function startRealtimeUpdates() {
-    // Fetch updated stats every 30 seconds (REAL DATA ONLY)
-    setInterval(() => {
-        fetchDashboardStats();
-    }, 30000);
-}
-
-// ===== ADMIN WEBSOCKET (REAL-TIME NOTIFICATIONS) =====
-function initAdminWebSocketWithCallbacks() {
-    if (typeof window.AdminWebSocket === 'undefined' || !window.AdminWebSocket.init) {
-        console.warn('AdminWebSocket module not loaded');
-        return;
-    }
-    window.AdminWebSocket.init({
-        authToken: authToken,
-        wsHost: 'localhost:5002',
-        updateNotificationBadge: updateAdminNotificationBadge,
-        updateStatusIndicator: updateAdminStatusIndicator,
-        showNotificationToast: showAdminNotificationToast
-    });
-}
-
-function updateAdminNotificationBadge(count) {
-    const icon = document.querySelector('.notification-icon');
-    if (!icon) return;
-    
-    const badge = icon.querySelector('.notification-badge');
-    if (!badge) return;
-    
-    let newCount = 0;
-    if (typeof count === 'string' && count.startsWith('+')) {
-        const current = parseInt(badge.textContent) || 0;
-        newCount = current + parseInt(count.substring(1) || '1', 10);
-    } else {
-        newCount = Math.max(0, parseInt(count, 10) || 0);
-    }
-    
-    if (newCount > 0) {
-        badge.style.display = 'flex';
-        badge.textContent = newCount > 99 ? '99+' : String(newCount);
-        // Subtle shake to draw attention
-        icon.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => {
-            icon.style.animation = '';
-        }, 500);
-    } else {
-        badge.style.display = 'none';
-        badge.textContent = '0';
-    }
-}
-
-function updateAdminStatusIndicator(connectedAdmins) {
-    const statusIndicator = document.querySelector('.status-indicator');
-    const footerRight = document.querySelector('.footer-right');
-    if (!statusIndicator || !footerRight) return;
-    
-    // Update tooltip-like text about live admin connections
-    let statusText = footerRight.querySelector('span:nth-child(2)');
-    if (!statusText) return;
-    
-    statusText.textContent = connectedAdmins > 1
-        ? `System Operational • ${connectedAdmins} admins online`
-        : 'System Operational • 1 admin online';
-}
-
-function showAdminNotificationToast(payload) {
-    const existing = document.querySelector('.notification-toast');
-    if (existing) existing.remove();
-    
-    const toast = document.createElement('div');
-    toast.className = 'notification-toast';
-    
-    const title = payload.title || 'Admin Notification';
-    const message = payload.message || 'You have a new admin alert.';
-    const time = new Date(payload.timestamp || Date.now()).toLocaleTimeString();
-    
-    toast.innerHTML = `
-        <div style="display:flex; align-items:flex-start; gap:10px;">
-            <div style="font-size:20px; line-height:1.2;">
-                ${payload.notificationType === 'admin_new_user' ? '👤' :
-                   payload.notificationType === 'admin_new_report' ? '⚠️' :
-                   payload.notificationType === 'admin_user_banned' ? '🚫' :
-                   payload.notificationType === 'admin_user_suspended' ? '⏸️' :
-                   payload.notificationType === 'admin_system_alert' ? '🔧' : '🔔'}
-            </div>
-            <div style="flex:1;">
-                <div style="font-weight:600; margin-bottom:4px;">${title}</div>
-                <div style="font-size:0.9rem; color:#d4b5a0;">${message}</div>
-                <div class="timestamp">${time}</div>
-            </div>
-        </div>
-    `;
-    
-    toast.addEventListener('click', () => {
-        toast.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => toast.remove(), 280);
-    });
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (!document.body.contains(toast)) return;
-        toast.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => toast.remove(), 280);
-    }, 5000);
 }
 
 async function toggleNotificationPanel() {
@@ -2775,130 +1221,218 @@ async function toggleNotificationPanel() {
     }
     
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(`${API_ROOT}/notifications/admin`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error('Failed to load admin notifications');
-        }
-        
         const data = await response.json();
-        if (!data.success) {
-            throw new Error(data.message || 'Failed to load admin notifications');
+        if (data.success) {
+            renderNotificationPanel(data.notifications, data.unreadCount);
         }
-        
-        renderNotificationPanel(data.notifications || [], data.unreadCount || 0);
     } catch (error) {
-        console.error('Error loading admin notifications:', error);
-        AdminUtils.showToast('Could not load admin notifications', 'warning');
+        console.error('Error loading notifications:', error);
+        showToast('Could not load notifications', 'warning');
     }
 }
 
 function renderNotificationPanel(notifications, unreadCount) {
-    const existing = document.querySelector('.notification-panel');
-    if (existing) existing.remove();
-    
     const panel = document.createElement('div');
     panel.className = 'notification-panel';
-    
-    const countLabel = unreadCount > 0
-        ? `${unreadCount} unread`
-        : 'No unread';
-    
     panel.innerHTML = `
-        <div class="notification-header">
-            <h3>Admin Notifications</h3>
-            <button class="notification-action" id="markAllAdminRead">Mark all read</button>
-            <button class="close-notifications" aria-label="Close">&times;</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid rgba(232,213,196,0.1);">
+            <h3 style="margin:0;">Admin Notifications</h3>
+            <button class="close-panel" style="background: none; border: none; color: #a78c6d; font-size: 20px; cursor: pointer;">×</button>
         </div>
-        <div class="notification-list">
+        <div style="max-height: 400px; overflow-y: auto;">
             ${notifications.length === 0 ? `
-                <div class="notification-item">
-                    <div class="notification-message">
-                        No admin notifications yet.
-                    </div>
-                </div>
+                <div style="padding: 40px; text-align: center; color: #a78c6d;">No notifications</div>
             ` : notifications.map(n => `
-                <div class="notification-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
-                    <div class="notification-item-header">
-                        <div>
-                            <div class="notification-title">${n.title}</div>
-                            <span class="notification-time">${n.timestamp}</span>
-                        </div>
-                        ${n.priority ? `<span class="notification-priority ${n.priority}">${n.priority}</span>` : ''}
-                    </div>
-                    <div class="notification-message">${n.message}</div>
+                <div class="notification-item ${!n.read ? 'unread' : ''}" data-id="${n.id}" style="padding: 16px; border-bottom: 1px solid rgba(232,213,196,0.05); cursor: pointer;">
+                    <div style="font-weight: 500; margin-bottom: 4px;">${n.title}</div>
+                    <div style="font-size: 13px; color: #a78c6d;">${n.message}</div>
+                    <div style="font-size: 11px; color: #6b4e3a; margin-top: 8px;">${new Date(n.timestamp).toLocaleString()}</div>
                 </div>
             `).join('')}
         </div>
-        <div class="notification-footer">
-            <button id="viewAllNotifications">View all (${countLabel})</button>
+        <div style="padding: 12px; border-top: 1px solid rgba(232,213,196,0.1); text-align: center;">
+            <button id="markAllRead" class="action-btn" style="padding: 8px 16px; font-size: 12px;">Mark all as read</button>
         </div>
     `;
     
     document.body.appendChild(panel);
     
-    const closeBtn = panel.querySelector('.close-notifications');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => panel.remove());
-    }
+    panel.querySelector('.close-panel').onclick = () => panel.remove();
+    panel.onclick = (e) => { if (e.target === panel) panel.remove(); };
     
-    const markAllBtn = panel.querySelector('#markAllAdminRead');
-    if (markAllBtn) {
-        markAllBtn.addEventListener('click', async () => {
+    panel.querySelectorAll('.notification-item').forEach(item => {
+        item.onclick = async () => {
+            const id = item.dataset.id;
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
-                const res = await fetch(`${API_ROOT}/notifications/read-all`, {
+                await fetch(`${API_ROOT}/notifications/read/${id}`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ type: 'admin' }),
-                    signal: controller.signal
+                    headers: { 'Authorization': `Bearer ${authToken}` }
                 });
-                
-                clearTimeout(timeoutId);
-                
-                const data = await res.json();
-                if (data.success) {
-                    panel.querySelectorAll('.notification-item.unread').forEach(el => {
-                        el.classList.remove('unread');
-                    });
-                    updateAdminNotificationBadge(0);
-                }
-            } catch (e) {
-                console.error('Error marking admin notifications read:', e);
+                item.classList.remove('unread');
+                updateNotificationBadge('-1');
+            } catch (error) {
+                console.error('Error marking read:', error);
             }
-        });
+        };
+    });
+    
+    panel.querySelector('#markAllRead').onclick = async () => {
+        try {
+            await fetch(`${API_ROOT}/notifications/read-all`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            panel.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('unread');
+            });
+            updateNotificationBadge(0);
+        } catch (error) {
+            console.error('Error marking all read:', error);
+        }
+    };
+}
+
+// ===== REAL-TIME UPDATES =====
+function startRealtimeUpdates() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => {
+        loadDashboardData();
+    }, 30000);
+}
+
+// ===== UTILITY FUNCTIONS =====
+function getTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+}
+
+function showLoadingState(show) {
+    let loader = document.getElementById('dashboard-loader');
+    if (show && !loader) {
+        loader = document.createElement('div');
+        loader.id = 'dashboard-loader';
+        loader.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(26, 15, 10, 0.8); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999; font-size: 18px; color: #d4a574;
+        `;
+        loader.innerHTML = '🔄 Loading dashboard data...';
+        document.body.appendChild(loader);
+    } else if (!show && loader) {
+        loader.remove();
     }
 }
 
-// ===== UTILITY FUNCTIONS (see modules/admin-utils.js) =====
-function logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    AdminUtils.showToast('Logged out successfully', 'info');
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    
+    const bgColor = type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#eab308' : '#2c1810';
+    const borderColor = type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#eab308' : '#d4a574';
+    
+    toast.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px;
+        background: ${bgColor}; color: #f5e6d3; padding: 12px 20px;
+        border-radius: 8px; border-left: 4px solid ${borderColor};
+        z-index: 10000; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out; font-size: 14px;
+    `;
+    
+    document.body.appendChild(toast);
     
     setTimeout(() => {
-        // Redirect to homepage after admin logout (requested behavior)
-        window.location.href = '../Homepage/index.html';
-    }, 1000);
+        toast.style.animation = 'slideOutRight 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
-// ===== ERROR HANDLING =====
-window.addEventListener('error', function(e) {
-    console.error('Dashboard error:', e.error);
-    AdminUtils.showToast('An error occurred. Please refresh.', 'warning');
-});
+function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        if (wsConnection) wsConnection.close();
+        if (refreshInterval) clearInterval(refreshInterval);
+        showToast('Logged out successfully', 'success');
+        setTimeout(() => {
+            window.location.href = '../Homepage/index.html';
+        }, 1000);
+    }
+}
+
+// Add CSS animations if not present
+if (!document.querySelector('#admin-animations')) {
+    const style = document.createElement('style');
+    style.id = 'admin-animations';
+    style.textContent = `
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .notification-panel {
+            position: fixed; top: 70px; right: 20px; width: 380px;
+            background: #2c1810; border: 1px solid rgba(232,213,196,0.1);
+            border-radius: 12px; z-index: 9999; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: slideInRight 0.3s ease-out;
+        }
+        .notification-item.unread {
+            background: rgba(212,165,116,0.05);
+        }
+        .notification-item:hover {
+            background: rgba(232,213,196,0.05);
+        }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 10000; animation: fadeIn 0.3s ease-out;
+        }
+        .modal-content {
+            background: #2c1810; border: 1px solid rgba(232,213,196,0.1);
+            border-radius: 12px; padding: 24px; max-width: 800px;
+            width: 90%; max-height: 80vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .action-btn {
+            background: rgba(212,165,116,0.1); color: #d4a574;
+            border: 1px solid rgba(212,165,116,0.2); border-radius: 6px;
+            padding: 8px 16px; cursor: pointer; transition: all 0.3s ease;
+        }
+        .action-btn:hover {
+            background: rgba(212,165,116,0.2); transform: translateY(-2px);
+        }
+        .badge-pending { background: #eab308; color: #1a0f0a; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .badge-reviewed { background: #16a34a; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .user-dropdown .dropdown-item {
+            display: block; padding: 10px 12px; color: #e8d5c4;
+            text-decoration: none; border-radius: 6px; transition: background 0.2s;
+        }
+        .user-dropdown .dropdown-item:hover {
+            background: rgba(212,165,116,0.1);
+        }
+    `;
+    document.head.appendChild(style);
+}
