@@ -1596,4 +1596,151 @@ router.post('/test-notification', requireAdmin, async (req, res) => {
   }
 });
 
+// Get admin notifications (for the notification panel)
+router.get('/notifications', requireAdmin, async (req, res) => {
+    try {
+        const Notification = require('../models/Notification');
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = parseInt(req.query.offset) || 0;
+        
+        const notifications = await Notification.find({
+            userId: req.user._id,
+            archived: false,
+            type: { $regex: '^admin_', $options: 'i' }
+        })
+        .populate('sourceUserId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit);
+        
+        const total = await Notification.countDocuments({
+            userId: req.user._id,
+            archived: false,
+            type: { $regex: '^admin_', $options: 'i' }
+        });
+        
+        const unreadCount = await Notification.countDocuments({
+            userId: req.user._id,
+            read: false,
+            archived: false,
+            type: { $regex: '^admin_', $options: 'i' }
+        });
+        
+        res.json({
+            success: true,
+            notifications: notifications.map(n => ({
+                id: n._id,
+                type: n.type,
+                title: n.title,
+                message: n.message,
+                timestamp: n.createdAt,
+                read: n.read,
+                priority: n.priority,
+                actionUrl: n.actionUrl,
+                metadata: n.metadata
+            })),
+            total,
+            unreadCount
+        });
+    } catch (error) {
+        console.error('Error fetching admin notifications:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+// Mark notification as read
+router.post('/notifications/:id/read', requireAdmin, async (req, res) => {
+    try {
+        const Notification = require('../models/Notification');
+        
+        const notification = await Notification.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
+            { read: true, readAt: new Date() },
+            { new: true }
+        );
+        
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+        
+        const unreadCount = await Notification.countDocuments({
+            userId: req.user._id,
+            read: false,
+            archived: false,
+            type: { $regex: '^admin_', $options: 'i' }
+        });
+        
+        res.json({
+            success: true,
+            notification,
+            unreadCount
+        });
+    } catch (error) {
+        console.error('Error marking notification read:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+// Mark all notifications as read
+router.post('/notifications/read-all', requireAdmin, async (req, res) => {
+    try {
+        const Notification = require('../models/Notification');
+        
+        await Notification.updateMany(
+            {
+                userId: req.user._id,
+                read: false,
+                archived: false,
+                type: { $regex: '^admin_', $options: 'i' }
+            },
+            { read: true, readAt: new Date() }
+        );
+        
+        res.json({
+            success: true,
+            message: 'All notifications marked as read'
+        });
+    } catch (error) {
+        console.error('Error marking all read:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+// Get unread notifications count
+router.get('/notifications/unread', requireAdmin, async (req, res) => {
+    try {
+        const Notification = require('../models/Notification');
+        
+        const unreadCount = await Notification.countDocuments({
+            userId: req.user._id,
+            read: false,
+            archived: false,
+            type: { $regex: '^admin_', $options: 'i' }
+        });
+        
+        res.json({
+            success: true,
+            unreadCount
+        });
+    } catch (error) {
+        console.error('Error getting unread count:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
 module.exports = router;
