@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Reports — Moderation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #3B1D14;
+    --card: #5A2E1F;
+    --card2: #4A2418;
+    --border: rgba(245,230,204,0.1);
+    --border2: rgba(245,230,204,0.2);
+    --cream: #F5E6CC;
+    --gold: #C4A882;
+    --danger: #A33030;
+    --danger-dark: #8B2020;
+    --warning: #D4A017;
+    --success: #2D6A4F;
+    --info: #4A90D9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #6B3D2A; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #7D4E3A; }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* Back Button */
+  .back-nav {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    color: var(--cream);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  .back-button:hover {
+    background: var(--card2);
+    transform: translateX(-2px);
+  }
+  .back-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--gold);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Header */
+  header { margin-bottom: 32px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.3px; }
+  header p { color: var(--gold); font-size: 0.875rem; margin-top: 4px; }
+
+  /* Summary Cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 32px; }
+  @media(max-width:900px){ .summary-grid { grid-template-columns: repeat(2,1fr); } }
+  .summary-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .summary-icon { padding: 12px; border-radius: 10px; display: flex; }
+  .summary-icon svg { width: 22px; height: 22px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .summary-icon.info { background: rgba(74,144,217,0.12); } .summary-icon.info svg { stroke: var(--info); }
+  .summary-icon.danger { background: rgba(163,48,48,0.12); } .summary-icon.danger svg { stroke: var(--danger); }
+  .summary-icon.success { background: rgba(45,106,79,0.12); } .summary-icon.success svg { stroke: #4caf82; }
+  .summary-icon.warning { background: rgba(212,160,23,0.12); } .summary-icon.warning svg { stroke: var(--warning); }
+  .summary-label { font-size: 0.8rem; font-weight: 500; color: var(--gold); }
+  .summary-value { font-size: 1.6rem; font-weight: 700; margin-top: 2px; }
+
+  /* Main Layout */
+  .main-layout { display: flex; gap: 24px; align-items: flex-start; }
+  .reports-col { flex: 1; min-width: 0; }
+  .sidebar { width: 320px; flex-shrink: 0; position: sticky; top: 24px; }
+  @media(max-width:1024px){ .main-layout { flex-direction: column; } .sidebar { width: 100%; position: static; } }
+
+  /* Filters */
+  .filters {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 20px; margin-bottom: 20px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  .filter-label { display: flex; align-items: center; gap: 6px; color: var(--gold); font-weight: 500; font-size: 0.875rem; }
+  .filter-label svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  select, input[type=date], input[type=text] {
+    background: #3B1D14; border: 1px solid var(--border2); color: var(--cream);
+    font-size: 0.85rem; border-radius: 8px; padding: 8px 12px; outline: none;
+    font-family: 'Inter', sans-serif; transition: border-color 0.2s;
+    color-scheme: dark;
+  }
+  select:focus, input:focus { border-color: var(--warning); }
+  select option { background: #3B1D14; }
+  .search-wrap { position: relative; flex: 1; min-width: 180px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: var(--gold); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .search-wrap input { width: 100%; padding-left: 34px; }
+  ::placeholder { color: rgba(196,168,130,0.5); }
+
+  /* Report Cards */
+  .report-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; margin-bottom: 14px; transition: border-color 0.2s, transform 0.2s;
+    display: flex; flex-direction: column;
+    animation: fadeIn 0.35s ease both;
+  }
+  .report-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+
+  .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .type-badge {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 0.7rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 4px 10px; border-radius: 6px;
+  }
+  .type-badge svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .type-badge.chat { background: rgba(74,144,217,0.12); color: var(--info); }
+  .type-badge.post { background: rgba(212,160,23,0.12); color: var(--warning); }
+  .type-badge.user { background: rgba(163,48,48,0.12); color: #e06060; }
+  .report-time { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--gold); }
+  .report-time svg { width: 11px; height: 11px; stroke: var(--gold); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .status-dot { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 500; color: var(--gold); text-transform: capitalize; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.pending { background: var(--warning); box-shadow: 0 0 0 0 rgba(212,160,23,0.5); animation: pulse 1.5s infinite; }
+  .dot.resolved { background: #4caf82; }
+  .dot.ignored { background: rgba(196,168,130,0.4); }
+
+  .report-content {
+    background: rgba(59,29,20,0.5); border: 1px solid rgba(245,230,204,0.05);
+    border-radius: 8px; padding: 12px; margin-bottom: 12px;
+  }
+  .report-content p { font-size: 0.85rem; font-style: italic; color: var(--cream); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .report-content p::before { content: '"'; } .report-content p::after { content: '"'; }
+
+  .report-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 500; }
+  .tag.reason { background: #3B1D14; color: var(--gold); border: 1px solid var(--border); }
+  .tag.history { background: rgba(163,48,48,0.1); color: #e06060; border: 1px solid rgba(163,48,48,0.2); }
+
+  .report-meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--gold); margin-bottom: 16px; }
+  .report-meta .reporter { color: var(--info); font-weight: 500; }
+  .report-meta .target { color: #e06060; font-weight: 500; }
+
+  .report-actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+  .btn svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .btn-details { background: transparent; border: 1px solid rgba(74,144,217,0.3); color: var(--info); }
+  .btn-details:hover { background: rgba(74,144,217,0.1); }
+  .btn-ignore { background: transparent; border: 1px solid var(--border2); color: var(--gold); }
+  .btn-ignore:hover:not(:disabled) { background: rgba(245,230,204,0.05); color: var(--cream); }
+  .btn-action { background: var(--danger); color: #fff; }
+  .btn-action:hover:not(:disabled) { background: var(--danger-dark); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Empty State */
+  .empty-state {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 48px 24px; text-align: center; color: var(--gold); font-size: 1rem;
+  }
+
+  /* Sidebar - Recent Actions */
+  .sidebar-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; max-height: 800px; overflow-y: auto;
+  }
+  .sidebar-title { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 600; margin-bottom: 20px; }
+  .sidebar-title svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .action-item { border-left: 2px solid var(--border); padding-left: 16px; padding-bottom: 4px; margin-bottom: 18px; position: relative; }
+  .action-item:last-child { margin-bottom: 0; }
+  .action-icon-wrap { position: absolute; left: -9px; top: 2px; background: var(--card); border-radius: 50%; padding: 1px; }
+  .action-icon { display: flex; }
+  .action-icon svg { width: 14px; height: 14px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .action-icon.ban svg { stroke: #e06060; }
+  .action-icon.delete svg { stroke: #e06060; }
+  .action-icon.warning svg { stroke: var(--warning); }
+  .action-icon.suspend svg { stroke: var(--warning); }
+  .action-icon.ignore svg { stroke: var(--gold); }
+  .action-desc { font-size: 0.82rem; font-weight: 500; margin-bottom: 4px; }
+  .action-target { font-size: 0.75rem; color: var(--gold); margin-bottom: 6px; }
+  .action-target span { color: var(--cream); }
+  .action-footer { display: flex; justify-content: space-between; font-size: 0.68rem; color: rgba(196,168,130,0.6); text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* Modal Overlay */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 18px; width: 100%; max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden;
+    animation: modalIn 0.25s ease;
+  }
+  .modal-lg { max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; }
+  .modal-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    background: rgba(59,29,20,0.6); display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-header h2 { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .modal-header svg.hicon { width: 20px; height: 20px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .btn-close { width: 32px; height: 32px; border-radius: 50%; background: transparent; border: none; cursor: pointer; color: var(--gold); display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .btn-close:hover { background: rgba(245,230,204,0.1); color: var(--cream); }
+  .btn-close svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .modal-body { padding: 24px; overflow-y: auto; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); background: rgba(59,29,20,0.4); display: flex; justify-content: flex-end; }
+
+  /* Details Modal */
+  .user-profile-snippet { display: flex; align-items: center; gap: 16px; padding: 16px; background: #3B1D14; border-radius: 12px; border: 1px solid rgba(245,230,204,0.05); margin-bottom: 20px; }
+  .user-avatar { width: 56px; height: 56px; border-radius: 50%; background: rgba(163,48,48,0.2); border: 1px solid rgba(163,48,48,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .user-avatar svg { width: 28px; height: 28px; stroke: #e06060; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .user-profile-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .user-profile-meta { display: flex; gap: 12px; font-size: 0.78rem; color: var(--gold); }
+  .user-profile-meta .danger-text { color: #e06060; display: flex; align-items: center; gap: 3px; }
+  .user-profile-meta svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .profile-action-btn { margin-left: auto; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(74,144,217,0.3); color: var(--info); background: transparent; font-size: 0.8rem; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 10px; }
+  .content-box { background: #3B1D14; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 20px; font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .meta-item { background: rgba(59,29,20,0.5); border: 1px solid rgba(245,230,204,0.05); border-radius: 10px; padding: 14px; }
+  .meta-item .key { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); margin-bottom: 4px; }
+  .meta-item .val { font-size: 0.875rem; font-weight: 500; }
+  .meta-item .val.info { color: var(--info); }
+  .meta-item .val.cream { color: var(--cream); }
+  .history-item { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; padding: 10px 12px; background: rgba(59,29,20,0.3); border: 1px solid rgba(163,48,48,0.1); border-radius: 8px; margin-bottom: 8px; }
+  .history-item svg { width: 14px; height: 14px; stroke: #e06060; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .history-item .hist-time { margin-left: auto; color: var(--gold); }
+
+  /* Action Modal */
+  .action-options { display: flex; flex-direction: column; gap: 10px; }
+  .action-option {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px; border-radius: 12px;
+    border: 1px solid; cursor: pointer; transition: all 0.2s; background: transparent; width: 100%; text-align: left;
+    font-family: 'Inter', sans-serif;
+  }
+  .action-option:hover { opacity: 0.9; }
+  .action-option.warning-opt { border-color: rgba(212,160,23,0.3); background: rgba(212,160,23,0.08); }
+  .action-option.warning-opt:hover { border-color: var(--warning); background: rgba(212,160,23,0.15); }
+  .action-option.delete-opt { border-color: rgba(163,48,48,0.3); background: rgba(163,48,48,0.08); }
+  .action-option.delete-opt:hover { border-color: var(--danger); background: rgba(163,48,48,0.15); }
+  .action-option.suspend-opt { border-color: rgba(234,100,30,0.3); background: rgba(234,100,30,0.08); }
+  .action-option.suspend-opt:hover { border-color: #ea641e; background: rgba(234,100,30,0.15); }
+  .action-option.ban-opt { border-color: rgba(139,32,32,0.4); background: rgba(139,32,32,0.15); }
+  .action-option.ban-opt:hover { border-color: var(--danger-dark); background: rgba(139,32,32,0.25); }
+  .action-opt-icon { padding: 8px; background: #3B1D14; border-radius: 8px; display: flex; flex-shrink: 0; }
+  .action-opt-icon svg { width: 18px; height: 18px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .action-opt-icon.warning-icon svg { stroke: var(--warning); }
+  .action-opt-icon.delete-icon svg { stroke: var(--danger); }
+  .action-opt-icon.suspend-icon svg { stroke: #ea641e; }
+  .action-opt-icon.ban-icon svg { stroke: var(--danger-dark); }
+  .action-opt-title { font-weight: 600; font-size: 0.9rem; color: var(--cream); margin-bottom: 3px; }
+  .action-opt-desc { font-size: 0.78rem; color: var(--gold); }
+  .confirm-view { text-align: center; padding: 16px 0; }
+  .confirm-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(163,48,48,0.2); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; }
+  .confirm-icon svg { width: 32px; height: 32px; stroke: var(--danger); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .confirm-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; }
+  .confirm-text { font-size: 0.875rem; color: var(--gold); line-height: 1.6; margin-bottom: 28px; }
+  .confirm-text strong { color: var(--cream); }
+  .confirm-text .danger-name { color: #e06060; font-weight: 700; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .btn-cancel { flex: 1; padding: 12px; border: 1px solid var(--border2); background: transparent; color: var(--cream); border-radius: 10px; font-size: 0.875rem; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.2s; }
+  .btn-cancel:hover { background: rgba(245,230,204,0.05); }
+  .btn-confirm { flex: 1; padding: 12px; background: var(--danger); color: #fff; border: none; border-radius: 10px; font-size: 0.875rem; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.2s; box-shadow: 0 4px 14px rgba(163,48,48,0.3); }
+  .btn-confirm:hover { background: var(--danger-dark); }
+  .back-btn { background: none; border: none; color: var(--gold); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.8rem; padding: 0; margin-right: 8px; }
+  .back-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+    background: #3d1a0e; border: 1px solid var(--gold); border-radius: 10px;
+    color: var(--cream); font-size: 0.85rem; z-index: 200; display: none;
+    animation: toastIn 0.3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(212,160,23,0.5); } 50% { box-shadow: 0 0 0 5px rgba(212,160,23,0); } }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- Back Navigation -->
+  <div class="back-nav">
+    <button class="back-button" onclick="goBack()">
+      <svg viewBox="0 0 24 24">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Back to Profile
+    </button>
+  </div>
+
+  <header>
+    <h1>User Reports</h1>
+    <p>Review and manage reported content to keep the community safe.</p>
+  </header>
+
+  <!-- Summary -->
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <!-- Main -->
+  <div class="main-layout">
+    <div class="reports-col">
+      <!-- Filters -->
+      <div class="filters">
+        <div class="filter-label">
+          <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span>Filters:</span>
+        </div>
+        <select id="typeFilter" onchange="applyFilters()">
+          <option value="all">All Types</option>
+          <option value="chat">Chat</option>
+          <option value="post">Post</option>
+          <option value="user">User</option>
+        </select>
+        <select id="statusFilter" onchange="applyFilters()">
+          <option value="pending" selected>Pending</option>
+          <option value="all">All Statuses</option>
+          <option value="resolved">Resolved</option>
+          <option value="ignored">Ignored</option>
+        </select>
+        <input type="date" id="dateFilter" onchange="applyFilters()">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchFilter" placeholder="Search username or content..." oninput="applyFilters()">
+        </div>
+      </div>
+      <div id="reportsList"></div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-card" id="recentActionsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal-overlay" id="detailsModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2>
+        <svg class="hicon" viewBox="0 0 24 24" style="stroke:#4A90D9"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Report Details
+      </h2>
+      <button class="btn-close" onclick="closeModal('detailsModal')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="detailsBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-details" style="padding:10px 20px;font-size:0.85rem" onclick="closeModal('detailsModal')">Close Details</button>
+    </div>
+  </div>
+</div>
+
+<!-- Action Modal -->
+<div class="modal-overlay" id="actionModal">
+  <div class="modal">
+    <div class="modal-header" id="actionHeader">
+      <h2>
+        <svg class="hicon" viewBox="0 0 24 24" style="stroke:#A33030"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Take Action: <span id="actionTargetName" style="color:var(--gold);margin-left:6px"></span>
+      </h2>
+      <button class="btn-close" onclick="closeModal('actionModal')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="actionBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Go back function
+function goBack() {
+  window.location.href = 'adprofile.html';
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+const reports = [
+  { id:'REP-1042', type:'chat', reportedContent:"I swear if you don't send the items I'm going to find where you live.", reason:'harassment', reportedBy:'trading_guy99', reportedUser:'angry_gamer_x', time:'2023-10-24T10:30:00Z', status:'pending', historyCount:3 },
+  { id:'REP-1043', type:'post', reportedContent:'Check out my new crypto scheme! Guaranteed 1000% returns in 2 days. Click here: http://sketchy-link.xyz', reason:'spam', reportedBy:'system_automod', reportedUser:'crypto_king_22', time:'2023-10-24T11:15:00Z', status:'pending', historyCount:0 },
+  { id:'REP-1044', type:'user', reportedContent:'User profile picture contains explicit material.', reason:'inappropriate', reportedBy:'sarah_mod', reportedUser:'troll_account_1', time:'2023-10-24T12:05:00Z', status:'pending', historyCount:5 },
+  { id:'REP-1045', type:'chat', reportedContent:'ur so bad at this game just quit', reason:'abuse', reportedBy:'newbie_player', reportedUser:'toxic_pro', time:'2023-10-24T13:20:00Z', status:'resolved', historyCount:1 },
+  { id:'REP-1046', type:'post', reportedContent:'Selling verified accounts for $50 each. DM me.', reason:'spam', reportedBy:'community_watch', reportedUser:'account_seller', time:'2023-10-24T14:10:00Z', status:'pending', historyCount:2 },
+  { id:'REP-1047', type:'chat', reportedContent:'Hello, I am a Nigerian prince and I need your help...', reason:'spam', reportedBy:'gullible_not', reportedUser:'prince_123', time:'2023-10-24T15:00:00Z', status:'ignored', historyCount:0 },
+  { id:'REP-1048', type:'user', reportedContent:'Username is an offensive slur.', reason:'abuse', reportedBy:'user_1992', reportedUser:'offensive_name_here', time:'2023-10-24T15:45:00Z', status:'pending', historyCount:0 },
+  { id:'REP-1049', type:'post', reportedContent:'Does anyone know how to bypass the new security update?', reason:'other', reportedBy:'dev_team', reportedUser:'hacker_wannabe', time:'2023-10-24T16:30:00Z', status:'pending', historyCount:1 },
+];
+
+let recentActions = [
+  { id:'ACT-001', action:'Banned user permanently', target:'scammer_bot_99', admin:'Admin_Sarah', time:'10 mins ago', type:'ban' },
+  { id:'ACT-002', action:'Deleted post (Spam)', target:'crypto_king_22', admin:'Admin_Mike', time:'25 mins ago', type:'delete' },
+  { id:'ACT-003', action:'Issued warning for toxicity', target:'toxic_pro', admin:'Admin_Sarah', time:'1 hour ago', type:'warning' },
+  { id:'ACT-004', action:'Suspended account (7 days)', target:'troll_account_0', admin:'Admin_Alex', time:'2 hours ago', type:'suspend' },
+  { id:'ACT-005', action:'Ignored report (False positive)', target:'prince_123', admin:'Admin_Mike', time:'3 hours ago', type:'ignore' },
+];
+
+let activeReport = null;
+let pendingAction = null;
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const icons = {
+  ban: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+  delete: `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  suspend: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>`,
+  ignore: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  eye: `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  post: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  user: `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  alert: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  check: `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
+  x: `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+};
+
+// ── Render ─────────────────────────────────────────────────────────────────────
+function formatDate(str) {
+  return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(str));
+}
+
+function renderSummary() {
+  const pending = reports.filter(r => r.status === 'pending').length;
+  const resolved = reports.filter(r => r.status === 'resolved').length;
+  const userCounts = {};
+  reports.forEach(r => userCounts[r.reportedUser] = (userCounts[r.reportedUser]||0)+1);
+  let most = 'None', max = 0;
+  Object.entries(userCounts).forEach(([u,c]) => { if(c>max){max=c;most=u;} });
+
+  const stats = [
+    { label:'Total Reports Today', value: reports.length, type:'info', icon: icons.alert },
+    { label:'Pending Reports', value: pending, type:'danger', icon: icons.clock },
+    { label:'Resolved Reports', value: resolved, type:'success', icon: icons.check },
+    { label:'Most Reported User', value: most, type:'warning', icon: icons.user },
+  ];
+  document.getElementById('summaryGrid').innerHTML = stats.map(s => `
+    <div class="summary-card">
+      <div class="summary-icon ${s.type}">${s.icon}</div>
+      <div><div class="summary-label">${s.label}</div><div class="summary-value">${s.value}</div></div>
+    </div>
+  `).join('');
+}
+
+function renderReports() {
+  const type = document.getElementById('typeFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const date = document.getElementById('dateFilter').value;
+  const search = document.getElementById('searchFilter').value.toLowerCase();
+
+  const filtered = reports.filter(r => {
+    if (type !== 'all' && r.type !== type) return false;
+    if (status !== 'all' && r.status !== status) return false;
+    if (date && !r.time.startsWith(date)) return false;
+    if (search && !r.reportedUser.toLowerCase().includes(search) && !r.reportedContent.toLowerCase().includes(search) && !r.reportedBy.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const list = document.getElementById('reportsList');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state">No reports found matching your filters.</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map((r,i) => `
+    <div class="report-card" style="animation-delay:${i*0.07}s" id="card-${r.id}">
+      <div class="report-header">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="type-badge ${r.type}">${icons[r.type]}${r.type}</span>
+          <span class="report-time">${icons.clock}${formatDate(r.time)}</span>
+        </div>
+        <div class="status-dot"><span class="dot ${r.status}"></span>${r.status}</div>
+      </div>
+      <div class="report-content"><p>${r.reportedContent}</p></div>
+      <div class="report-tags">
+        <span class="tag reason">Reason: <strong>${r.reason}</strong></span>
+        ${r.historyCount > 0 ? `<span class="tag history">Prior Reports: ${r.historyCount}</span>` : ''}
+      </div>
+      <div class="report-meta">
+        <span>Reported by: <span class="reporter">${r.reportedBy}</span></span>
+        <span>Target: <span class="target">${r.reportedUser}</span></span>
+      </div>
+      <div class="report-actions">
+        <button class="btn btn-details" onclick="openDetails('${r.id}')">${icons.eye}Details</button>
+        <button class="btn btn-ignore" onclick="ignoreReport('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${icons.x}Ignore</button>
+        <button class="btn btn-action" onclick="openAction('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${icons.alert}Action</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderRecentActions() {
+  const el = document.getElementById('recentActionsList');
+  el.innerHTML = `<div class="sidebar-title">${icons.shield}Recent Actions</div>` +
+    recentActions.map(a => `
+      <div class="action-item">
+        <div class="action-icon-wrap"><div class="action-icon ${a.type}">${icons[a.type]||icons.warning}</div></div>
+        <div class="action-desc">${a.action}</div>
+        <div class="action-target">Target: <span>${a.target}</span></div>
+        <div class="action-footer"><span>By ${a.admin}</span><span>${a.time}</span></div>
+      </div>
+    `).join('');
+}
+
+function applyFilters() { renderReports(); }
+
+// ── Details Modal ─────────────────────────────────────────────────────────────
+function openDetails(id) {
+  const r = reports.find(x => x.id === id);
+  if (!r) return;
+  const histItems = Array.from({length: Math.min(r.historyCount, 3)}, (_,i) =>
+    `<div class="history-item">${icons.alert}<span>Reported for ${['spam','harassment','abuse'][i%3]}</span><span class="hist-time">${i+1} weeks ago</span></div>`
+  ).join('');
+  document.getElementById('detailsBody').innerHTML = `
+    <div class="user-profile-snippet">
+      <div class="user-avatar">${icons.user}</div>
+      <div>
+        <div class="user-profile-name">${r.reportedUser}</div>
+        <div class="user-profile-meta">
+          <span style="display:flex;align-items:center;gap:3px">${icons.clock}Joined 2022</span>
+          <span class="danger-text">${icons.alert}${r.historyCount} Prior Reports</span>
+        </div>
+      </div>
+      <button class="profile-action-btn" onclick="void(0)">View Full Profile</button>
+    </div>
+    <div class="section-label">Reported Content (${r.type})</div>
+    <div class="content-box">${r.reportedContent}</div>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="key">Reported By</div><div class="val info">${r.reportedBy}</div></div>
+      <div class="meta-item"><div class="key">Reason</div><div class="val cream" style="text-transform:capitalize">${r.reason}</div></div>
+      <div class="meta-item"><div class="key">Time</div><div class="val cream">${new Date(r.time).toLocaleString()}</div></div>
+      <div class="meta-item"><div class="key">Status</div><div class="val cream" style="text-transform:capitalize">${r.status}</div></div>
+    </div>
+    ${r.historyCount > 0 ? `<div class="section-label">Recent History</div>${histItems}` : ''}
+  `;
+  document.getElementById('detailsModal').classList.add('open');
+}
+
+// ── Action Modal ──────────────────────────────────────────────────────────────
+function openAction(id) {
+  activeReport = reports.find(x => x.id === id);
+  if (!activeReport) return;
+  pendingAction = null;
+  document.getElementById('actionTargetName').textContent = activeReport.reportedUser;
+  renderActionOptions();
+  document.getElementById('actionModal').classList.add('open');
+}
+
+function renderActionOptions() {
+  const opts = [
+    { id:'warning', cls:'warning-opt', iconCls:'warning-icon', icon:icons.warning, title:'Send Warning', desc:'Send an official warning message to the user.' },
+    { id:'delete', cls:'delete-opt', iconCls:'delete-icon', icon:icons.delete, title:'Delete Content', desc:'Remove the reported content immediately.' },
+    { id:'suspend', cls:'suspend-opt', iconCls:'suspend-icon', icon:icons.suspend, title:'Suspend User', desc:'Temporarily disable the user account for 7 days.' },
+    { id:'ban', cls:'ban-opt', iconCls:'ban-icon', icon:icons.ban, title:'Ban User', desc:'Permanently ban the user from the platform.' },
+  ];
+  const header = document.getElementById('actionHeader');
+  header.querySelector('h2').innerHTML = `<svg class="hicon" viewBox="0 0 24 24" style="stroke:#A33030"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Take Action: <span style="color:var(--gold);margin-left:6px">${activeReport.reportedUser}</span>`;
+
+  document.getElementById('actionBody').innerHTML = `
+    <p style="font-size:0.82rem;color:var(--gold);margin-bottom:16px">Select an administrative action to resolve this report.</p>
+    <div class="action-options">
+      ${opts.map(o => `
+        <button class="action-option ${o.cls}" onclick="selectAction('${o.id}')">
+          <div class="action-opt-icon ${o.iconCls}">${o.icon}</div>
+          <div><div class="action-opt-title">${o.title}</div><div class="action-opt-desc">${o.desc}</div></div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function selectAction(action) {
+  pendingAction = action;
+  const label = {warning:'Warning',delete:'Delete Content',suspend:'Suspend',ban:'Ban'}[action];
+  const header = document.getElementById('actionHeader');
+  header.querySelector('h2').innerHTML = `<button class="back-btn" onclick="renderActionOptions()"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="15 18 9 12 15 6"/></svg></button>Take Action: <span style="color:var(--gold);margin-left:6px">${activeReport.reportedUser}</span>`;
+  document.getElementById('actionBody').innerHTML = `
+    <div class="confirm-view">
+      <div class="confirm-icon">${icons.alert}</div>
+      <div class="confirm-title">Are you absolutely sure?</div>
+      <p class="confirm-text">You are about to <strong style="text-transform:uppercase">${action}</strong> the user <span class="danger-name">${activeReport.reportedUser}</span>. This action will be logged and the report will be marked as resolved.</p>
+      <div class="confirm-btns">
+        <button class="btn-cancel" onclick="renderActionOptions()">Cancel</button>
+        <button class="btn-confirm" onclick="executeAction()">Confirm Action</button>
+      </div>
+    </div>
+  `;
+}
+
+function executeAction() {
+  if (!activeReport || !pendingAction) return;
+  const r = reports.find(x => x.id === activeReport.id);
+  if (r) r.status = 'resolved';
+  const descMap = { warning:'Issued warning', delete:'Deleted content', suspend:'Suspended account (7 days)', ban:'Banned user permanently' };
+  recentActions.unshift({ id:'ACT-'+Date.now(), action: descMap[pendingAction], target: activeReport.reportedUser, admin:'Current_Admin', time:'Just now', type: pendingAction });
+  closeModal('actionModal');
+  renderSummary();
+  renderReports();
+  renderRecentActions();
+  showToast(`Action taken: ${descMap[pendingAction]} for ${activeReport.reportedUser}`);
+}
+
+function ignoreReport(id) {
+  const r = reports.find(x => x.id === id);
+  if (!r || r.status !== 'pending') return;
+  r.status = 'ignored';
+  recentActions.unshift({ id:'ACT-'+Date.now(), action:'Ignored report', target: r.reportedUser, admin:'Current_Admin', time:'Just now', type:'ignore' });
+  renderSummary();
+  renderReports();
+  renderRecentActions();
+  showToast(`Report for ${r.reportedUser} has been ignored.`);
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// Init
+renderSummary();
+renderReports();
+renderRecentActions();
+</script>
+</body>
+</html>
