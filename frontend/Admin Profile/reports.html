@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>User Reports — Moderation</title>
+<title>User Reports — Moderation | Litlink</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -35,7 +35,6 @@
 
   .page { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
 
-  /* Back Button */
   .back-nav {
     margin-bottom: 24px;
     display: flex;
@@ -72,12 +71,10 @@
     stroke-linejoin: round;
   }
 
-  /* Header */
   header { margin-bottom: 32px; }
   header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.3px; }
   header p { color: var(--gold); font-size: 0.875rem; margin-top: 4px; }
 
-  /* Summary Cards */
   .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 32px; }
   @media(max-width:900px){ .summary-grid { grid-template-columns: repeat(2,1fr); } }
   .summary-card {
@@ -94,13 +91,11 @@
   .summary-label { font-size: 0.8rem; font-weight: 500; color: var(--gold); }
   .summary-value { font-size: 1.6rem; font-weight: 700; margin-top: 2px; }
 
-  /* Main Layout */
   .main-layout { display: flex; gap: 24px; align-items: flex-start; }
   .reports-col { flex: 1; min-width: 0; }
   .sidebar { width: 320px; flex-shrink: 0; position: sticky; top: 24px; }
   @media(max-width:1024px){ .main-layout { flex-direction: column; } .sidebar { width: 100%; position: static; } }
 
-  /* Filters */
   .filters {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
     padding: 16px 20px; margin-bottom: 20px;
@@ -121,7 +116,6 @@
   .search-wrap input { width: 100%; padding-left: 34px; }
   ::placeholder { color: rgba(196,168,130,0.5); }
 
-  /* Report Cards */
   .report-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
     padding: 20px; margin-bottom: 14px; transition: border-color 0.2s, transform 0.2s;
@@ -175,13 +169,11 @@
   .btn-action:hover:not(:disabled) { background: var(--danger-dark); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  /* Empty State */
   .empty-state {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
     padding: 48px 24px; text-align: center; color: var(--gold); font-size: 1rem;
   }
 
-  /* Sidebar - Recent Actions */
   .sidebar-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
     padding: 20px; max-height: 800px; overflow-y: auto;
@@ -203,7 +195,6 @@
   .action-target span { color: var(--cream); }
   .action-footer { display: flex; justify-content: space-between; font-size: 0.68rem; color: rgba(196,168,130,0.6); text-transform: uppercase; letter-spacing: 0.04em; }
 
-  /* Modal Overlay */
   .modal-overlay {
     display: none; position: fixed; inset: 0; z-index: 100;
     background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
@@ -228,7 +219,6 @@
   .modal-body { padding: 24px; overflow-y: auto; }
   .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); background: rgba(59,29,20,0.4); display: flex; justify-content: flex-end; }
 
-  /* Details Modal */
   .user-profile-snippet { display: flex; align-items: center; gap: 16px; padding: 16px; background: #3B1D14; border-radius: 12px; border: 1px solid rgba(245,230,204,0.05); margin-bottom: 20px; }
   .user-avatar { width: 56px; height: 56px; border-radius: 50%; background: rgba(163,48,48,0.2); border: 1px solid rgba(163,48,48,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .user-avatar svg { width: 28px; height: 28px; stroke: #e06060; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -249,7 +239,6 @@
   .history-item svg { width: 14px; height: 14px; stroke: #e06060; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
   .history-item .hist-time { margin-left: auto; color: var(--gold); }
 
-  /* Action Modal */
   .action-options { display: flex; flex-direction: column; gap: 10px; }
   .action-option {
     display: flex; align-items: flex-start; gap: 14px; padding: 14px; border-radius: 12px;
@@ -299,12 +288,18 @@
   @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(212,160,23,0.5); } 50% { box-shadow: 0 0 0 5px rgba(212,160,23,0); } }
+
+  .loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(59,29,20,0.9); backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 9999; font-size: 18px; color: var(--gold);
+  }
 </style>
 </head>
 <body>
 
 <div class="page">
-  <!-- Back Navigation -->
   <div class="back-nav">
     <button class="back-button" onclick="goBack()">
       <svg viewBox="0 0 24 24">
@@ -319,192 +314,230 @@
     <p>Review and manage reported content to keep the community safe.</p>
   </header>
 
-  <!-- Summary -->
-  <div class="summary-grid" id="summaryGrid"></div>
-
-  <!-- Main -->
-  <div class="main-layout">
-    <div class="reports-col">
-      <!-- Filters -->
-      <div class="filters">
-        <div class="filter-label">
-          <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          <span>Filters:</span>
-        </div>
-        <select id="typeFilter" onchange="applyFilters()">
-          <option value="all">All Types</option>
-          <option value="chat">Chat</option>
-          <option value="post">Post</option>
-          <option value="user">User</option>
-        </select>
-        <select id="statusFilter" onchange="applyFilters()">
-          <option value="pending" selected>Pending</option>
-          <option value="all">All Statuses</option>
-          <option value="resolved">Resolved</option>
-          <option value="ignored">Ignored</option>
-        </select>
-        <input type="date" id="dateFilter" onchange="applyFilters()">
-        <div class="search-wrap">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchFilter" placeholder="Search username or content..." oninput="applyFilters()">
-        </div>
-      </div>
-      <div id="reportsList"></div>
-    </div>
-    <div class="sidebar">
-      <div class="sidebar-card" id="recentActionsList"></div>
-    </div>
+  <div id="reportsContent">
+    <div class="loading-overlay">Loading reports...</div>
   </div>
 </div>
-
-<!-- Details Modal -->
-<div class="modal-overlay" id="detailsModal">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <h2>
-        <svg class="hicon" viewBox="0 0 24 24" style="stroke:#4A90D9"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Report Details
-      </h2>
-      <button class="btn-close" onclick="closeModal('detailsModal')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body" id="detailsBody"></div>
-    <div class="modal-footer">
-      <button class="btn btn-details" style="padding:10px 20px;font-size:0.85rem" onclick="closeModal('detailsModal')">Close Details</button>
-    </div>
-  </div>
-</div>
-
-<!-- Action Modal -->
-<div class="modal-overlay" id="actionModal">
-  <div class="modal">
-    <div class="modal-header" id="actionHeader">
-      <h2>
-        <svg class="hicon" viewBox="0 0 24 24" style="stroke:#A33030"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Take Action: <span id="actionTargetName" style="color:var(--gold);margin-left:6px"></span>
-      </h2>
-      <button class="btn-close" onclick="closeModal('actionModal')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body" id="actionBody"></div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
 
 <script>
-// Go back function
+const API_BASE = 'http://localhost:5002/api/admin';
+const API_ROOT = 'http://localhost:5002/api';
+let authToken = null;
+let currentUser = null;
+let allReports = [];
+let recentActions = [];
+
 function goBack() {
   window.location.href = 'adprofile.html';
 }
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-const reports = [
-  { id:'REP-1042', type:'chat', reportedContent:"I swear if you don't send the items I'm going to find where you live.", reason:'harassment', reportedBy:'trading_guy99', reportedUser:'angry_gamer_x', time:'2023-10-24T10:30:00Z', status:'pending', historyCount:3 },
-  { id:'REP-1043', type:'post', reportedContent:'Check out my new crypto scheme! Guaranteed 1000% returns in 2 days. Click here: http://sketchy-link.xyz', reason:'spam', reportedBy:'system_automod', reportedUser:'crypto_king_22', time:'2023-10-24T11:15:00Z', status:'pending', historyCount:0 },
-  { id:'REP-1044', type:'user', reportedContent:'User profile picture contains explicit material.', reason:'inappropriate', reportedBy:'sarah_mod', reportedUser:'troll_account_1', time:'2023-10-24T12:05:00Z', status:'pending', historyCount:5 },
-  { id:'REP-1045', type:'chat', reportedContent:'ur so bad at this game just quit', reason:'abuse', reportedBy:'newbie_player', reportedUser:'toxic_pro', time:'2023-10-24T13:20:00Z', status:'resolved', historyCount:1 },
-  { id:'REP-1046', type:'post', reportedContent:'Selling verified accounts for $50 each. DM me.', reason:'spam', reportedBy:'community_watch', reportedUser:'account_seller', time:'2023-10-24T14:10:00Z', status:'pending', historyCount:2 },
-  { id:'REP-1047', type:'chat', reportedContent:'Hello, I am a Nigerian prince and I need your help...', reason:'spam', reportedBy:'gullible_not', reportedUser:'prince_123', time:'2023-10-24T15:00:00Z', status:'ignored', historyCount:0 },
-  { id:'REP-1048', type:'user', reportedContent:'Username is an offensive slur.', reason:'abuse', reportedBy:'user_1992', reportedUser:'offensive_name_here', time:'2023-10-24T15:45:00Z', status:'pending', historyCount:0 },
-  { id:'REP-1049', type:'post', reportedContent:'Does anyone know how to bypass the new security update?', reason:'other', reportedBy:'dev_team', reportedUser:'hacker_wannabe', time:'2023-10-24T16:30:00Z', status:'pending', historyCount:1 },
-];
-
-let recentActions = [
-  { id:'ACT-001', action:'Banned user permanently', target:'scammer_bot_99', admin:'Admin_Sarah', time:'10 mins ago', type:'ban' },
-  { id:'ACT-002', action:'Deleted post (Spam)', target:'crypto_king_22', admin:'Admin_Mike', time:'25 mins ago', type:'delete' },
-  { id:'ACT-003', action:'Issued warning for toxicity', target:'toxic_pro', admin:'Admin_Sarah', time:'1 hour ago', type:'warning' },
-  { id:'ACT-004', action:'Suspended account (7 days)', target:'troll_account_0', admin:'Admin_Alex', time:'2 hours ago', type:'suspend' },
-  { id:'ACT-005', action:'Ignored report (False positive)', target:'prince_123', admin:'Admin_Mike', time:'3 hours ago', type:'ignore' },
-];
-
-let activeReport = null;
-let pendingAction = null;
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
-const icons = {
-  ban: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
-  delete: `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  warning: `<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  suspend: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>`,
-  ignore: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-  eye: `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  chat: `<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
-  post: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-  user: `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-  clock: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-  alert: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-  check: `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
-  x: `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  shield: `<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-};
-
-// ── Render ─────────────────────────────────────────────────────────────────────
-function formatDate(str) {
-  return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(str));
+async function checkAuth() {
+  authToken = localStorage.getItem('authToken');
+  const userStr = localStorage.getItem('user');
+  
+  try {
+    currentUser = userStr ? JSON.parse(userStr) : null;
+  } catch (e) {
+    currentUser = null;
+  }
+  
+  if (!authToken || !currentUser?.isAdmin) {
+    showToast('Admin access required', 'error');
+    setTimeout(() => {
+      window.location.href = '../login.html';
+    }, 1500);
+    return false;
+  }
+  
+  return true;
 }
 
-function renderSummary() {
-  const pending = reports.filter(r => r.status === 'pending').length;
-  const resolved = reports.filter(r => r.status === 'resolved').length;
-  const userCounts = {};
-  reports.forEach(r => userCounts[r.reportedUser] = (userCounts[r.reportedUser]||0)+1);
-  let most = 'None', max = 0;
-  Object.entries(userCounts).forEach(([u,c]) => { if(c>max){max=c;most=u;} });
+async function loadReports() {
+  const content = document.getElementById('reportsContent');
+  content.innerHTML = '<div class="loading-overlay">Loading reports...</div>';
+  
+  try {
+    // Fetch reports and recent actions
+    const [reportsRes, actionsRes] = await Promise.all([
+      fetch(`${API_BASE}/reports?limit=100`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      }),
+      fetch(`${API_BASE}/reports?limit=10&status=resolved`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+    ]);
+    
+    const reportsData = await reportsRes.json();
+    const actionsData = await actionsRes.json();
+    
+    if (reportsData.success) {
+      allReports = reportsData.reports;
+      recentActions = actionsData.reports || [];
+      
+      renderReportsPage();
+    } else {
+      throw new Error('Failed to load reports');
+    }
+    
+  } catch (error) {
+    console.error('Error loading reports:', error);
+    content.innerHTML = `
+      <div style="text-align: center; padding: 60px; color: var(--text-sec);">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p style="margin-top: 16px;">Failed to load reports. Please refresh the page.</p>
+        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: var(--gold); border: none; border-radius: 8px; color: var(--bg); cursor: pointer;">Retry</button>
+      </div>
+    `;
+  }
+}
 
-  const stats = [
-    { label:'Total Reports Today', value: reports.length, type:'info', icon: icons.alert },
-    { label:'Pending Reports', value: pending, type:'danger', icon: icons.clock },
-    { label:'Resolved Reports', value: resolved, type:'success', icon: icons.check },
-    { label:'Most Reported User', value: most, type:'warning', icon: icons.user },
-  ];
-  document.getElementById('summaryGrid').innerHTML = stats.map(s => `
-    <div class="summary-card">
-      <div class="summary-icon ${s.type}">${s.icon}</div>
-      <div><div class="summary-label">${s.label}</div><div class="summary-value">${s.value}</div></div>
+function renderReportsPage() {
+  const pendingCount = allReports.filter(r => r.status === 'pending').length;
+  const resolvedCount = allReports.filter(r => r.status === 'resolved').length;
+  const dismissedCount = allReports.filter(r => r.status === 'dismissed').length;
+  
+  // Find most reported user
+  const userReportCounts = {};
+  allReports.forEach(r => {
+    const userId = r.reportedUser?._id;
+    if (userId) {
+      userReportCounts[userId] = (userReportCounts[userId] || 0) + 1;
+    }
+  });
+  let mostReportedUser = 'None';
+  let maxReports = 0;
+  for (const [userId, count] of Object.entries(userReportCounts)) {
+    if (count > maxReports) {
+      maxReports = count;
+      const user = allReports.find(r => r.reportedUser?._id === userId)?.reportedUser;
+      mostReportedUser = user?.name || 'Unknown';
+    }
+  }
+  
+  const html = `
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-icon info">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div><div class="summary-label">Total Reports</div><div class="summary-value">${allReports.length}</div></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon danger">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div><div class="summary-label">Pending Reports</div><div class="summary-value">${pendingCount}</div></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon success">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div><div class="summary-label">Resolved</div><div class="summary-value">${resolvedCount}</div></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon warning">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <div><div class="summary-label">Most Reported</div><div class="summary-value">${mostReportedUser}</div></div>
+      </div>
     </div>
-  `).join('');
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <div class="reports-col">
+        <!-- Filters -->
+        <div class="filters">
+          <div class="filter-label">
+            <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span>Filters:</span>
+          </div>
+          <select id="typeFilter" onchange="applyFilters()">
+            <option value="all">All Types</option>
+            <option value="user">User</option>
+            <option value="post">Post</option>
+            <option value="chat">Chat</option>
+            <option value="profile">Profile</option>
+            <option value="voice_room">Voice Room</option>
+          </select>
+          <select id="statusFilter" onchange="applyFilters()">
+            <option value="pending" selected>Pending</option>
+            <option value="all">All Statuses</option>
+            <option value="resolved">Resolved</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+          <input type="date" id="dateFilter" onchange="applyFilters()">
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchFilter" placeholder="Search username or content..." oninput="applyFilters()">
+          </div>
+        </div>
+        <div id="reportsList"></div>
+      </div>
+      <div class="sidebar">
+        <div class="sidebar-card" id="recentActionsList"></div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('reportsContent').innerHTML = html;
+  renderReportsList();
+  renderRecentActions();
 }
 
-function renderReports() {
-  const type = document.getElementById('typeFilter').value;
-  const status = document.getElementById('statusFilter').value;
-  const date = document.getElementById('dateFilter').value;
-  const search = document.getElementById('searchFilter').value.toLowerCase();
-
-  const filtered = reports.filter(r => {
-    if (type !== 'all' && r.type !== type) return false;
+function renderReportsList() {
+  const type = document.getElementById('typeFilter')?.value || 'all';
+  const status = document.getElementById('statusFilter')?.value || 'pending';
+  const date = document.getElementById('dateFilter')?.value || '';
+  const search = document.getElementById('searchFilter')?.value.toLowerCase() || '';
+  
+  let filtered = allReports.filter(r => {
+    if (type !== 'all' && r.reportedItemType !== type) return false;
     if (status !== 'all' && r.status !== status) return false;
-    if (date && !r.time.startsWith(date)) return false;
-    if (search && !r.reportedUser.toLowerCase().includes(search) && !r.reportedContent.toLowerCase().includes(search) && !r.reportedBy.toLowerCase().includes(search)) return false;
+    if (date && !r.createdAt?.startsWith(date)) return false;
+    if (search) {
+      const reporterName = r.reporter?.name?.toLowerCase() || '';
+      const reportedName = r.reportedUser?.name?.toLowerCase() || '';
+      const reason = (r.reason || '').toLowerCase();
+      if (!reporterName.includes(search) && !reportedName.includes(search) && !reason.includes(search)) return false;
+    }
     return true;
   });
-
+  
   const list = document.getElementById('reportsList');
-  if (!filtered.length) {
+  if (!list) return;
+  
+  if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state">No reports found matching your filters.</div>`;
     return;
   }
-  list.innerHTML = filtered.map((r,i) => `
-    <div class="report-card" style="animation-delay:${i*0.07}s" id="card-${r.id}">
+  
+  list.innerHTML = filtered.map((r, i) => `
+    <div class="report-card" style="animation-delay:${i*0.07}s" id="card-${r._id}">
       <div class="report-header">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span class="type-badge ${r.type}">${icons[r.type]}${r.type}</span>
-          <span class="report-time">${icons.clock}${formatDate(r.time)}</span>
+          <span class="type-badge ${r.reportedItemType}">${getReportIcon(r.reportedItemType)}${r.reportedItemType}</span>
+          <span class="report-time">${getClockIcon()}${formatDate(r.createdAt)}</span>
         </div>
         <div class="status-dot"><span class="dot ${r.status}"></span>${r.status}</div>
       </div>
-      <div class="report-content"><p>${r.reportedContent}</p></div>
+      <div class="report-content"><p>${escapeHtml(r.reason || r.category || 'No description')}</p></div>
       <div class="report-tags">
-        <span class="tag reason">Reason: <strong>${r.reason}</strong></span>
-        ${r.historyCount > 0 ? `<span class="tag history">Prior Reports: ${r.historyCount}</span>` : ''}
+        <span class="tag reason">Category: <strong>${r.category || 'other'}</strong></span>
+        ${r.priority === 'high' || r.priority === 'urgent' ? `<span class="tag history">Priority: ${r.priority}</span>` : ''}
       </div>
       <div class="report-meta">
-        <span>Reported by: <span class="reporter">${r.reportedBy}</span></span>
-        <span>Target: <span class="target">${r.reportedUser}</span></span>
+        <span>Reported by: <span class="reporter">${escapeHtml(r.reporter?.name || 'Anonymous')}</span></span>
+        <span>Target: <span class="target">${escapeHtml(r.reportedUser?.name || 'Unknown')}</span></span>
       </div>
       <div class="report-actions">
-        <button class="btn btn-details" onclick="openDetails('${r.id}')">${icons.eye}Details</button>
-        <button class="btn btn-ignore" onclick="ignoreReport('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${icons.x}Ignore</button>
-        <button class="btn btn-action" onclick="openAction('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${icons.alert}Action</button>
+        <button class="btn btn-details" onclick="openDetails('${r._id}')">${getEyeIcon()}Details</button>
+        <button class="btn btn-ignore" onclick="ignoreReport('${r._id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${getXIcon()}Ignore</button>
+        <button class="btn btn-action" onclick="openAction('${r._id}')" ${r.status !== 'pending' ? 'disabled' : ''}>${getAlertIcon()}Action</button>
       </div>
     </div>
   `).join('');
@@ -512,146 +545,358 @@ function renderReports() {
 
 function renderRecentActions() {
   const el = document.getElementById('recentActionsList');
-  el.innerHTML = `<div class="sidebar-title">${icons.shield}Recent Actions</div>` +
-    recentActions.map(a => `
-      <div class="action-item">
-        <div class="action-icon-wrap"><div class="action-icon ${a.type}">${icons[a.type]||icons.warning}</div></div>
-        <div class="action-desc">${a.action}</div>
-        <div class="action-target">Target: <span>${a.target}</span></div>
-        <div class="action-footer"><span>By ${a.admin}</span><span>${a.time}</span></div>
-      </div>
-    `).join('');
+  if (!el) return;
+  
+  const actions = recentActions.slice(0, 5);
+  el.innerHTML = `
+    <div class="sidebar-title">${getShieldIcon()}Recent Actions</div>
+    ${actions.length === 0 ? '<div style="color: var(--gold); text-align: center;">No recent actions</div>' : 
+      actions.map(a => `
+        <div class="action-item">
+          <div class="action-icon-wrap"><div class="action-icon ${a.status === 'resolved' ? 'delete' : 'ignore'}">${a.status === 'resolved' ? getDeleteIcon() : getIgnoreIcon()}</div></div>
+          <div class="action-desc">${a.status === 'resolved' ? 'Resolved report' : a.status === 'dismissed' ? 'Dismissed report' : 'Reviewed report'}</div>
+          <div class="action-target">Target: <span>${escapeHtml(a.reportedUser?.name || 'Unknown')}</span></div>
+          <div class="action-footer"><span>By ${escapeHtml(a.resolvedBy?.name || 'Admin')}</span><span>${formatDate(a.resolvedAt || a.createdAt)}</span></div>
+        </div>
+      `).join('')
+    }
+  `;
 }
 
-function applyFilters() { renderReports(); }
+function applyFilters() {
+  renderReportsList();
+}
 
-// ── Details Modal ─────────────────────────────────────────────────────────────
-function openDetails(id) {
-  const r = reports.find(x => x.id === id);
-  if (!r) return;
-  const histItems = Array.from({length: Math.min(r.historyCount, 3)}, (_,i) =>
-    `<div class="history-item">${icons.alert}<span>Reported for ${['spam','harassment','abuse'][i%3]}</span><span class="hist-time">${i+1} weeks ago</span></div>`
-  ).join('');
-  document.getElementById('detailsBody').innerHTML = `
-    <div class="user-profile-snippet">
-      <div class="user-avatar">${icons.user}</div>
-      <div>
-        <div class="user-profile-name">${r.reportedUser}</div>
-        <div class="user-profile-meta">
-          <span style="display:flex;align-items:center;gap:3px">${icons.clock}Joined 2022</span>
-          <span class="danger-text">${icons.alert}${r.historyCount} Prior Reports</span>
+function formatDate(dateStr) {
+  if (!dateStr) return 'Unknown';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(dateStr));
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// Icons
+function getReportIcon(type) {
+  const icons = {
+    user: `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    post: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    profile: `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    voice_room: `<svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+  };
+  return icons[type] || icons.user;
+}
+
+function getClockIcon() {
+  return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+}
+
+function getEyeIcon() {
+  return `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+}
+
+function getXIcon() {
+  return `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+}
+
+function getAlertIcon() {
+  return `<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+}
+
+function getShieldIcon() {
+  return `<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+}
+
+function getDeleteIcon() {
+  return `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+}
+
+function getIgnoreIcon() {
+  return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+}
+
+// Report actions
+async function openDetails(reportId) {
+  try {
+    const response = await fetch(`${API_BASE}/reports/${reportId}`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await response.json();
+    if (data.success) showReportModal(data.report);
+  } catch (error) {
+    console.error('Error fetching report:', error);
+    showToast('Could not load report details', 'warning');
+  }
+}
+
+function showReportModal(report) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2><svg class="hicon" viewBox="0 0 24 24" style="stroke:#4A90D9"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Report Details</h2>
+        <button class="btn-close" onclick="closeModal(this)"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="user-profile-snippet">
+          <div class="user-avatar">${getReportIcon('user')}</div>
+          <div>
+            <div class="user-profile-name">${escapeHtml(report.reportedUser?.name || 'Unknown')}</div>
+            <div class="user-profile-meta">
+              <span>${getClockIcon()}Reported: ${formatDate(report.createdAt)}</span>
+              <span class="danger-text">${getAlertIcon()}${report.priority || 'medium'} priority</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-label">Reported Content (${report.reportedItemType})</div>
+        <div class="content-box">${escapeHtml(report.reason || report.category || 'No content')}</div>
+        <div class="meta-grid">
+          <div class="meta-item"><div class="key">Reported By</div><div class="val info">${escapeHtml(report.reporter?.name || 'Anonymous')}</div></div>
+          <div class="meta-item"><div class="key">Category</div><div class="val cream">${report.category || 'other'}</div></div>
+          <div class="meta-item"><div class="key">Status</div><div class="val cream">${report.status}</div></div>
+          <div class="meta-item"><div class="key">Description</div><div class="val cream">${escapeHtml(report.description || 'No description')}</div></div>
         </div>
       </div>
-      <button class="profile-action-btn" onclick="void(0)">View Full Profile</button>
-    </div>
-    <div class="section-label">Reported Content (${r.type})</div>
-    <div class="content-box">${r.reportedContent}</div>
-    <div class="meta-grid">
-      <div class="meta-item"><div class="key">Reported By</div><div class="val info">${r.reportedBy}</div></div>
-      <div class="meta-item"><div class="key">Reason</div><div class="val cream" style="text-transform:capitalize">${r.reason}</div></div>
-      <div class="meta-item"><div class="key">Time</div><div class="val cream">${new Date(r.time).toLocaleString()}</div></div>
-      <div class="meta-item"><div class="key">Status</div><div class="val cream" style="text-transform:capitalize">${r.status}</div></div>
-    </div>
-    ${r.historyCount > 0 ? `<div class="section-label">Recent History</div>${histItems}` : ''}
-  `;
-  document.getElementById('detailsModal').classList.add('open');
-}
-
-// ── Action Modal ──────────────────────────────────────────────────────────────
-function openAction(id) {
-  activeReport = reports.find(x => x.id === id);
-  if (!activeReport) return;
-  pendingAction = null;
-  document.getElementById('actionTargetName').textContent = activeReport.reportedUser;
-  renderActionOptions();
-  document.getElementById('actionModal').classList.add('open');
-}
-
-function renderActionOptions() {
-  const opts = [
-    { id:'warning', cls:'warning-opt', iconCls:'warning-icon', icon:icons.warning, title:'Send Warning', desc:'Send an official warning message to the user.' },
-    { id:'delete', cls:'delete-opt', iconCls:'delete-icon', icon:icons.delete, title:'Delete Content', desc:'Remove the reported content immediately.' },
-    { id:'suspend', cls:'suspend-opt', iconCls:'suspend-icon', icon:icons.suspend, title:'Suspend User', desc:'Temporarily disable the user account for 7 days.' },
-    { id:'ban', cls:'ban-opt', iconCls:'ban-icon', icon:icons.ban, title:'Ban User', desc:'Permanently ban the user from the platform.' },
-  ];
-  const header = document.getElementById('actionHeader');
-  header.querySelector('h2').innerHTML = `<svg class="hicon" viewBox="0 0 24 24" style="stroke:#A33030"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Take Action: <span style="color:var(--gold);margin-left:6px">${activeReport.reportedUser}</span>`;
-
-  document.getElementById('actionBody').innerHTML = `
-    <p style="font-size:0.82rem;color:var(--gold);margin-bottom:16px">Select an administrative action to resolve this report.</p>
-    <div class="action-options">
-      ${opts.map(o => `
-        <button class="action-option ${o.cls}" onclick="selectAction('${o.id}')">
-          <div class="action-opt-icon ${o.iconCls}">${o.icon}</div>
-          <div><div class="action-opt-title">${o.title}</div><div class="action-opt-desc">${o.desc}</div></div>
-        </button>
-      `).join('')}
-    </div>
-  `;
-}
-
-function selectAction(action) {
-  pendingAction = action;
-  const label = {warning:'Warning',delete:'Delete Content',suspend:'Suspend',ban:'Ban'}[action];
-  const header = document.getElementById('actionHeader');
-  header.querySelector('h2').innerHTML = `<button class="back-btn" onclick="renderActionOptions()"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="15 18 9 12 15 6"/></svg></button>Take Action: <span style="color:var(--gold);margin-left:6px">${activeReport.reportedUser}</span>`;
-  document.getElementById('actionBody').innerHTML = `
-    <div class="confirm-view">
-      <div class="confirm-icon">${icons.alert}</div>
-      <div class="confirm-title">Are you absolutely sure?</div>
-      <p class="confirm-text">You are about to <strong style="text-transform:uppercase">${action}</strong> the user <span class="danger-name">${activeReport.reportedUser}</span>. This action will be logged and the report will be marked as resolved.</p>
-      <div class="confirm-btns">
-        <button class="btn-cancel" onclick="renderActionOptions()">Cancel</button>
-        <button class="btn-confirm" onclick="executeAction()">Confirm Action</button>
+      <div class="modal-footer">
+        <button class="btn btn-details" style="padding:10px 20px;font-size:0.85rem" onclick="closeModal(this)">Close Details</button>
       </div>
     </div>
   `;
+  document.body.appendChild(modal);
+  modal.classList.add('open');
+  
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 }
 
-function executeAction() {
-  if (!activeReport || !pendingAction) return;
-  const r = reports.find(x => x.id === activeReport.id);
-  if (r) r.status = 'resolved';
-  const descMap = { warning:'Issued warning', delete:'Deleted content', suspend:'Suspended account (7 days)', ban:'Banned user permanently' };
-  recentActions.unshift({ id:'ACT-'+Date.now(), action: descMap[pendingAction], target: activeReport.reportedUser, admin:'Current_Admin', time:'Just now', type: pendingAction });
-  closeModal('actionModal');
-  renderSummary();
-  renderReports();
-  renderRecentActions();
-  showToast(`Action taken: ${descMap[pendingAction]} for ${activeReport.reportedUser}`);
+async function ignoreReport(reportId) {
+  const reason = prompt('Enter reason for ignoring this report:', 'Report dismissed as invalid');
+  if (!reason) return;
+  
+  try {
+    const response = await fetch(`${API_BASE}/reports/${reportId}/dismiss`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reason })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      showToast(`Report dismissed`, 'success');
+      await loadReports();
+    } else {
+      showToast(data.message || 'Failed to dismiss report', 'error');
+    }
+  } catch (error) {
+    console.error('Error dismissing report:', error);
+    showToast('Failed to dismiss report', 'error');
+  }
 }
 
-function ignoreReport(id) {
-  const r = reports.find(x => x.id === id);
-  if (!r || r.status !== 'pending') return;
-  r.status = 'ignored';
-  recentActions.unshift({ id:'ACT-'+Date.now(), action:'Ignored report', target: r.reportedUser, admin:'Current_Admin', time:'Just now', type:'ignore' });
-  renderSummary();
-  renderReports();
-  renderRecentActions();
-  showToast(`Report for ${r.reportedUser} has been ignored.`);
+async function openAction(reportId) {
+  const report = allReports.find(r => r._id === reportId);
+  if (!report) return;
+  
+  const action = prompt(
+    `Take action for report against ${report.reportedUser?.name || 'Unknown'}:\n\n` +
+    `Options:\n` +
+    `1 - Send Warning\n` +
+    `2 - Delete Content\n` +
+    `3 - Suspend User (7 days)\n` +
+    `4 - Ban User\n\n` +
+    `Enter number (1-4):`
+  );
+  
+  if (!action) return;
+  
+  let actionType = '';
+  let duration = '';
+  let reason = '';
+  
+  switch(action) {
+    case '1':
+      actionType = 'warn';
+      reason = prompt('Enter warning reason:', 'Violation of community guidelines');
+      if (!reason) return;
+      await warnUser(report.reportedUser?._id, reason);
+      break;
+    case '2':
+      actionType = 'delete';
+      reason = prompt('Enter reason for deletion:', 'Inappropriate content');
+      if (!reason) return;
+      await deleteContent(reportId, reason);
+      break;
+    case '3':
+      actionType = 'suspend';
+      duration = prompt('Enter suspension duration in days (default: 7):', '7');
+      if (!duration) return;
+      reason = prompt('Enter suspension reason:', 'Violation of community guidelines');
+      if (!reason) return;
+      await suspendUser(report.reportedUser?._id, reason, parseInt(duration));
+      break;
+    case '4':
+      actionType = 'ban';
+      reason = prompt('Enter ban reason:', 'Violation of terms of service');
+      if (!reason) return;
+      await banUser(report.reportedUser?._id, reason);
+      break;
+    default:
+      showToast('Invalid option', 'warning');
+      return;
+  }
+  
+  // Resolve the report after action
+  await resolveReport(reportId);
 }
 
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+async function warnUser(userId, reason) {
+  if (!userId) return;
+  try {
+    const response = await fetch(`${API_BASE}/users/${userId}/warn`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reason })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`Warning sent to user`, 'success');
+    } else {
+      showToast(data.message || 'Failed to warn user', 'error');
+    }
+  } catch (error) {
+    console.error('Error warning user:', error);
+    showToast('Failed to warn user', 'error');
+  }
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 3000);
+async function suspendUser(userId, reason, duration) {
+  if (!userId) return;
+  try {
+    const response = await fetch(`${API_BASE}/users/${userId}/suspend`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reason, durationDays: duration })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`User suspended for ${duration} days`, 'success');
+    } else {
+      showToast(data.message || 'Failed to suspend user', 'error');
+    }
+  } catch (error) {
+    console.error('Error suspending user:', error);
+    showToast('Failed to suspend user', 'error');
+  }
 }
 
-// Close on overlay click
-document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
-});
+async function banUser(userId, reason) {
+  if (!userId) return;
+  try {
+    const response = await fetch(`${API_BASE}/users/${userId}/ban`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reason })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`User banned`, 'success');
+    } else {
+      showToast(data.message || 'Failed to ban user', 'error');
+    }
+  } catch (error) {
+    console.error('Error banning user:', error);
+    showToast('Failed to ban user', 'error');
+  }
+}
 
-// Init
-renderSummary();
-renderReports();
-renderRecentActions();
+async function deleteContent(reportId, reason) {
+  try {
+    const response = await fetch(`${API_BASE}/reports/${reportId}/resolve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resolution: reason, resolutionNotes: 'Content deleted by admin' })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`Content deleted`, 'success');
+    } else {
+      showToast(data.message || 'Failed to delete content', 'error');
+    }
+  } catch (error) {
+    console.error('Error deleting content:', error);
+    showToast('Failed to delete content', 'error');
+  }
+}
+
+async function resolveReport(reportId) {
+  try {
+    const response = await fetch(`${API_BASE}/reports/${reportId}/resolve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resolution: 'Report resolved by admin action' })
+    });
+    const data = await response.json();
+    if (data.success) {
+      await loadReports();
+    }
+  } catch (error) {
+    console.error('Error resolving report:', error);
+  }
+}
+
+function closeModal(element) {
+  const modal = element.closest('.modal-overlay');
+  if (modal) modal.remove();
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+// Initialize
+(async function init() {
+  if (await checkAuth()) {
+    await loadReports();
+  }
+})();
+
+window.closeModal = closeModal;
+window.openDetails = openDetails;
+window.ignoreReport = ignoreReport;
+window.openAction = openAction;
+window.applyFilters = applyFilters;
+window.goBack = goBack;
 </script>
+
+<div class="toast" id="toast"></div>
 </body>
 </html>
