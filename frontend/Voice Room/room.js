@@ -1,4 +1,3 @@
-/* ===== VOICE ROOM - COMPLETE REAL IMPLEMENTATION ===== */
 const API_BASE = 'http://localhost:5002/api';
 let socket;
 let roomId;
@@ -28,7 +27,6 @@ function loadSocketIO() {
     script.onerror = () => {
       console.error('Failed to load Socket.IO');
       showToast('Failed to load real-time features', 'error');
-      // Resolve anyway to continue with offline mode
       resolve();
     };
     document.head.appendChild(script);
@@ -49,29 +47,162 @@ function loadSimplePeer() {
     script.onerror = () => {
       console.error('Failed to load SimplePeer');
       showToast('Voice chat features limited', 'warning');
-      // Resolve anyway to continue with offline mode
       resolve();
     };
     document.head.appendChild(script);
   });
 }
 
+/* ===== END ROOM FUNCTIONS ===== */
+
+// Check if current user is host
+function isCurrentUserHost() {
+  return roomData && roomData.hostId === currentUser.id;
+}
+
+// Add end room button to UI
+function addHostControls() {
+  const controlsContainer = document.getElementById('room-controls');
+  if (!controlsContainer) return;
+  
+  // Remove existing end room button if present
+  const existingEndBtn = document.getElementById('ctrl-end-room');
+  if (existingEndBtn) existingEndBtn.remove();
+  
+  if (isCurrentUserHost()) {
+    const endRoomBtn = document.createElement('button');
+    endRoomBtn.id = 'ctrl-end-room';
+    endRoomBtn.className = 'ctrl-btn ctrl-end-room';
+    endRoomBtn.setAttribute('aria-label', 'End Room');
+    endRoomBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    `;
+    endRoomBtn.addEventListener('click', confirmEndRoom);
+    
+    // Insert before leave button
+    const leaveBtn = document.getElementById('ctrl-leave');
+    if (leaveBtn) {
+      controlsContainer.insertBefore(endRoomBtn, leaveBtn);
+    } else {
+      controlsContainer.appendChild(endRoomBtn);
+    }
+  }
+}
+
+// Confirm end room with dialog
+function confirmEndRoom() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+  `;
+  
+  modal.innerHTML = `
+    <div style="background: var(--bg-secondary); border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+      <h3 style="margin-bottom: 12px; color: var(--text-primary);">End Room</h3>
+      <p style="margin-bottom: 20px; color: var(--text-muted);">Are you sure you want to end this room? All participants will be disconnected.</p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button id="cancel-end" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); cursor: pointer;">Cancel</button>
+        <button id="confirm-end" style="padding: 8px 16px; background: var(--live-red); border: none; border-radius: 6px; color: white; cursor: pointer;">End Room</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  const cancelBtn = modal.querySelector('#cancel-end');
+  const confirmBtn = modal.querySelector('#confirm-end');
+  
+  cancelBtn.addEventListener('click', () => modal.remove());
+  confirmBtn.addEventListener('click', async () => {
+    modal.remove();
+    await endRoom();
+  });
+}
+
+// API call to end room
+async function endRoom() {
+  try {
+    const token = localStorage.getItem('authToken');
+    showToast('Ending room...', 'info');
+    
+    const response = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}/end`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showToast('Room ended successfully', 'success');
+      
+      // Clean up and redirect
+      cleanupWebRTC();
+      
+      if (socket && socket.connected) {
+        socket.emit('leave-voice-room', {
+          roomId,
+          userId: currentUser.id
+        });
+      }
+      
+      setTimeout(() => {
+        window.location.href = 'voice-rooms.html';
+      }, 1500);
+    } else {
+      showToast(data.message || 'Failed to end room', 'error');
+    }
+  } catch (error) {
+    console.error('Error ending room:', error);
+    showToast('Failed to end room', 'error');
+  }
+}
+
 /* ===== INITIALIZATION ===== */
 async function init() {
   console.log('🎙 Initializing Voice Room...');
   
-  // Get room ID from URL
   const params = new URLSearchParams(window.location.search);
   roomId = params.get('id');
   
-  if (!roomId) {
-    console.error('❌ No room ID provided');
-    showToast('Invalid room', 'error');
-    setTimeout(() => window.location.href = 'voice-rooms.html', 2000);
+  console.log('📌 Room ID from URL:', roomId);
+  
+  if (!roomId || roomId === 'undefined' || roomId === 'null') {
+    console.error('❌ No valid room ID provided');
+    showToast('Invalid room - no room ID found', 'error');
+    const stageContent = document.getElementById('stage-content');
+    if (stageContent) {
+      stageContent.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px;">
+          <svg viewBox="0 0 24 24" width="64" height="64" stroke="currentColor" fill="none" style="margin-bottom: 20px; opacity: 0.5;">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <h3 style="margin-bottom: 10px;">Invalid Room</h3>
+          <p style="color: var(--text-muted); margin-bottom: 20px;">The room ID is missing or invalid.</p>
+          <button onclick="window.location.href='voice-rooms.html'" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: var(--bg-primary); cursor: pointer;">Return to Lobby</button>
+        </div>
+      `;
+    }
+    setTimeout(() => window.location.href = 'voice-rooms.html', 3000);
     return;
   }
   
-  // Get current user
   const token = localStorage.getItem('authToken');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   
@@ -83,28 +214,21 @@ async function init() {
   
   currentUser = user;
   
-  // Update UI with user info
   updateUserUI();
   
-  // Load required libraries
   await loadSocketIO();
   await loadSimplePeer();
   
-  // Load room details
   await loadRoomDetails();
   
-  // Connect to WebSocket and join room
   connectToRoom(token);
   
-  // Setup event listeners
   setupEventListeners();
   
-  // Render chat reactions
   renderChatReactions();
 }
 
 function updateUserUI() {
-  // Update avatar in header if exists
   const participantCard = document.querySelector(`[data-user-id="${currentUser.id}"]`);
   if (participantCard) {
     const avatar = participantCard.querySelector('.pc-avatar');
@@ -140,7 +264,6 @@ async function loadRoomDetails() {
     console.error('Error loading room details:', error);
     showToast('Using demo mode', 'info');
     
-    // Use demo data as fallback
     roomData = {
       id: roomId,
       name: 'Fantasy World Debate',
@@ -156,42 +279,44 @@ async function loadRoomDetails() {
 }
 
 function updateRoomUI(room) {
-  // Update header
   document.getElementById('hdr-name').textContent = room.name || 'Voice Room';
   document.getElementById('hdr-genre').textContent = room.genre || 'Discussion';
   document.getElementById('hdr-count').textContent = (room.participantCount || participants.length) + ' participants';
   document.title = `Litlink — ${room.name || 'Voice Room'}`;
   
-  // Check if current user is host
   const isHost = room.hostId === currentUser.id;
   if (isHost) {
     console.log('👑 You are the host');
+    setTimeout(() => addHostControls(), 500);
   }
 }
 
 /* ===== WEBSOCKET CONNECTION ===== */
 function connectToRoom(token) {
   try {
-    // Check if io is defined
     if (typeof io === 'undefined') {
       console.log('Socket.IO not available, using offline mode');
       showToast('Using offline mode', 'warning');
       return;
     }
     
-    socket = io('http://localhost:5002', {
+    const socketUrl = window.location.hostname === '127.0.0.1' 
+      ? 'http://127.0.0.1:5002' 
+      : 'http://localhost:5002';
+    
+    socket = io(socketUrl, {
       path: '/socket.io',
       transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      withCredentials: true
     });
 
     socket.on('connect', () => {
       console.log('✅ Connected to voice server');
       showToast('Connected to voice server', 'success');
-      
-      // Authenticate
       socket.emit('authenticate', token);
     });
 
@@ -204,7 +329,6 @@ function connectToRoom(token) {
       if (data.success) {
         console.log('🔐 Authentication successful');
         
-        // Join room after authentication
         setTimeout(() => {
           socket.emit('join-voice-room', {
             roomId,
@@ -217,14 +341,25 @@ function connectToRoom(token) {
       }
     });
 
-    // Room events
     socket.on('room-joined', (data) => {
       console.log('✅ Joined room:', data.roomName);
       participants = data.participants || [];
+      
+      if (roomData) {
+        roomData.hostId = data.hostId;
+      } else {
+        roomData = {
+          id: roomId,
+          name: data.roomName,
+          hostId: data.hostId
+        };
+      }
+      
       renderParticipants();
       showToast(`Joined ${data.roomName}`, 'success');
       
-      // Initialize WebRTC with existing participants
+      addHostControls();
+      
       if (typeof SimplePeer !== 'undefined') {
         initWebRTC(participants);
       } else {
@@ -236,10 +371,8 @@ function connectToRoom(token) {
       console.log('👤 User joined:', data.userName);
       participants = data.participants || participants;
       
-      // Add new participant to UI
       addParticipantToUI(data);
       
-      // Create peer connection for new user
       if (data.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
         createPeerConnection(data.userId, true);
       }
@@ -250,13 +383,9 @@ function connectToRoom(token) {
     socket.on('user-left', (data) => {
       console.log('👋 User left:', data.userId);
       
-      // Remove from UI
       removeParticipantFromUI(data.userId);
-      
-      // Update participants list
       participants = participants.filter(p => p.userId !== data.userId);
       
-      // Close peer connection
       if (peerConnections[data.userId]) {
         try {
           peerConnections[data.userId].destroy();
@@ -264,11 +393,9 @@ function connectToRoom(token) {
         delete peerConnections[data.userId];
       }
       
-      // Update participant count
       document.getElementById('hdr-count').textContent = participants.length + ' participants';
     });
 
-    // Audio events
     socket.on('user-muted', (data) => {
       updateParticipantMute(data.userId, data.isMuted);
     });
@@ -281,19 +408,14 @@ function connectToRoom(token) {
       updateParticipantSpeaking(data.userId, data.isSpeaking);
     });
 
-    // Chat events
     socket.on('new-message', (data) => {
       addChatMessage(data);
     });
 
-    // Room status events
     socket.on('room-ended', (data) => {
       console.log('📢 Room ended:', data.message);
       showToast(data.message || 'Room has ended', 'warning');
-      
-      // Clean up
       cleanupWebRTC();
-      
       setTimeout(() => {
         window.location.href = 'voice-rooms.html';
       }, 3000);
@@ -302,9 +424,7 @@ function connectToRoom(token) {
     socket.on('server-shutdown', (data) => {
       console.log('🔌 Server shutdown:', data.message);
       showToast(data.message || 'Server is shutting down', 'warning');
-      
       cleanupWebRTC();
-      
       setTimeout(() => {
         window.location.href = 'voice-rooms.html';
       }, 3000);
@@ -318,8 +438,6 @@ function connectToRoom(token) {
     socket.on('reconnect', () => {
       console.log('✅ Reconnected to server');
       showToast('Reconnected to server', 'success');
-      
-      // Rejoin room
       socket.emit('join-voice-room', {
         roomId,
         userId: currentUser.id,
@@ -327,7 +445,6 @@ function connectToRoom(token) {
       });
     });
 
-    // WebRTC signaling
     socket.on('signal', async (data) => {
       const { from, signal } = data;
       
@@ -341,6 +458,11 @@ function connectToRoom(token) {
         }
       } catch (error) {
         console.error('Error handling signal:', error);
+        
+        if (error.message && error.message.includes('Invalid signaling data')) {
+          console.log('Retrying with new connection for:', from);
+          await recreatePeerConnection(from);
+        }
       }
     });
 
@@ -353,7 +475,6 @@ function connectToRoom(token) {
 /* ===== WEBRTC IMPLEMENTATION ===== */
 async function initWebRTC(existingParticipants) {
   try {
-    // Request microphone permission
     localStream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: true,
@@ -363,14 +484,9 @@ async function initWebRTC(existingParticipants) {
     });
     
     console.log('✅ Microphone access granted');
-    
-    // Store local stream globally
     window.localStream = localStream;
-    
-    // Initialize audio analysis for speaking detection
     initAudioAnalysis();
     
-    // Create peer connections for each existing participant
     for (const participant of existingParticipants) {
       if (participant.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
         await createPeerConnection(participant.userId, true);
@@ -380,8 +496,6 @@ async function initWebRTC(existingParticipants) {
   } catch (error) {
     console.error('Error accessing microphone:', error);
     showToast('Please allow microphone access to join voice chat', 'error');
-    
-    // Still allow joining but without audio
     document.getElementById('ctrl-mic').disabled = true;
   }
 }
@@ -389,7 +503,6 @@ async function initWebRTC(existingParticipants) {
 async function createPeerConnection(targetUserId, isInitiator = false) {
   return new Promise((resolve, reject) => {
     try {
-      // Check if SimplePeer is available
       if (typeof SimplePeer === 'undefined') {
         console.error('SimplePeer not loaded');
         return reject('SimplePeer not available');
@@ -398,15 +511,31 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
       const peer = new SimplePeer({
         initiator: isInitiator,
         stream: localStream,
-        trickle: false,
+        trickle: true,
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
-          ]
+            { urls: 'stun:stun4.l.google.com:19302' },
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
+          ],
+          iceCandidatePoolSize: 10
         }
       });
 
@@ -414,7 +543,8 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
         if (socket && socket.connected) {
           socket.emit('signal', {
             to: targetUserId,
-            signal
+            signal,
+            roomId: roomId
           });
         }
       });
@@ -422,22 +552,34 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
       peer.on('stream', (stream) => {
         console.log('📡 Received stream from user:', targetUserId);
         
-        // Create audio element for remote stream
-        const audio = document.createElement('audio');
+        let audio = document.getElementById(`audio-${targetUserId}`);
+        if (!audio) {
+          audio = document.createElement('audio');
+          audio.id = `audio-${targetUserId}`;
+          audio.autoplay = true;
+          audio.style.display = 'none';
+          document.body.appendChild(audio);
+        }
         audio.srcObject = stream;
-        audio.autoplay = true;
-        audio.id = `audio-${targetUserId}`;
         
-        // Remove existing if any
-        const existing = document.getElementById(`audio-${targetUserId}`);
-        if (existing) existing.remove();
-        
-        document.body.appendChild(audio);
-        audio.play().catch(e => console.log('Audio play failed:', e));
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            console.log('Audio play failed, waiting for user interaction:', e);
+            document.addEventListener('click', function enableAudio() {
+              audio.play().catch(console.log);
+              document.removeEventListener('click', enableAudio);
+            }, { once: true });
+          });
+        }
       });
 
       peer.on('error', (err) => {
         console.error('Peer connection error:', err);
+        if (err.code === 'ERR_WEBRTC_SUPPORT' || err.message.includes('ICE')) {
+          console.log('Attempting to reconnect...');
+          setTimeout(() => recreatePeerConnection(targetUserId), 1000);
+        }
       });
 
       peer.on('close', () => {
@@ -456,6 +598,20 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
   });
 }
 
+async function recreatePeerConnection(targetUserId) {
+  if (peerConnections[targetUserId]) {
+    try {
+      peerConnections[targetUserId].destroy();
+    } catch (e) {}
+    delete peerConnections[targetUserId];
+  }
+  
+  const audio = document.getElementById(`audio-${targetUserId}`);
+  if (audio) audio.remove();
+  
+  await createPeerConnection(targetUserId, true);
+}
+
 function initAudioAnalysis() {
   if (!localStream) return;
   
@@ -469,7 +625,6 @@ function initAudioAnalysis() {
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Check speaking status every 100ms
     speakingInterval = setInterval(() => {
       if (!analyser) return;
       
@@ -479,9 +634,8 @@ function initAudioAnalysis() {
         sum += dataArray[i];
       }
       const average = sum / bufferLength;
-      const isCurrentlySpeaking = average > 20; // Threshold
+      const isCurrentlySpeaking = average > 20;
       
-      // Emit speaking status if changed
       if (window.lastSpeakingStatus !== isCurrentlySpeaking) {
         window.lastSpeakingStatus = isCurrentlySpeaking;
         if (socket && socket.connected) {
@@ -492,7 +646,6 @@ function initAudioAnalysis() {
           });
         }
         
-        // Update own UI
         updateOwnSpeaking(isCurrentlySpeaking);
       }
     }, 100);
@@ -511,7 +664,6 @@ function renderParticipants() {
   const featured = participants.find(p => p.featured) || participants[0] || { userId: 'host', name: 'Host', initials: 'H' };
   const gridPeople = participants.filter(p => !p.featured && p.userId !== currentUser.id);
   
-  // Add current user to grid if not host/featured
   const currentUserParticipant = {
     userId: currentUser.id,
     name: currentUser.name + (currentUser.id === roomData?.hostId ? ' (Host)' : ' (You)'),
@@ -527,7 +679,6 @@ function renderParticipants() {
   if (!stageContent) return;
   
   stageContent.innerHTML = `
-    <!-- Featured Speaker -->
     <div class="featured-speaker">
       <div class="featured-ring-wrap">
         <div class="featured-ring ${featured.isSpeaking ? 'speaking' : ''}"></div>
@@ -537,9 +688,7 @@ function renderParticipants() {
       <div class="featured-status">${featured.isSpeaking ? 'Speaking' : 'Listening'}</div>
     </div>
 
-    <!-- Grid -->
     <div class="participants-grid">
-      <!-- Current User -->
       <div class="participant-card" data-user-id="${currentUser.id}">
         <div class="pc-avatar-wrap">
           <div class="pc-avatar ${currentUserParticipant.isSpeaking ? 'speaking' : ''}" style="background:${currentUserParticipant.color}">
@@ -574,7 +723,6 @@ function renderParticipants() {
     </div>
   `;
   
-  // Also render sidebar
   renderSidebar();
 }
 
@@ -586,13 +734,11 @@ function renderSidebar() {
   if (!sidebarBody) return;
   
   sidebarBody.innerHTML = `
-    <!-- About -->
     <div class="rsb-section">
       <div class="rsb-label">About</div>
       <p class="rsb-about">Welcome to <strong>${escapeHtml(roomData?.name || 'this room')}</strong>. A place to discuss all things <strong>${escapeHtml(roomData?.genre || 'literature')}</strong>. Be respectful and wait your turn to speak.</p>
     </div>
 
-    <!-- Host -->
     <div class="rsb-section">
       <div class="rsb-label">Host</div>
       <div class="rsb-host-row">
@@ -606,11 +752,9 @@ function renderSidebar() {
       </div>
     </div>
 
-    <!-- Participants -->
     <div class="rsb-section">
       <div class="rsb-label">Participants ( <span style="color:var(--sidebar-text)">${participants.length + 1}</span> )</div>
       <div class="rsb-p-list">
-        <!-- Current user -->
         <div class="rsb-p-row">
           <div class="rsb-p-av ${window.lastSpeakingStatus ? 'speaking' : ''}">${getInitials(currentUser.name)}</div>
           <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${currentUser.id === roomData?.hostId ? '(Host)' : '(You)'}</span>
@@ -643,11 +787,9 @@ function renderChatReactions() {
 
 /* ===== PARTICIPANT UI UPDATES ===== */
 function addParticipantToUI(data) {
-  // Check if participant already exists
   const exists = document.querySelector(`[data-user-id="${data.userId}"]`);
   if (exists) return;
   
-  // Add to participants array
   participants.push({
     userId: data.userId,
     name: data.userName,
@@ -657,10 +799,7 @@ function addParticipantToUI(data) {
     color: getRandomColor()
   });
   
-  // Re-render all participants
   renderParticipants();
-  
-  // Update count
   document.getElementById('hdr-count').textContent = participants.length + 1 + ' participants';
 }
 
@@ -680,7 +819,6 @@ function updateParticipantMute(userId, isMuted) {
   if (participant) {
     participant.isMuted = isMuted;
     
-    // Update UI
     const card = document.querySelector(`[data-user-id="${userId}"] .pc-mic`);
     if (card) {
       card.className = `pc-mic ${isMuted ? 'muted' : 'active'}`;
@@ -699,10 +837,8 @@ function updateParticipantHand(userId, raised) {
   if (participant) {
     participant.handRaised = raised;
     
-    // Update UI
     const card = document.querySelector(`[data-user-id="${userId}"] .pc-hand`);
     if (raised && !card) {
-      // Add hand icon
       const wrap = document.querySelector(`[data-user-id="${userId}"] .pc-avatar-wrap`);
       if (wrap) {
         const handDiv = document.createElement('div');
@@ -714,7 +850,6 @@ function updateParticipantHand(userId, raised) {
       card.remove();
     }
     
-    // Update sidebar
     renderSidebar();
   }
 }
@@ -724,23 +859,17 @@ function updateParticipantSpeaking(userId, isSpeaking) {
   if (participant) {
     participant.isSpeaking = isSpeaking;
     
-    // Update avatar ring
     const avatar = document.querySelector(`[data-user-id="${userId}"] .pc-avatar`);
     if (avatar) {
       avatar.classList.toggle('speaking', isSpeaking);
     }
     
-    // Update status
     const status = document.querySelector(`[data-user-id="${userId}"] .pc-status`);
     if (status) {
       status.textContent = isSpeaking ? 'Speaking' : (participant.isMuted ? 'Muted' : 'Listening');
     }
     
-    // Update sidebar
-    const sidebarAvatar = document.querySelector(`.rsb-p-row:has([data-user-id="${userId}"]) .rsb-p-av`);
-    if (sidebarAvatar) {
-      sidebarAvatar.classList.toggle('speaking', isSpeaking);
-    }
+    renderSidebar();
   }
 }
 
@@ -755,7 +884,6 @@ function updateOwnSpeaking(isSpeaking) {
     status.textContent = isSpeaking ? 'Speaking' : (!isMicOn ? 'Muted' : 'Listening');
   }
   
-  // Update sidebar
   renderSidebar();
 }
 
@@ -775,7 +903,6 @@ function sendMessage(text) {
     socket.emit('room-message', message);
   }
   
-  // Add to local chat
   addChatMessage({
     ...message,
     id: 'local-' + Date.now()
@@ -825,14 +952,12 @@ function toggleMute() {
     isMicOn = !isMicOn;
     audioTracks[0].enabled = isMicOn;
     
-    // Update UI
     const micBtn = document.getElementById('ctrl-mic');
     micBtn.className = `ctrl-btn ${isMicOn ? 'ctrl-mic-active' : 'ctrl-mic-neutral'}`;
     micBtn.setAttribute('aria-pressed', isMicOn);
     document.getElementById('mic-off-svg').style.display = isMicOn ? 'none' : 'block';
     document.getElementById('mic-on-svg').style.display = isMicOn ? 'block' : 'none';
     
-    // Update own card
     const micIcon = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-mic`);
     if (micIcon) {
       micIcon.className = `pc-mic ${!isMicOn ? 'muted' : 'active'}`;
@@ -844,10 +969,8 @@ function toggleMute() {
       status.textContent = !isMicOn ? 'Muted' : (window.lastSpeakingStatus ? 'Speaking' : 'Listening');
     }
     
-    // Update sidebar
     renderSidebar();
     
-    // Notify server
     if (socket && socket.connected) {
       socket.emit('toggle-mute', {
         roomId,
@@ -861,12 +984,10 @@ function toggleMute() {
 function toggleHand() {
   isHandUp = !isHandUp;
   
-  // Update UI
   const handBtn = document.getElementById('ctrl-hand');
   handBtn.className = `ctrl-btn ${isHandUp ? 'ctrl-hand-on' : 'ctrl-hand-off'}`;
   handBtn.setAttribute('aria-pressed', isHandUp);
   
-  // Update own card
   const wrap = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-avatar-wrap`);
   if (wrap) {
     const existingHand = wrap.querySelector('.pc-hand');
@@ -880,10 +1001,8 @@ function toggleHand() {
     }
   }
   
-  // Update sidebar
   renderSidebar();
   
-  // Notify server
   if (socket && socket.connected) {
     socket.emit('raise-hand', {
       roomId,
@@ -906,19 +1025,16 @@ function leaveRoom() {
 }
 
 function cleanupWebRTC() {
-  // Stop all peer connections
   Object.values(peerConnections).forEach(peer => {
     try { peer.destroy(); } catch (e) {}
   });
   peerConnections = {};
   
-  // Stop local stream
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
   }
   
-  // Stop audio analysis
   if (speakingInterval) {
     clearInterval(speakingInterval);
     speakingInterval = null;
@@ -944,16 +1060,13 @@ function closeChatPanel() {
 
 /* ===== EVENT LISTENERS ===== */
 function setupEventListeners() {
-  // Control buttons
   document.getElementById('ctrl-mic')?.addEventListener('click', toggleMute);
   document.getElementById('ctrl-hand')?.addEventListener('click', toggleHand);
   document.getElementById('ctrl-leave')?.addEventListener('click', leaveRoom);
   
-  // Chat panel
   document.getElementById('open-chat-btn')?.addEventListener('click', openChatPanel);
   document.getElementById('chat-back-btn')?.addEventListener('click', closeChatPanel);
   
-  // Chat input
   const chatInput = document.getElementById('chat-input');
   const chatSend = document.getElementById('chat-send');
   
@@ -982,13 +1095,11 @@ function setupEventListeners() {
     });
   }
   
-  // Back button
   document.querySelector('.back-btn')?.addEventListener('click', (e) => {
     e.preventDefault();
     leaveRoom();
   });
   
-  // Handle page unload
   window.addEventListener('beforeunload', () => {
     if (socket && socket.connected) {
       socket.emit('leave-voice-room', {
@@ -1032,7 +1143,6 @@ function formatTime(timestamp) {
 }
 
 function showToast(message, type = 'info') {
-  // Remove existing toast
   const existingToast = document.querySelector('.room-toast');
   if (existingToast) existingToast.remove();
   
@@ -1074,7 +1184,7 @@ function getDemoParticipants() {
   ];
 }
 
-// Add animation styles
+/* ===== STYLES ===== */
 const style = document.createElement('style');
 style.textContent = `
   @keyframes slideIn {
@@ -1118,6 +1228,21 @@ style.textContent = `
   }
   .room-toast {
     z-index: 9999;
+  }
+  .ctrl-end-room {
+    border-color: var(--live-red);
+    background: rgba(232, 93, 74, 0.2);
+    color: var(--live-red);
+    transition: all 0.2s;
+  }
+  .ctrl-end-room:hover {
+    background: var(--live-red);
+    color: white;
+    transform: scale(1.05);
+  }
+  .ctrl-end-room svg {
+    width: 24px;
+    height: 24px;
   }
 `;
 document.head.appendChild(style);
