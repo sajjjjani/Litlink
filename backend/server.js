@@ -48,7 +48,10 @@ app.use(cors({
     'http://localhost:5002',
     'http://127.0.0.1:5002',
     'http://localhost:5001',
-    'http://127.0.0.1:5001'
+    'http://127.0.0.1:5001',
+    // Allow any localhost port for development
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -256,43 +259,11 @@ const startServer = async () => {
       console.log('   GET    /api/auth/me - Get current user');
       console.log('='.repeat(70));
       
-      console.log('📌 DISCUSSION ENDPOINTS:');
-      console.log('   GET    /api/discussions/threads - Get all threads');
-      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
-      console.log('   POST   /api/discussions/threads - Create public discussion');
-      console.log('   GET    /api/discussions/public - Get public discussions');
-      console.log('   GET    /api/discussions/all - Get all activity');
-      console.log('   GET    /api/discussions/highlights - Get community highlights');
-      console.log('   POST   /api/discussions/threads/:threadId/like - Like thread');
-      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
-      console.log('   GET    /api/discussions/stats/genres - Genre statistics');
-      console.log('='.repeat(70));
-      
-      console.log('📌 CIRCLE ENDPOINTS:');
-      console.log('   GET    /api/discussions/circles/:circleId/threads - Get circle threads');
-      console.log('   POST   /api/discussions/circles/threads - Create circle thread');
-      console.log('   POST   /api/discussions/circles/polls - Create circle poll');
-      console.log('='.repeat(70));
-      
       console.log('📌 VOICE ROOM ENDPOINTS:');
       console.log('   GET    /api/voice-rooms/rooms/live - Get all live rooms');
       console.log('   GET    /api/voice-rooms/rooms/scheduled - Get scheduled rooms');
       console.log('   GET    /api/voice-rooms/rooms/:roomId - Get room details');
       console.log('   POST   /api/voice-rooms/rooms - Create new room');
-      console.log('='.repeat(70));
-      
-      console.log('📌 ADMIN ENDPOINTS:');
-      console.log('   GET    /api/admin/dashboard/stats - Dashboard statistics');
-      console.log('   GET    /api/admin/users - List all users');
-      console.log('   GET    /api/admin/filter-words - List filter words');
-      console.log('   GET    /api/admin/reports - List reports');
-      console.log('='.repeat(70));
-      
-      console.log('📌 OTHER ENDPOINTS:');
-      console.log('   GET    /api/books/search - Search books');
-      console.log('   GET    /api/dashboard/:userId - User dashboard');
-      console.log('   GET    /api/notifications - User notifications');
-      console.log('   GET    /health - Health check');
       console.log('='.repeat(70));
       
       console.log(`🕐 Server started at: ${new Date().toLocaleString()}`);
