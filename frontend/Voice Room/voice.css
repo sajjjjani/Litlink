@@ -321,3 +321,22 @@ a{text-decoration:none;color:inherit}
 .chat-send-btn:hover{color:var(--bg-primary)}
 .chat-send-btn:disabled{color:var(--sidebar-muted);cursor:not-allowed}
 .chat-send-btn svg{width:16px;height:16px;display:block}
+
+/* End Room Button */
+.ctrl-end-room {
+  border-color: var(--live-red);
+  background: rgba(232, 93, 74, 0.2);
+  color: var(--live-red);
+  transition: all 0.2s;
+}
+
+.ctrl-end-room:hover {
+  background: var(--live-red);
+  color: white;
+  transform: scale(1.05);
+}
+
+.ctrl-end-room svg {
+  width: 24px;
+  height: 24px;
+}
