@@ -10,7 +10,7 @@ const AdminNotificationService = require('../services/adminNotificationService')
 // Create a new voice room
 router.post('/rooms', authenticate, async (req, res) => {
     try {
-        const { name, description, maxParticipants, scheduledStart, scheduledEnd, isPublic, genre } = req.body;
+        const { name, description, maxParticipants, scheduledStart, scheduledEnd, isPublic } = req.body;
         
         if (!name) {
             return res.status(400).json({
@@ -19,44 +19,30 @@ router.post('/rooms', authenticate, async (req, res) => {
             });
         }
         
-        const user = await User.findById(req.userId);
-        
         const room = new VoiceRoom({
             name,
             description: description || '',
-            genre: genre || 'Discussion',
             hostId: req.userId,
-            hostName: user.name,
             maxParticipants: maxParticipants || 50,
-            status: scheduledStart ? 'scheduled' : 'live',
+            status: 'scheduled',
             isPublic: isPublic !== false,
-            scheduledFor: scheduledStart ? new Date(scheduledStart) : null,
+            scheduledStart: scheduledStart ? new Date(scheduledStart) : new Date(),
+            scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
             createdAt: new Date(),
-            participantCount: 1
+            participantCount: 0
         });
         
         await room.save();
-        
-        // Add host as participant
-        const participant = new RoomParticipant({
-            roomId: room._id,
-            userId: req.userId,
-            userName: user.name,
-            joinedAt: new Date(),
-            isMuted: false,
-            handRaised: false
-        });
-        
-        await participant.save();
         
         // Populate host info
         await room.populate('hostId', 'name email profilePicture');
         
         // Notify admins
+        const host = await User.findById(req.userId);
         await AdminNotificationService.sendToAllAdmins(
             'voice_room_created',
             'New Voice Room Created',
-            `${user.name} created a new voice room: ${name}`,
+            `${host.name} created a new voice room: ${name}`,
             {
                 priority: 'medium',
                 sourceUserId: req.userId,
@@ -67,7 +53,7 @@ router.post('/rooms', authenticate, async (req, res) => {
                     roomId: room._id.toString(),
                     roomName: name,
                     hostId: req.userId.toString(),
-                    hostName: user.name
+                    hostName: host.name
                 }
             }
         );
@@ -140,14 +126,14 @@ router.get('/rooms/scheduled', authenticate, async (req, res) => {
     try {
         const rooms = await VoiceRoom.find({
             status: 'scheduled',
-            scheduledFor: { $gt: new Date() },
+            scheduledStart: { $gt: new Date() },
             $or: [
                 { isPublic: true },
                 { hostId: req.userId }
             ]
         })
         .populate('hostId', 'name email profilePicture')
-        .sort({ scheduledFor: 1 });
+        .sort({ scheduledStart: 1 });
         
         res.json({
             success: true,
@@ -228,14 +214,14 @@ router.post('/rooms/:roomId/join', authenticate, async (req, res) => {
         
         if (room.status !== 'live') {
             // If room is scheduled and start time has passed, start it
-            if (room.status === 'scheduled' && room.scheduledFor && room.scheduledFor <= new Date()) {
+            if (room.status === 'scheduled' && room.scheduledStart <= new Date()) {
                 room.status = 'live';
                 await room.save();
             } else if (room.status === 'scheduled') {
                 return res.status(400).json({
                     success: false,
                     message: 'Room has not started yet',
-                    scheduledStart: room.scheduledFor
+                    scheduledStart: room.scheduledStart
                 });
             } else {
                 return res.status(400).json({
@@ -487,57 +473,6 @@ router.get('/rooms/stats', authenticate, async (req, res) => {
     }
 });
 
-// Get admin voice room stats (for admin dashboard)
-router.get('/admin/stats', authenticate, async (req, res) => {
-    try {
-        const user = await User.findById(req.userId);
-        if (!user || !user.isAdmin) {
-            return res.status(403).json({
-                success: false,
-                message: 'Admin access required'
-            });
-        }
-        
-        const liveRooms = await VoiceRoom.countDocuments({ status: 'live' });
-        const scheduledRooms = await VoiceRoom.countDocuments({ status: 'scheduled' });
-        const endedRooms = await VoiceRoom.countDocuments({ status: 'ended' });
-        
-        const activeParticipants = await RoomParticipant.countDocuments({ leftAt: null });
-        const totalParticipantsEver = await RoomParticipant.countDocuments();
-        
-        const popularRooms = await VoiceRoom.find({ status: 'live' })
-            .sort({ participantCount: -1 })
-            .limit(5)
-            .populate('hostId', 'name email');
-        
-        const genreStats = await VoiceRoom.aggregate([
-            { $match: { status: 'live' } },
-            { $group: { _id: '$genre', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
-        ]);
-        
-        res.json({
-            success: true,
-            stats: {
-                liveRooms,
-                scheduledRooms,
-                endedRooms,
-                activeParticipants,
-                totalParticipantsEver,
-                popularRooms,
-                genreStats
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error fetching voice room admin stats:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
-    }
-});
-
 // Get user's voice room history
 router.get('/rooms/history', authenticate, async (req, res) => {
     try {
@@ -626,71 +561,6 @@ router.put('/rooms/:roomId/participants/status', authenticate, async (req, res) 
             message: 'Server error'
         });
     }
-});
-
-// End a voice room (host only)
-router.post('/rooms/:roomId/end', authenticateToken, async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const userId = req.user.id;
-
-    // Find the room
-    const room = await VoiceRoom.findById(roomId);
-    if (!room) {
-      return res.status(404).json({ success: false, message: 'Room not found' });
-    }
-
-    // Check if user is the host
-    if (room.hostId.toString() !== userId) {
-      return res.status(403).json({ success: false, message: 'Only the host can end the room' });
-    }
-
-    // Check if room is already ended
-    if (room.status === 'ended') {
-      return res.status(400).json({ success: false, message: 'Room already ended' });
-    }
-
-    // Update room status
-    room.status = 'ended';
-    room.endedAt = new Date();
-    await room.save();
-
-    // Get all participants to notify
-    const participants = await RoomParticipant.find({ 
-      roomId, 
-      leftAt: null 
-    });
-
-    // Broadcast room ended event to all participants via WebSocket
-    if (global.io) {
-      global.io.to(`room-${roomId}`).emit('room-ended', {
-        roomId,
-        message: 'The host has ended this room',
-        endedAt: room.endedAt
-      });
-    }
-
-    // Update all participants' leftAt time
-    await RoomParticipant.updateMany(
-      { roomId, leftAt: null },
-      { leftAt: new Date() }
-    );
-
-    res.json({
-      success: true,
-      message: 'Room ended successfully',
-      room: {
-        id: room._id,
-        name: room.name,
-        status: room.status,
-        endedAt: room.endedAt
-      }
-    });
-
-  } catch (error) {
-    console.error('Error ending room:', error);
-    res.status(500).json({ success: false, message: 'Failed to end room' });
-  }
 });
 
 module.exports = router;
