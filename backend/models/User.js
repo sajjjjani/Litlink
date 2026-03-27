@@ -268,6 +268,19 @@ userSchema.index({ isBanned: 1 });
 userSchema.index({ isSuspended: 1 });
 userSchema.index({ lastLogin: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ favoriteGenres: 1 });
+userSchema.index({ favoriteAuthors: 1 });
+userSchema.index({ favoriteBooks: 1 });
+userSchema.index({ readingHabit: 1 });
+userSchema.index({ preferredFormats: 1 });
+
+// Compound index for matching queries
+userSchema.index({ 
+  favoriteGenres: 1, 
+  favoriteAuthors: 1, 
+  favoriteBooks: 1 
+});
+
 
 const User = mongoose.model('User', userSchema);
 
