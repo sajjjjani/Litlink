@@ -1,9 +1,9 @@
 const express = require('express');
-// Use safe fetch wrapper (Node 18+ global fetch, with node-fetch fallback)
 const fetch = require('../utils/fetch');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
+const matchService = require('../services/matchService');
 
 // Helper: Get book cover URL
 function getBookCoverUrl(bookId, coverId, isbn) {
@@ -20,13 +20,233 @@ function getBookCoverUrl(bookId, coverId, isbn) {
   return null;
 }
 
+// ==================== USER ENDPOINTS FOR EXPLORE PAGE ====================
+
+// GET /api/users - Get all users (excluding current user, admins, banned)
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const users = await User.find({
+      _id: { $ne: req.user._id },
+      isBanned: false,
+      isSuspended: false,
+      isAdmin: false  // Exclude admin users
+    }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry -adminLevel -adminPermissions');
+    
+    res.json({
+      success: true,
+      users: users,
+      total: users.length
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users'
+    });
+  }
+});
+
+// GET /api/users/:userId - Get specific user by ID
+router.get('/:userId', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      user: user
+    });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user'
+    });
+  }
+});
+
+// GET /api/users/search - Search users by name, username, or interests
+router.get('/search', authenticate, async (req, res) => {
+  try {
+    const { query, genre, limit = 20 } = req.query;
+    
+    let searchCriteria = {
+      _id: { $ne: req.user._id },
+      isBanned: false,
+      isSuspended: false,
+      isAdmin: false
+    };
+    
+    if (query) {
+      searchCriteria.$or = [
+        { name: { $regex: query, $options: 'i' } },
+        { username: { $regex: query, $options: 'i' } },
+        { favoriteBooks: { $regex: query, $options: 'i' } },
+        { favoriteGenres: { $regex: query, $options: 'i' } }
+      ];
+    }
+    
+    if (genre && genre !== 'all') {
+      searchCriteria.favoriteGenres = genre;
+    }
+    
+    const users = await User.find(searchCriteria)
+      .select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry')
+      .limit(parseInt(limit))
+      .sort({ lastLogin: -1 });
+    
+    // Calculate match percentages for each user
+    const usersWithMatches = users.map(user => {
+      const match = matchService.calculateMatchScore(req.user, user);
+      return {
+        ...user.toObject(),
+        matchPercentage: match.matchPercentage,
+        matchDetails: match.details
+      };
+    }).sort((a, b) => b.matchPercentage - a.matchPercentage);
+    
+    res.json({
+      success: true,
+      users: usersWithMatches,
+      total: usersWithMatches.length
+    });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching users'
+    });
+  }
+});
+
+// GET /api/users/:userId/matches - Get matches for a specific user
+router.get('/:userId/matches', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    if (userId !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+    
+    const currentUser = req.user;
+    
+    // Get all other users
+    const allUsers = await User.find({
+      _id: { $ne: currentUser._id },
+      isBanned: false,
+      isSuspended: false,
+      isAdmin: false
+    }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
+    
+    // Calculate matches
+    const matches = allUsers.map(user => matchService.calculateMatchScore(currentUser, user))
+      .sort((a, b) => b.matchPercentage - a.matchPercentage)
+      .slice(0, limit);
+    
+    // Get user details for each match
+    const matchesWithDetails = await Promise.all(
+      matches.map(async (match) => {
+        const user = await User.findById(match.userId)
+          .select('name username profilePicture bio favoriteGenres favoriteAuthors favoriteBooks location readingHabit');
+        return { ...match, userDetails: user };
+      })
+    );
+    
+    res.json({
+      success: true,
+      matches: matchesWithDetails,
+      total: matchesWithDetails.length
+    });
+    
+  } catch (error) {
+    console.error('Get user matches error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching matches'
+    });
+  }
+});
+
+// GET /api/users/:userId/suggested - Get suggested users
+router.get('/:userId/suggested', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    if (userId !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+    
+    const currentUser = req.user;
+    
+    // Get all other users
+    const allUsers = await User.find({
+      _id: { $ne: currentUser._id },
+      isBanned: false,
+      isSuspended: false,
+      isAdmin: false
+    }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
+    
+    // Get match suggestions
+    const suggestions = matchService.getMatchSuggestions(currentUser, allUsers, limit);
+    
+    // Add user details
+    const suggestionsWithDetails = await Promise.all(
+      suggestions.map(async (suggestion) => {
+        const user = await User.findById(suggestion.userId)
+          .select('name username profilePicture bio favoriteGenres favoriteAuthors');
+        
+        let reason = "Similar reading interests";
+        if (suggestion.details.bookMatch > 0) {
+          reason = `Also loves ${suggestion.details.bookList[0]}`;
+        } else if (suggestion.details.authorMatch > 0) {
+          reason = `Shares favorite author: ${suggestion.details.authorList[0]}`;
+        } else if (suggestion.details.genreMatch > 0) {
+          reason = `Enjoys ${suggestion.details.genreList[0]} books too`;
+        }
+        
+        return { ...suggestion, userDetails: user, reason };
+      })
+    );
+    
+    res.json({
+      success: true,
+      users: suggestionsWithDetails,
+      total: suggestionsWithDetails.length
+    });
+    
+  } catch (error) {
+    console.error('Get suggested users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching suggestions'
+    });
+  }
+});
+
+// ==================== BOOK ENDPOINTS ====================
+
 // POST /api/users/:userId/books - Add book to user profile
 router.post('/:userId/books', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     const { bookTitle, bookId } = req.body;
     
-    if (userId !== req.userId.toString()) {
+    if (userId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
@@ -44,10 +264,9 @@ router.post('/:userId/books', authenticate, async (req, res) => {
     let bookCover = '';
     let bookAuthor = '';
     
-    // Get book cover from Open Library - IMPROVED with multiple strategies
+    // Get book cover from Open Library
     if (bookId) {
       try {
-        // Strategy 1: Try works endpoint first
         let workKey = bookId;
         if (!workKey.startsWith('/works/')) {
           workKey = workKey.startsWith('OL') ? `/works/${workKey}` : `/works/${workKey}`;
@@ -60,29 +279,19 @@ router.post('/:userId/books', authenticate, async (req, res) => {
         if (response.ok) {
           const bookData = await response.json();
           
-          // Try covers array first
           if (bookData.covers && bookData.covers.length > 0) {
             const coverId = bookData.covers[0];
             bookCover = `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
           }
           
-          // Try ISBN 13
           if (!bookCover && bookData.isbn_13 && bookData.isbn_13.length > 0) {
             bookCover = `https://covers.openlibrary.org/b/isbn/${bookData.isbn_13[0]}-M.jpg`;
           }
           
-          // Try ISBN 10
           if (!bookCover && bookData.isbn_10 && bookData.isbn_10.length > 0) {
             bookCover = `https://covers.openlibrary.org/b/isbn/${bookData.isbn_10[0]}-M.jpg`;
           }
           
-          // Try edition key for cover
-          if (!bookCover && bookData.key) {
-            const editionKey = bookData.key.replace('/works/', '').replace('OL', 'OL');
-            bookCover = `https://covers.openlibrary.org/b/olid/${editionKey}-M.jpg`;
-          }
-          
-          // Get author
           if (bookData.authors && bookData.authors.length > 0) {
             const authorRef = bookData.authors[0];
             if (authorRef.author && authorRef.author.key) {
@@ -99,40 +308,8 @@ router.post('/:userId/books', authenticate, async (req, res) => {
               }
             }
             
-            // Fallback to author name directly
             if (!bookAuthor && authorRef.name) {
               bookAuthor = authorRef.name;
-            }
-          }
-        }
-        
-        // Strategy 2: Try OLID (Open Library ID) cover URL
-        if (!bookCover) {
-          const olid = bookId.replace('OL', 'OL').replace(/[^A-Z0-9]/g, '');
-          if (olid) {
-            const olidUrl = `https://covers.openlibrary.org/b/olid/${olid}-M.jpg`;
-            try {
-              const testRes = await fetch(olidUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-              if (testRes.ok && testRes.headers.get('content-type')?.includes('image')) {
-                bookCover = olidUrl;
-              }
-            } catch (err) {
-              // Continue
-            }
-          }
-        }
-        
-        // Strategy 3: Try generic cover URL with bookId
-        if (!bookCover) {
-          const genericUrl = getBookCoverUrl(bookId, null, null);
-          if (genericUrl) {
-            try {
-              const testRes = await fetch(genericUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-              if (testRes.ok && testRes.headers.get('content-type')?.includes('image')) {
-                bookCover = genericUrl;
-              }
-            } catch (err) {
-              // Continue
             }
           }
         }
@@ -159,7 +336,6 @@ router.post('/:userId/books', authenticate, async (req, res) => {
       user.booksRead = [];
     }
     
-    // Check if book already exists
     const existingIndex = user.booksRead.findIndex(book => 
       book.bookId === bookData.bookId || 
       book.title.toLowerCase() === bookTitle.toLowerCase()
@@ -199,7 +375,7 @@ router.get('/:userId/books', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    if (userId !== req.userId.toString()) {
+    if (userId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
@@ -245,7 +421,7 @@ router.delete('/:userId/books/:bookId', authenticate, async (req, res) => {
   try {
     const { userId, bookId } = req.params;
     
-    if (userId !== req.userId.toString()) {
+    if (userId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
@@ -291,49 +467,159 @@ router.delete('/:userId/books/:bookId', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/users/:userId/matches - Get user's matches
-router.get('/:userId/matches', authenticate, async (req, res) => {
+// ==================== FOLLOW/UNFOLLOW ENDPOINTS ====================
+
+// POST /api/users/:userId/follow - Follow a user
+router.post('/:userId/follow', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    if (userId !== req.userId.toString()) {
-      return res.status(403).json({
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'You cannot follow yourself'
       });
     }
     
-    const user = await User.findById(userId);
-    if (!user) {
+    const userToFollow = await User.findById(userId);
+    if (!userToFollow) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
     
-    // For now, return empty matches array
-    // In production, this would match users based on reading preferences
+    const currentUser = req.user;
+    
+    // Check if already following
+    if (currentUser.following && currentUser.following.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Already following this user'
+      });
+    }
+    
+    // Add to following list
+    if (!currentUser.following) currentUser.following = [];
+    currentUser.following.push(userId);
+    await currentUser.save();
+    
+    // Add to followers list of the other user
+    if (!userToFollow.followers) userToFollow.followers = [];
+    userToFollow.followers.push(req.user._id);
+    await userToFollow.save();
+    
     res.json({
       success: true,
-      matches: [],
-      total: 0
+      message: `You are now following ${userToFollow.name}`
     });
     
   } catch (error) {
-    console.error('Get user matches error:', error);
+    console.error('Follow user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching matches'
+      message: 'Error following user'
     });
   }
 });
 
-// GET /api/users/:userId/clubs - Get user's book clubs
-router.get('/:userId/clubs', authenticate, async (req, res) => {
+// POST /api/users/:userId/unfollow - Unfollow a user
+router.post('/:userId/unfollow', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUser = req.user;
+    
+    if (currentUser.following) {
+      currentUser.following = currentUser.following.filter(id => id.toString() !== userId);
+      await currentUser.save();
+    }
+    
+    const userToUnfollow = await User.findById(userId);
+    if (userToUnfollow && userToUnfollow.followers) {
+      userToUnfollow.followers = userToUnfollow.followers.filter(id => id.toString() !== req.user._id.toString());
+      await userToUnfollow.save();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Unfollowed successfully'
+    });
+    
+  } catch (error) {
+    console.error('Unfollow user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error unfollowing user'
+    });
+  }
+});
+
+// GET /api/users/:userId/followers - Get user's followers
+router.get('/:userId/followers', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .populate('followers', 'name username profilePicture')
+      .select('followers');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      followers: user.followers || [],
+      count: user.followers?.length || 0
+    });
+    
+  } catch (error) {
+    console.error('Get followers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching followers'
+    });
+  }
+});
+
+// GET /api/users/:userId/following - Get users that a user follows
+router.get('/:userId/following', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .populate('following', 'name username profilePicture')
+      .select('following');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      following: user.following || [],
+      count: user.following?.length || 0
+    });
+    
+  } catch (error) {
+    console.error('Get following error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching following'
+    });
+  }
+});
+
+// ==================== USER STATS ENDPOINTS ====================
+
+// GET /api/users/:userId/stats - Get user statistics
+router.get('/:userId/stats', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    if (userId !== req.userId.toString()) {
+    if (userId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
@@ -348,22 +634,37 @@ router.get('/:userId/clubs', authenticate, async (req, res) => {
       });
     }
     
-    // For now, return empty clubs array
-    // In production, this would return book clubs the user is part of
+    // Get all other users for match statistics
+    const allUsers = await User.find({
+      _id: { $ne: user._id },
+      isBanned: false,
+      isSuspended: false
+    });
+    
+    const matchStats = matchService.getMatchStats(user, allUsers);
+    
     res.json({
       success: true,
-      clubs: [],
-      total: 0
+      stats: {
+        totalBooksRead: user.booksRead?.length || 0,
+        currentlyReading: user.currentlyReading?.length || 0,
+        wantToRead: user.wantToRead?.length || 0,
+        followers: user.followers?.length || 0,
+        following: user.following?.length || 0,
+        readingGoal: user.readingGoal,
+        readingGoalProgress: user.booksRead?.length ? 
+          Math.round((user.booksRead.length / (user.readingGoal || 1)) * 100) : 0,
+        matchStats: matchStats
+      }
     });
     
   } catch (error) {
-    console.error('Get user clubs error:', error);
+    console.error('Get user stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching clubs'
+      message: 'Error fetching user stats'
     });
   }
 });
 
 module.exports = router;
-
