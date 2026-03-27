@@ -15,13 +15,11 @@ function loadSocketIO() {
     
     const script = document.createElement('script');
     script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
-    // Remove integrity attribute to avoid mismatch issues
     script.crossOrigin = 'anonymous';
     script.onload = resolve;
     script.onerror = () => {
       console.error('Failed to load Socket.IO');
       showToast('Failed to load real-time features', 'error');
-      // Resolve anyway to continue with offline mode
       resolve();
     };
     document.head.appendChild(script);
@@ -73,7 +71,6 @@ function updateUserUI() {
 /* ===== WEBSOCKET CONNECTION ===== */
 function connectSocket(token) {
   try {
-    // Check if io is defined
     if (typeof io === 'undefined') {
       console.log('Socket.IO not available, using offline mode');
       showToast('Using offline mode - real-time updates disabled', 'warning');
@@ -154,7 +151,8 @@ async function loadLiveRooms() {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
@@ -163,11 +161,11 @@ async function loadLiveRooms() {
       renderRooms(data.rooms);
     } else {
       console.error('Failed to load rooms:', data.message);
-      showToast('Failed to load rooms', 'error');
+      showToast(data.message || 'Failed to load rooms', 'error');
     }
   } catch (error) {
     console.error('Error loading live rooms:', error);
-    // Fallback to demo data
+    showToast('Failed to load rooms. Using demo data.', 'warning');
     const demoRooms = getDemoRooms();
     renderRooms(demoRooms);
   }
@@ -195,29 +193,45 @@ async function loadUpcomingRooms() {
 async function createRoom(roomData) {
   try {
     const token = localStorage.getItem('authToken');
+    
+    // Convert frontend data to backend expected format
+    const backendData = {
+      name: roomData.name,
+      description: roomData.description || '',
+      maxParticipants: 50,
+      isPublic: true,
+      scheduledStart: roomData.scheduledFor ? new Date(roomData.scheduledFor).toISOString() : null,
+      scheduledEnd: null
+    };
+    
+    // Add genre to description if provided (since genre isn't in model)
+    if (roomData.genre && roomData.genre !== '') {
+      backendData.description = `[${roomData.genre}] ${backendData.description}`.trim();
+    }
+    
+    console.log('Creating room with data:', backendData);
+    
     const response = await fetch(`${API_BASE}/voice-rooms/rooms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(roomData)
+      body: JSON.stringify(backendData)
     });
     
     const data = await response.json();
     if (data.success) {
       closeModal();
       showToast('Room created successfully!', 'success');
-      goToRoom(data.room.id);
+      goToRoom(data.room._id);
     } else {
       showToast(data.message || 'Failed to create room', 'error');
+      console.error('Create room error:', data);
     }
   } catch (error) {
     console.error('Error creating room:', error);
-    showToast('Failed to create room. Using demo mode.', 'warning');
-    // Demo mode - create fake room and go to it
-    closeModal();
-    goToRoom('demo-room-' + Date.now());
+    showToast('Failed to create room. Please try again.', 'error');
   }
 }
 
@@ -226,7 +240,7 @@ function renderRooms(rooms) {
   const list = document.getElementById('rooms-list');
   if (!list) return;
   
-  const liveRooms = rooms.filter(r => r.isLive !== false);
+  const liveRooms = rooms.filter(r => r.status === 'live');
   document.getElementById('live-count-badge').textContent = liveRooms.length + ' live';
 
   if (liveRooms.length === 0) {
@@ -244,30 +258,44 @@ function renderRooms(rooms) {
     return;
   }
 
-  list.innerHTML = liveRooms.map(room => `
-    <button class="room-card" onclick="goToRoom('${room.id}')">
-      <div class="rc-top">
-        <div style="flex:1;min-width:0">
-          <div class="rc-name">${escapeHtml(room.name)}</div>
-          <span class="genre-chip">${escapeHtml(room.genre)}</span>
+  list.innerHTML = liveRooms.map(room => {
+    // Extract genre from description if it exists
+    let genre = 'Discussion';
+    let description = room.description || '';
+    const genreMatch = description.match(/^\[(.*?)\]/);
+    if (genreMatch) {
+      genre = genreMatch[1];
+      description = description.replace(/^\[.*?\]\s*/, '');
+    }
+    
+    const hostName = room.hostId?.name || 'Host';
+    const participantCount = room.participantCount || 0;
+    
+    return `
+      <button class="room-card" onclick="goToRoom('${room._id}')">
+        <div class="rc-top">
+          <div style="flex:1;min-width:0">
+            <div class="rc-name">${escapeHtml(room.name)}</div>
+            <span class="genre-chip">${escapeHtml(genre)}</span>
+          </div>
+          <div class="live-ind">
+            <span class="live-dot pulse-live"></span>
+            <span class="live-lbl">Live</span>
+          </div>
         </div>
-        <div class="live-ind">
-          <span class="live-dot pulse-live"></span>
-          <span class="live-lbl">Live</span>
+        <div class="rc-footer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>${participantCount} participant${participantCount !== 1 ? 's' : ''}</span>
+          <span style="margin-left: auto; font-size: 11px; color: var(--accent);">Host: ${escapeHtml(hostName)}</span>
         </div>
-      </div>
-      <div class="rc-footer">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-        <span>${room.participantCount || 1} participant${room.participantCount !== 1 ? 's' : ''}</span>
-        ${room.hostName ? `<span style="margin-left: auto; font-size: 11px; color: var(--accent);">Host: ${escapeHtml(room.hostName)}</span>` : ''}
-      </div>
-    </button>
-  `).join('');
+      </button>
+    `;
+  }).join('');
 }
 
 function renderUpcoming(rooms) {
@@ -283,29 +311,42 @@ function renderUpcoming(rooms) {
     return;
   }
 
-  list.innerHTML = rooms.map(room => `
-    <div class="upcoming-card">
-      <div class="upc-time">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-        ${escapeHtml(room.time || formatScheduledTime(room.scheduledFor))}
+  list.innerHTML = rooms.map(room => {
+    // Extract genre from description
+    let genre = 'Discussion';
+    let description = room.description || '';
+    const genreMatch = description.match(/^\[(.*?)\]/);
+    if (genreMatch) {
+      genre = genreMatch[1];
+    }
+    
+    const hostName = room.hostId?.name || 'Host';
+    const scheduledTime = room.scheduledStart ? formatScheduledTime(room.scheduledStart) : 'Soon';
+    
+    return `
+      <div class="upcoming-card">
+        <div class="upc-time">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          ${escapeHtml(scheduledTime)}
+        </div>
+        <div class="upc-name">${escapeHtml(room.name)}</div>
+        <div class="upc-meta">
+          <span class="genre-chip">${escapeHtml(genre)}</span>
+          <span>by ${escapeHtml(hostName)}</span>
+        </div>
+        <button class="upc-remind" onclick="setReminder('${room._id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          Set Reminder
+        </button>
       </div>
-      <div class="upc-name">${escapeHtml(room.name)}</div>
-      <div class="upc-meta">
-        <span class="genre-chip">${escapeHtml(room.genre)}</span>
-        <span>by ${escapeHtml(room.hostName || 'Host')}</span>
-      </div>
-      <button class="upc-remind" onclick="setReminder('${room.id}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
-        Set Reminder
-      </button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // Helper functions for real-time updates
@@ -316,12 +357,12 @@ function addRoomToList(room) {
 }
 
 function removeRoomFromList(roomId) {
-  liveRooms = liveRooms.filter(r => r.id !== roomId);
+  liveRooms = liveRooms.filter(r => r._id !== roomId);
   renderRooms(liveRooms);
 }
 
 function updateRoomInList(updatedRoom) {
-  const index = liveRooms.findIndex(r => r.id === updatedRoom.roomId);
+  const index = liveRooms.findIndex(r => r._id === updatedRoom.roomId);
   if (index !== -1) {
     liveRooms[index] = { ...liveRooms[index], ...updatedRoom };
     renderRooms(liveRooms);
@@ -404,7 +445,7 @@ function handleModalSubmit() {
   
   const roomData = {
     name: title,
-    genre,
+    genre: genre,
     description: description || '',
     scheduledFor: schedType === 'later' ? getScheduledDateTime() : null
   };
@@ -448,14 +489,15 @@ function setupEventListeners() {
     if (e.key === 'Escape') closeModal();
   });
   
-  // Navigation - UPDATED PATHS
-  document.querySelector('.nav-explore')?.addEventListener('click', goToExplore);
-  document.querySelector('.nav-avatar')?.addEventListener('click', goToProfile);
+  // Navigation
+  const exploreBtn = document.querySelector('.nav-explore');
+  if (exploreBtn) {
+    exploreBtn.addEventListener('click', goToExplore);
+  }
   
-  // Notification icon
-  const bellIcon = document.querySelector('.nav-bell');
-  if (bellIcon) {
-    bellIcon.addEventListener('click', goToNotifications);
+  const avatar = document.querySelector('.nav-avatar');
+  if (avatar) {
+    avatar.addEventListener('click', goToProfile);
   }
 }
 
@@ -526,17 +568,17 @@ document.head.appendChild(style);
 /* ===== DEMO FALLBACK DATA ===== */
 function getDemoRooms() {
   return [
-    { id: '1', name: 'Fantasy World Debate', genre: 'Fantasy', participantCount: 12, hostName: 'Elena Vance', isLive: true },
-    { id: '2', name: 'Mystery Book Analysis', genre: 'Mystery', participantCount: 8, hostName: 'James Hardy', isLive: true },
-    { id: '3', name: 'Poetry Reading Circle', genre: 'Poetry', participantCount: 5, hostName: 'Amara Singh', isLive: true },
-    { id: '4', name: 'Sci-Fi Predictions', genre: 'Sci-Fi', participantCount: 15, hostName: 'Leo Nakamura', isLive: true },
+    { _id: '1', name: 'Fantasy World Debate', description: '[Fantasy] Join us to discuss epic fantasy novels', status: 'live', participantCount: 12, hostId: { name: 'Elena Vance' } },
+    { _id: '2', name: 'Mystery Book Analysis', description: '[Mystery] Analyzing the latest thriller releases', status: 'live', participantCount: 8, hostId: { name: 'James Hardy' } },
+    { _id: '3', name: 'Poetry Reading Circle', description: '[Poetry] Share and discuss your favorite poems', status: 'live', participantCount: 5, hostId: { name: 'Amara Singh' } },
+    { _id: '4', name: 'Sci-Fi Predictions', description: '[Sci-Fi] Future tech and speculative fiction', status: 'live', participantCount: 15, hostId: { name: 'Leo Nakamura' } },
   ];
 }
 
 function getDemoUpcoming() {
   return [
-    { id: 'u1', name: 'Classic Literature Hour', genre: 'Classic', time: 'In 2 hours', hostName: 'Marcus' },
-    { id: 'u2', name: 'Horror Stories Night', genre: 'Horror', time: 'Tomorrow, 8pm', hostName: 'Elena' },
+    { _id: 'u1', name: 'Classic Literature Hour', description: '[Classic] Exploring timeless literary works', scheduledStart: new Date(Date.now() + 2 * 60 * 60 * 1000), hostId: { name: 'Marcus' } },
+    { _id: 'u2', name: 'Horror Stories Night', description: '[Horror] Spine-chilling tales and discussion', scheduledStart: new Date(Date.now() + 24 * 60 * 60 * 1000), hostId: { name: 'Elena' } },
   ];
 }
 
