@@ -1,4 +1,4 @@
-// server.js - Complete with Voice Room and Circle support
+// server.js - Complete with Voice Room, Circle, and MATCHING support
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -28,6 +28,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const discussionRoutes = require('./routes/discussionRoutes');
 const openLibraryRoutes = require('./routes/openLibraryRoutes');
 const voiceRoomRoutes = require('./routes/voiceRoomRoutes');
+const matchRoutes = require('./routes/matchRoutes'); 
 
 // Import WebSocket server
 const SocketServer = require('./socketServer');
@@ -48,10 +49,7 @@ app.use(cors({
     'http://localhost:5002',
     'http://127.0.0.1:5002',
     'http://localhost:5001',
-    'http://127.0.0.1:5001',
-    // Allow any localhost port for development
-    /^http:\/\/localhost:\d+$/,
-    /^http:\/\/127\.0\.0\.1:\d+$/
+    'http://127.0.0.1:5001'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -114,6 +112,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/discussions', discussionRoutes);
 app.use('/api/openlibrary', openLibraryRoutes);
 app.use('/api/voice-rooms', voiceRoomRoutes);
+app.use('/api/matches', matchRoutes); 
 app.use('/api', miscRoutes);
 
 // Health check endpoint
@@ -125,6 +124,10 @@ app.get('/health', (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     databaseState: mongoose.STATES[mongoose.connection.readyState],
     websocket: global.io ? 'enabled' : 'disabled',
+    matching: {
+      enabled: true,
+      version: '1.0.0'
+    },
     voiceRooms: {
       total: global.activeRooms ? global.activeRooms.size : 0,
       active: global.activeRooms ? Array.from(global.activeRooms.keys()).length : 0
@@ -139,7 +142,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'Litlink Backend API',
     version: '1.0.0',
-    description: 'Literary Social Network API',
+    description: 'Literary Social Network API with AI-Powered Matching',
     endpoints: {
       auth: '/api/auth',
       books: '/api/books',
@@ -150,9 +153,15 @@ app.get('/', (req, res) => {
       notifications: '/api/notifications',
       discussions: '/api/discussions',
       voiceRooms: '/api/voice-rooms',
+      matches: '/api/matches', // 👈 NEW: Match endpoints
       health: '/health'
     },
-    documentation: 'See README.md for detailed API documentation',
+    features: {
+      matching: 'AI-powered user matching based on reading preferences',
+      discussions: 'Community discussions and circles',
+      voiceRooms: 'Live voice chat rooms',
+      admin: 'Admin dashboard and moderation'
+    },
     status: 'running'
   });
 });
@@ -172,6 +181,7 @@ app.use((req, res) => {
       '/api/notifications',
       '/api/discussions',
       '/api/voice-rooms',
+      '/api/matches',
       '/health'
     ]
   });
@@ -259,11 +269,52 @@ const startServer = async () => {
       console.log('   GET    /api/auth/me - Get current user');
       console.log('='.repeat(70));
       
+      console.log('📌 MATCHING ENDPOINTS: 👈 NEW');
+      console.log('   GET    /api/matches/matches - Get your matches');
+      console.log('   GET    /api/matches/matches/:userId - Get match details');
+      console.log('   GET    /api/matches/match-suggestions - Get suggestions');
+      console.log('   GET    /api/matches/matches/by-book/:bookTitle - Find by book');
+      console.log('   GET    /api/matches/global - Global top matches');
+      console.log('   PUT    /api/matches/preferences - Update preferences');
+      console.log('='.repeat(70));
+      
+      console.log('📌 DISCUSSION ENDPOINTS:');
+      console.log('   GET    /api/discussions/threads - Get all threads');
+      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
+      console.log('   POST   /api/discussions/threads - Create public discussion');
+      console.log('   GET    /api/discussions/public - Get public discussions');
+      console.log('   GET    /api/discussions/all - Get all activity');
+      console.log('   GET    /api/discussions/highlights - Get community highlights');
+      console.log('   POST   /api/discussions/threads/:threadId/like - Like thread');
+      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
+      console.log('   GET    /api/discussions/stats/genres - Genre statistics');
+      console.log('='.repeat(70));
+      
+      console.log('📌 CIRCLE ENDPOINTS:');
+      console.log('   GET    /api/discussions/circles/:circleId/threads - Get circle threads');
+      console.log('   POST   /api/discussions/circles/threads - Create circle thread');
+      console.log('   POST   /api/discussions/circles/polls - Create circle poll');
+      console.log('='.repeat(70));
+      
       console.log('📌 VOICE ROOM ENDPOINTS:');
       console.log('   GET    /api/voice-rooms/rooms/live - Get all live rooms');
       console.log('   GET    /api/voice-rooms/rooms/scheduled - Get scheduled rooms');
       console.log('   GET    /api/voice-rooms/rooms/:roomId - Get room details');
       console.log('   POST   /api/voice-rooms/rooms - Create new room');
+      console.log('='.repeat(70));
+      
+      console.log('📌 ADMIN ENDPOINTS:');
+      console.log('   GET    /api/admin/dashboard/stats - Dashboard statistics');
+      console.log('   GET    /api/admin/users - List all users');
+      console.log('   GET    /api/admin/filter-words - List filter words');
+      console.log('   GET    /api/admin/reports - List reports');
+      console.log('='.repeat(70));
+      
+      console.log('📌 OTHER ENDPOINTS:');
+      console.log('   GET    /api/books/search - Search books');
+      console.log('   GET    /api/dashboard/:userId - User dashboard');
+      console.log('   GET    /api/notifications - User notifications');
+      console.log('   GET    /health - Health check');
       console.log('='.repeat(70));
       
       console.log(`🕐 Server started at: ${new Date().toLocaleString()}`);
