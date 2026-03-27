@@ -53,11 +53,9 @@ function loadSimplePeer() {
   });
 }
 
-/* ===== END ROOM FUNCTIONS ===== */
-
 // Check if current user is host
 function isCurrentUserHost() {
-  return roomData && roomData.hostId === currentUser.id;
+  return roomData && roomData.hostId && roomData.hostId._id === currentUser.id;
 }
 
 // Add end room button to UI
@@ -265,11 +263,10 @@ async function loadRoomDetails() {
     showToast('Using demo mode', 'info');
     
     roomData = {
-      id: roomId,
+      _id: roomId,
       name: 'Fantasy World Debate',
       genre: 'Fantasy',
-      hostId: 'host1',
-      hostName: 'Elena Vance',
+      hostId: { _id: 'host1', name: 'Elena Vance' },
       participantCount: 8
     };
     participants = getDemoParticipants();
@@ -279,12 +276,20 @@ async function loadRoomDetails() {
 }
 
 function updateRoomUI(room) {
+  // Extract genre from description
+  let genre = 'Discussion';
+  let description = room.description || '';
+  const genreMatch = description.match(/^\[(.*?)\]/);
+  if (genreMatch) {
+    genre = genreMatch[1];
+  }
+  
   document.getElementById('hdr-name').textContent = room.name || 'Voice Room';
-  document.getElementById('hdr-genre').textContent = room.genre || 'Discussion';
+  document.getElementById('hdr-genre').textContent = genre;
   document.getElementById('hdr-count').textContent = (room.participantCount || participants.length) + ' participants';
   document.title = `Litlink — ${room.name || 'Voice Room'}`;
   
-  const isHost = room.hostId === currentUser.id;
+  const isHost = room.hostId && room.hostId._id === currentUser.id;
   if (isHost) {
     console.log('👑 You are the host');
     setTimeout(() => addHostControls(), 500);
@@ -346,12 +351,12 @@ function connectToRoom(token) {
       participants = data.participants || [];
       
       if (roomData) {
-        roomData.hostId = data.hostId;
+        roomData.hostId = { _id: data.hostId, name: data.hostName };
       } else {
         roomData = {
-          id: roomId,
+          _id: roomId,
           name: data.roomName,
-          hostId: data.hostId
+          hostId: { _id: data.hostId, name: data.hostName }
         };
       }
       
@@ -664,11 +669,19 @@ function renderParticipants() {
   const featured = participants.find(p => p.featured) || participants[0] || { userId: 'host', name: 'Host', initials: 'H' };
   const gridPeople = participants.filter(p => !p.featured && p.userId !== currentUser.id);
   
+  // Extract genre from description
+  let genre = 'Discussion';
+  let description = roomData?.description || '';
+  const genreMatch = description.match(/^\[(.*?)\]/);
+  if (genreMatch) {
+    genre = genreMatch[1];
+  }
+  
   const currentUserParticipant = {
     userId: currentUser.id,
-    name: currentUser.name + (currentUser.id === roomData?.hostId ? ' (Host)' : ' (You)'),
+    name: currentUser.name + (roomData?.hostId && roomData.hostId._id === currentUser.id ? ' (Host)' : ' (You)'),
     initials: getInitials(currentUser.name),
-    isHost: roomData?.hostId === currentUser.id,
+    isHost: roomData?.hostId && roomData.hostId._id === currentUser.id,
     isMuted: !isMicOn,
     handRaised: isHandUp,
     isSpeaking: window.lastSpeakingStatus || false,
@@ -728,7 +741,16 @@ function renderParticipants() {
 
 function renderSidebar() {
   const host = participants.find(p => p.isHost) || 
-               (roomData?.hostId ? { userId: roomData.hostId, name: roomData.hostName || 'Host' } : participants[0]);
+               (roomData?.hostId ? { userId: roomData.hostId._id, name: roomData.hostId.name || 'Host' } : participants[0]);
+  
+  // Extract genre from description
+  let genre = 'Discussion';
+  let description = roomData?.description || '';
+  const genreMatch = description.match(/^\[(.*?)\]/);
+  if (genreMatch) {
+    genre = genreMatch[1];
+    description = description.replace(/^\[.*?\]\s*/, '');
+  }
   
   const sidebarBody = document.getElementById('rsb-body');
   if (!sidebarBody) return;
@@ -736,7 +758,7 @@ function renderSidebar() {
   sidebarBody.innerHTML = `
     <div class="rsb-section">
       <div class="rsb-label">About</div>
-      <p class="rsb-about">Welcome to <strong>${escapeHtml(roomData?.name || 'this room')}</strong>. A place to discuss all things <strong>${escapeHtml(roomData?.genre || 'literature')}</strong>. Be respectful and wait your turn to speak.</p>
+      <p class="rsb-about">Welcome to <strong>${escapeHtml(roomData?.name || 'this room')}</strong>. ${description ? escapeHtml(description) : `A place to discuss all things <strong>${escapeHtml(genre)}</strong>.`} Be respectful and wait your turn to speak.</p>
     </div>
 
     <div class="rsb-section">
@@ -757,8 +779,8 @@ function renderSidebar() {
       <div class="rsb-p-list">
         <div class="rsb-p-row">
           <div class="rsb-p-av ${window.lastSpeakingStatus ? 'speaking' : ''}">${getInitials(currentUser.name)}</div>
-          <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${currentUser.id === roomData?.hostId ? '(Host)' : '(You)'}</span>
-          ${roomData?.hostId === currentUser.id ? '<span class="rsb-p-icon crown">👑</span>' : ''}
+          <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${roomData?.hostId && roomData.hostId._id === currentUser.id ? '(Host)' : '(You)'}</span>
+          ${roomData?.hostId && roomData.hostId._id === currentUser.id ? '<span class="rsb-p-icon crown">👑</span>' : ''}
           ${isHandUp ? '<span class="rsb-p-icon" style="color: var(--accent-gold);">✋</span>' : ''}
         </div>
         
