@@ -11,24 +11,25 @@ class MatchController {
       const limit = parseInt(req.query.limit) || 10;
       const minMatchPercentage = parseInt(req.query.minMatchPercentage) || 0;
       
-      console.log(`📊 Getting matches for: ${currentUser.name}`);
+      console.log(`📊 Getting matches for: ${currentUser.name} (ID: ${currentUser._id})`);
       
+      // Get all active users
       const allUsers = await User.find({
         _id: { $ne: currentUser._id },
         isBanned: false,
         isSuspended: false
       }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
       
-      let topMatches = matchService.getTopMatches(currentUser, allUsers, limit);
+      console.log(`📚 Found ${allUsers.length} potential matches`);
       
-      if (minMatchPercentage > 0) {
-        topMatches = topMatches.filter(m => m.matchPercentage >= minMatchPercentage);
-      }
+      // Get top matches
+      let topMatches = matchService.getTopMatches(currentUser, allUsers, limit, minMatchPercentage);
       
+      // Add user details and compatibility
       const matchesWithDetails = await Promise.all(
         topMatches.map(async (match) => {
           const user = await User.findById(match.userId)
-            .select('name username profilePicture bio favoriteGenres favoriteAuthors favoriteBooks location');
+            .select('name username profilePicture bio favoriteGenres favoriteAuthors favoriteBooks location readingHabit readingGoal');
           
           return {
             ...match,
@@ -38,17 +39,24 @@ class MatchController {
         })
       );
       
+      // Get match stats
+      const stats = matchService.getMatchStats(currentUser, allUsers);
+      
       res.json({
         success: true,
         matches: matchesWithDetails,
         total: matchesWithDetails.length,
+        stats: stats,
         filters: { limit, minMatchPercentage },
         userInterests: {
           genres: currentUser.favoriteGenres || [],
           authors: currentUser.favoriteAuthors || [],
-          books: currentUser.favoriteBooks || []
+          books: currentUser.favoriteBooks || [],
+          readingHabit: currentUser.readingHabit,
+          preferredFormats: currentUser.preferredFormats
         }
       });
+      
     } catch (error) {
       console.error('❌ Error getting matches:', error);
       res.status(500).json({
@@ -80,6 +88,7 @@ class MatchController {
       const matchDetails = matchService.calculateMatchScore(currentUser, otherUser);
       const compatibility = matchService.getCompatibilitySummary(currentUser, otherUser);
       
+      // Find common interests
       const commonBooks = currentUser.favoriteBooks?.filter(book => 
         otherUser.favoriteBooks?.includes(book)
       ) || [];
@@ -91,6 +100,13 @@ class MatchController {
       const commonGenres = currentUser.favoriteGenres?.filter(genre => 
         otherUser.favoriteGenres?.includes(genre)
       ) || [];
+      
+      // Calculate reading goal similarity
+      let readingGoalMatch = false;
+      if (currentUser.readingGoal && otherUser.readingGoal) {
+        const goalDiff = Math.abs(currentUser.readingGoal - otherUser.readingGoal);
+        readingGoalMatch = goalDiff <= 10;
+      }
       
       res.json({
         success: true,
@@ -118,10 +134,13 @@ class MatchController {
             genres: commonGenres,
             authors: commonAuthors,
             books: commonBooks,
+            readingGoalMatch: readingGoalMatch,
             total: commonGenres.length + commonAuthors.length + commonBooks.length
-          }
+          },
+          recommendations: this.generateRecommendations(currentUser, otherUser, commonGenres, commonAuthors, commonBooks)
         }
       });
+      
     } catch (error) {
       console.error('❌ Error getting match details:', error);
       res.status(500).json({
@@ -130,6 +149,47 @@ class MatchController {
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
+  }
+
+  /**
+   * Generate personalized recommendations based on match
+   */
+  generateRecommendations(currentUser, otherUser, commonGenres, commonAuthors, commonBooks) {
+    const recommendations = [];
+    
+    if (commonGenres.length > 0) {
+      recommendations.push({
+        type: 'genre',
+        message: `You both enjoy ${commonGenres.slice(0, 3).join(', ')}. Why not discuss your favorite books in these genres?`,
+        action: 'Start a discussion'
+      });
+    }
+    
+    if (commonAuthors.length > 0) {
+      recommendations.push({
+        type: 'author',
+        message: `You share ${commonAuthors.length} favorite author${commonAuthors.length > 1 ? 's' : ''}. Ask ${otherUser.name} which ${commonAuthors[0]} book they recommend!`,
+        action: 'Send a message'
+      });
+    }
+    
+    if (commonBooks.length > 0) {
+      recommendations.push({
+        type: 'book',
+        message: `You both love ${commonBooks[0]}. Compare your thoughts on the characters and plot!`,
+        action: 'Discuss now'
+      });
+    }
+    
+    if (recommendations.length === 0) {
+      recommendations.push({
+        type: 'suggestion',
+        message: `You haven't found common interests yet. Why not ask ${otherUser.name} about their favorite books?`,
+        action: 'Start conversation'
+      });
+    }
+    
+    return recommendations;
   }
 
   /**
@@ -146,12 +206,33 @@ class MatchController {
         isSuspended: false
       }).select('-password');
       
-      let matches = matchService.getFilteredMatches(currentUser, allUsers, {
-        minMatchPercentage,
-        genres,
-        authors,
-        books
-      });
+      let matches = matchService.getTopMatches(currentUser, allUsers, 100);
+      
+      // Apply filters
+      if (minMatchPercentage) {
+        matches = matches.filter(m => m.matchPercentage >= minMatchPercentage);
+      }
+      
+      if (genres && genres.length > 0) {
+        matches = matches.filter(m => {
+          const user = allUsers.find(u => u._id.toString() === m.userId.toString());
+          return user && user.favoriteGenres?.some(g => genres.includes(g));
+        });
+      }
+      
+      if (authors && authors.length > 0) {
+        matches = matches.filter(m => {
+          const user = allUsers.find(u => u._id.toString() === m.userId.toString());
+          return user && user.favoriteAuthors?.some(a => authors.includes(a));
+        });
+      }
+      
+      if (books && books.length > 0) {
+        matches = matches.filter(m => {
+          const user = allUsers.find(u => u._id.toString() === m.userId.toString());
+          return user && user.favoriteBooks?.some(b => books.includes(b));
+        });
+      }
       
       matches = matches.slice(0, limit);
       
@@ -159,7 +240,6 @@ class MatchController {
         matches.map(async (match) => {
           const user = await User.findById(match.userId)
             .select('name username profilePicture bio favoriteGenres favoriteAuthors');
-          
           return { ...match, userDetails: user };
         })
       );
@@ -170,6 +250,7 @@ class MatchController {
         total: matchesWithDetails.length,
         filters: { minMatchPercentage, genres, authors, books }
       });
+      
     } catch (error) {
       console.error('❌ Error getting filtered matches:', error);
       res.status(500).json({
@@ -199,8 +280,9 @@ class MatchController {
       const suggestionsWithDetails = await Promise.all(
         suggestions.map(async (suggestion) => {
           const user = await User.findById(suggestion.userId)
-            .select('name username profilePicture bio favoriteGenres');
+            .select('name username profilePicture bio favoriteGenres favoriteAuthors favoriteBooks');
           
+          // Generate a friendly reason
           let reason = "Similar reading interests";
           if (suggestion.details.bookMatch > 0) {
             reason = `Also loves ${suggestion.details.bookList[0]}`;
@@ -210,7 +292,12 @@ class MatchController {
             reason = `Enjoys ${suggestion.details.genreList[0]} books too`;
           }
           
-          return { ...suggestion, userDetails: user, reason };
+          return { 
+            ...suggestion, 
+            userDetails: user, 
+            reason,
+            compatibilityLevel: this.getCompatibilityLevel(suggestion.matchPercentage)
+          };
         })
       );
       
@@ -219,6 +306,7 @@ class MatchController {
         suggestions: suggestionsWithDetails,
         total: suggestionsWithDetails.length
       });
+      
     } catch (error) {
       console.error('❌ Error getting suggestions:', error);
       res.status(500).json({
@@ -227,6 +315,14 @@ class MatchController {
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
+  }
+  
+  getCompatibilityLevel(percentage) {
+    if (percentage >= 80) return 'Excellent';
+    if (percentage >= 60) return 'Very Good';
+    if (percentage >= 40) return 'Good';
+    if (percentage >= 20) return 'Moderate';
+    return 'Low';
   }
 
   /**
@@ -259,6 +355,7 @@ class MatchController {
         matches,
         total: matches.length
       });
+      
     } catch (error) {
       console.error('❌ Error getting matches by book:', error);
       res.status(500).json({
@@ -270,7 +367,7 @@ class MatchController {
   }
 
   /**
-   * Get global matches
+   * Get global matches (top overall)
    */
   async getGlobalMatches(req, res) {
     try {
@@ -291,13 +388,14 @@ class MatchController {
       
       const matches = allUsers.map(user => 
         matchService.calculateMatchScore(currentUser, user)
-      ).sort((a, b) => b.score - a.score);
+      ).sort((a, b) => b.matchPercentage - a.matchPercentage);
       
       res.json({
         success: true,
         matches,
         total: matches.length
       });
+      
     } catch (error) {
       console.error('❌ Error getting global matches:', error);
       res.status(500).json({
@@ -337,11 +435,49 @@ class MatchController {
         message: 'Preferences updated successfully',
         user: updatedUser
       });
+      
     } catch (error) {
       console.error('❌ Error updating preferences:', error);
       res.status(500).json({
         success: false,
         message: 'Error updating preferences',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get match statistics for dashboard
+   */
+  async getMatchStats(req, res) {
+    try {
+      const currentUser = req.user;
+      
+      const allUsers = await User.find({
+        _id: { $ne: currentUser._id },
+        isBanned: false,
+        isSuspended: false
+      }).select('favoriteGenres favoriteAuthors favoriteBooks readingHabit readingGoal');
+      
+      const stats = matchService.getMatchStats(currentUser, allUsers);
+      
+      res.json({
+        success: true,
+        stats: stats,
+        yourPreferences: {
+          genres: currentUser.favoriteGenres || [],
+          authors: currentUser.favoriteAuthors || [],
+          books: currentUser.favoriteBooks || [],
+          readingHabit: currentUser.readingHabit,
+          readingGoal: currentUser.readingGoal
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error getting match stats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching match statistics',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
