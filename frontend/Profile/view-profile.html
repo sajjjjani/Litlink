@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Profile - Litlink</title>
+    <link rel="stylesheet" href="profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .view-profile-container {
+            max-width: 800px;
+            margin: 80px auto 40px;
+            padding: 20px;
+        }
+        .profile-card {
+            background: #3d2617;
+            border-radius: 24px;
+            padding: 32px;
+            border: 1px solid rgba(245,230,211,0.1);
+        }
+        .profile-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #e0b973;
+            margin-bottom: 16px;
+        }
+        .profile-name {
+            font-size: 1.8rem;
+            color: #f5e6d3;
+            margin-bottom: 8px;
+        }
+        .profile-username {
+            color: #d4b5a0;
+            margin-bottom: 16px;
+        }
+        .profile-bio {
+            color: #d4b5a0;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: rgba(245,230,211,0.05);
+            border-radius: 12px;
+        }
+        .info-section {
+            margin-bottom: 24px;
+        }
+        .info-section h3 {
+            color: #e0b973;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+        }
+        .tags-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .tag {
+            background: rgba(245,230,211,0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #d4b5a0;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+        }
+        .btn-primary, .btn-secondary {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #e0b973;
+            color: #2c1810;
+        }
+        .btn-primary:hover {
+            background: #f0c98a;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #e0b973;
+            color: #e0b973;
+        }
+        .btn-secondary:hover {
+            background: rgba(224,185,115,0.1);
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #d4b5a0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span>Litlink</span>
+            </div>
+            <div class="nav-links">
+                <a href="../Dashboard/dashboard.html"><i class="fas fa-home"></i> Home</a>
+                <a href="../Chat/chat.html"><i class="fas fa-comments"></i> Chat</a>
+                <a href="../Discussion Board/discussion.html"><i class="fas fa-users"></i> Discussions</a>
+                <a href="../Profile/profile.html"><i class="fas fa-user"></i> My Profile</a>
+            </div>
+            <a href="../Chat/chatexplore.html" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </nav>
+
+    <div class="view-profile-container">
+        <div id="profileContent" class="profile-card">
+            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading profile...</div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('id');
+        
+        async function loadProfile() {
+            if (!userId) {
+                window.location.href = '../Chat/chatexplore.html';
+                return;
+            }
+            
+            try {
+                const token = localStorage.getItem('litlink_token');
+                const response = await fetch(`http://localhost:5002/api/users/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('User not found');
+                
+                const user = await response.json();
+                renderProfile(user);
+                
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                document.getElementById('profileContent').innerHTML = `
+                    <div class="empty-state" style="text-align:center">
+                        <i class="fas fa-exclamation-triangle" style="font-size:3rem;margin-bottom:16px"></i>
+                        <p>User not found</p>
+                        <button onclick="window.location.href='../Chat/chatexplore.html'" class="btn-primary">Back to Explore</button>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderProfile(user) {
+            const profileHtml = `
+                <div class="profile-header">
+                    ${user.profilePicture && user.profilePicture !== 'null' ? 
+                        `<img src="${user.profilePicture}" alt="${user.name}" class="profile-avatar">` :
+                        `<div class="profile-avatar" style="background:linear-gradient(135deg,#5c3a28,#3d2417);display:flex;align-items:center;justify-content:center;font-size:48px;margin:0 auto 16px">
+                            ${user.name.charAt(0).toUpperCase()}
+                        </div>`
+                    }
+                    <h1 class="profile-name">${escapeHtml(user.name)}</h1>
+                    <div class="profile-username">@${user.username || user.name.toLowerCase().replace(' ', '')}</div>
+                    ${user.bio ? `<div class="profile-bio">${escapeHtml(user.bio)}</div>` : ''}
+                </div>
+                
+                <div class="info-section">
+                    <h3>📚 Favorite Genres</h3>
+                    <div class="tags-list">
+                        ${(user.favoriteGenres || []).map(genre => `<span class="tag">${escapeHtml(genre)}</span>`).join('')}
+                        ${(!user.favoriteGenres || user.favoriteGenres.length === 0) ? '<span class="tag">Not specified</span>' : ''}
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>✍️ Favorite Authors</h3>
+                    <div class="tags-list">
+                        ${(user.favoriteAuthors || []).map(author => `<span class="tag">${escapeHtml(author)}</span>`).join('')}
+                        ${(!user.favoriteAuthors || user.favoriteAuthors.length === 0) ? '<span class="tag">Not specified</span>' : ''}
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>📖 Favorite Books</h3>
+                    <div class="tags-list">
+                        ${(user.favoriteBooks || []).map(book => `<span class="tag">${escapeHtml(book)}</span>`).join('')}
+                        ${(!user.favoriteBooks || user.favoriteBooks.length === 0) ? '<span class="tag">Not specified</span>' : ''}
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>⏰ Reading Habit</h3>
+                    <div class="tags-list">
+                        <span class="tag">${user.readingHabit || 'Not specified'}</span>
+                        ${user.readingGoal ? `<span class="tag">Goal: ${user.readingGoal} books/year</span>` : ''}
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn-secondary" onclick="window.location.href='../Chat/chatexplore.html'">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button class="btn-primary" onclick="messageUser()">
+                        <i class="fas fa-comment"></i> Send Message
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('profileContent').innerHTML = profileHtml;
+            window.currentUserProfile = user;
+        }
+        
+        function messageUser() {
+            if (window.currentUserProfile) {
+                window.location.href = `../Chat/chat.html?userId=${window.currentUserProfile._id}`;
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadProfile();
+    </script>
+</body>
+</html>
