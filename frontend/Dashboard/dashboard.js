@@ -1,5 +1,3 @@
-// Litlink - Book Community Dashboard - Real Data Integration
-
 // ===== AUTHENTICATION & SESSION FUNCTIONS =====
 
 function checkAuth() {
@@ -665,28 +663,31 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // ===== LOAD REAL DATA FROM API ENDPOINTS =====
-
 async function loadTopMatches(token) {
     try {
-        const response = await fetch('http://localhost:5002/api/users/matches', {
+        // Change from /api/users/matches to /api/matches/matches
+        const response = await fetch('http://localhost:5002/api/matches/matches?limit=4', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
             const data = await response.json();
+            console.log('📊 Matches loaded:', data);
+            
             if (data.success && data.matches) {
-                // Filter out system admin
+                // Filter out system admin and any non-real users
                 const filteredMatches = data.matches.filter(m => 
                     m.name !== 'System Admin' && 
                     m.name !== 'Admin' && 
-                    !m.isSystem &&
-                    m.role !== 'admin'
+                    !m.userDetails?.isSystem &&
+                    m.userDetails?.role !== 'admin'
                 );
                 populateTopMatches(filteredMatches);
             } else {
                 populateTopMatches([]);
             }
         } else {
+            console.error('Failed to load matches:', response.status);
             populateTopMatches([]);
         }
     } catch (error) {
