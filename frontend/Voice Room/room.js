@@ -19,7 +19,6 @@ function loadSocketIO() {
       resolve();
       return;
     }
-    
     const script = document.createElement('script');
     script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
     script.crossOrigin = 'anonymous';
@@ -40,7 +39,6 @@ function loadSimplePeer() {
       resolve();
       return;
     }
-    
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js';
     script.onload = resolve;
@@ -53,20 +51,23 @@ function loadSimplePeer() {
   });
 }
 
-// Check if current user is host
+// FIX: compare both sides as strings — hostId._id is a Mongoose ObjectId object, not a plain string
 function isCurrentUserHost() {
-  return roomData && roomData.hostId && roomData.hostId._id === currentUser.id;
+  if (!roomData || !currentUser) return false;
+  const hostId = roomData.hostId?._id
+    ? roomData.hostId._id.toString()
+    : roomData.hostId?.toString();
+  return hostId === currentUser.id?.toString();
 }
 
-// Add end room button to UI
+// Add end room button to UI (host only)
 function addHostControls() {
   const controlsContainer = document.getElementById('room-controls');
   if (!controlsContainer) return;
-  
-  // Remove existing end room button if present
+
   const existingEndBtn = document.getElementById('ctrl-end-room');
   if (existingEndBtn) existingEndBtn.remove();
-  
+
   if (isCurrentUserHost()) {
     const endRoomBtn = document.createElement('button');
     endRoomBtn.id = 'ctrl-end-room';
@@ -80,8 +81,6 @@ function addHostControls() {
       </svg>
     `;
     endRoomBtn.addEventListener('click', confirmEndRoom);
-    
-    // Insert before leave button
     const leaveBtn = document.getElementById('ctrl-leave');
     if (leaveBtn) {
       controlsContainer.insertBefore(endRoomBtn, leaveBtn);
@@ -105,7 +104,6 @@ function confirmEndRoom() {
     z-index: 10000;
     animation: fadeIn 0.2s ease;
   `;
-  
   modal.innerHTML = `
     <div style="background: var(--bg-secondary); border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
       <h3 style="margin-bottom: 12px; color: var(--text-primary);">End Room</h3>
@@ -116,14 +114,9 @@ function confirmEndRoom() {
       </div>
     </div>
   `;
-  
   document.body.appendChild(modal);
-  
-  const cancelBtn = modal.querySelector('#cancel-end');
-  const confirmBtn = modal.querySelector('#confirm-end');
-  
-  cancelBtn.addEventListener('click', () => modal.remove());
-  confirmBtn.addEventListener('click', async () => {
+  modal.querySelector('#cancel-end').addEventListener('click', () => modal.remove());
+  modal.querySelector('#confirm-end').addEventListener('click', async () => {
     modal.remove();
     await endRoom();
   });
@@ -134,7 +127,6 @@ async function endRoom() {
   try {
     const token = localStorage.getItem('authToken');
     showToast('Ending room...', 'info');
-    
     const response = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}/end`, {
       method: 'POST',
       headers: {
@@ -142,25 +134,14 @@ async function endRoom() {
         'Content-Type': 'application/json'
       }
     });
-    
     const data = await response.json();
-    
     if (data.success) {
       showToast('Room ended successfully', 'success');
-      
-      // Clean up and redirect
       cleanupWebRTC();
-      
       if (socket && socket.connected) {
-        socket.emit('leave-voice-room', {
-          roomId,
-          userId: currentUser.id
-        });
+        socket.emit('leave-voice-room', { roomId, userId: currentUser.id });
       }
-      
-      setTimeout(() => {
-        window.location.href = 'voice-rooms.html';
-      }, 1500);
+      setTimeout(() => { window.location.href = 'voice-rooms.html'; }, 1500);
     } else {
       showToast(data.message || 'Failed to end room', 'error');
     }
@@ -173,12 +154,10 @@ async function endRoom() {
 /* ===== INITIALIZATION ===== */
 async function init() {
   console.log('🎙 Initializing Voice Room...');
-  
   const params = new URLSearchParams(window.location.search);
   roomId = params.get('id');
-  
   console.log('📌 Room ID from URL:', roomId);
-  
+
   if (!roomId || roomId === 'undefined' || roomId === 'null') {
     console.error('❌ No valid room ID provided');
     showToast('Invalid room - no room ID found', 'error');
@@ -200,29 +179,22 @@ async function init() {
     setTimeout(() => window.location.href = 'voice-rooms.html', 3000);
     return;
   }
-  
+
   const token = localStorage.getItem('authToken');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  
   if (!token || !user.id) {
     console.log('❌ Not authenticated');
     window.location.href = '../login.html';
     return;
   }
-  
+
   currentUser = user;
-  
   updateUserUI();
-  
   await loadSocketIO();
   await loadSimplePeer();
-  
   await loadRoomDetails();
-  
   connectToRoom(token);
-  
   setupEventListeners();
-  
   renderChatReactions();
 }
 
@@ -244,11 +216,9 @@ async function loadRoomDetails() {
     const response = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
     const data = await response.json();
     if (data.success) {
       roomData = data.room;
@@ -260,36 +230,39 @@ async function loadRoomDetails() {
     }
   } catch (error) {
     console.error('Error loading room details:', error);
-    showToast('Using demo mode', 'info');
-    
-    roomData = {
-      _id: roomId,
-      name: 'Fantasy World Debate',
-      genre: 'Fantasy',
-      hostId: { _id: 'host1', name: 'Elena Vance' },
-      participantCount: 8
-    };
-    participants = getDemoParticipants();
-    updateRoomUI(roomData);
-    renderParticipants();
+    showToast('Failed to load room details', 'error');
+    // FIX: removed demo data fallback — show a real error instead
+    const stageContent = document.getElementById('stage-content');
+    if (stageContent) {
+      stageContent.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px;">
+          <p style="color: var(--text-muted); margin-bottom: 20px;">Could not load room. Please try again.</p>
+          <button onclick="window.location.href='voice-rooms.html'" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: var(--bg-primary); cursor: pointer;">Return to Lobby</button>
+        </div>
+      `;
+    }
   }
 }
 
 function updateRoomUI(room) {
-  // Extract genre from description
-  let genre = 'Discussion';
+  // FIX: use room.genre directly; fall back to bracket extraction only for legacy rooms
+  let genre = room.genre || 'Discussion';
   let description = room.description || '';
-  const genreMatch = description.match(/^\[(.*?)\]/);
-  if (genreMatch) {
-    genre = genreMatch[1];
+  if (!room.genre) {
+    const genreMatch = description.match(/^\[(.*?)\]/);
+    if (genreMatch) genre = genreMatch[1];
   }
-  
+
   document.getElementById('hdr-name').textContent = room.name || 'Voice Room';
   document.getElementById('hdr-genre').textContent = genre;
   document.getElementById('hdr-count').textContent = (room.participantCount || participants.length) + ' participants';
   document.title = `Litlink — ${room.name || 'Voice Room'}`;
-  
-  const isHost = room.hostId && room.hostId._id === currentUser.id;
+
+  // FIX: compare as strings — ObjectId !== plain string without .toString()
+  const hostId = room.hostId?._id
+    ? room.hostId._id.toString()
+    : room.hostId?.toString();
+  const isHost = hostId === currentUser.id?.toString();
   if (isHost) {
     console.log('👑 You are the host');
     setTimeout(() => addHostControls(), 500);
@@ -304,11 +277,10 @@ function connectToRoom(token) {
       showToast('Using offline mode', 'warning');
       return;
     }
-    
-    const socketUrl = window.location.hostname === '127.0.0.1' 
-      ? 'http://127.0.0.1:5002' 
+    const socketUrl = window.location.hostname === '127.0.0.1'
+      ? 'http://127.0.0.1:5002'
       : 'http://localhost:5002';
-    
+
     socket = io(socketUrl, {
       path: '/socket.io',
       transports: ['polling', 'websocket'],
@@ -333,7 +305,6 @@ function connectToRoom(token) {
     socket.on('authenticated', (data) => {
       if (data.success) {
         console.log('🔐 Authentication successful');
-        
         setTimeout(() => {
           socket.emit('join-voice-room', {
             roomId,
@@ -349,7 +320,7 @@ function connectToRoom(token) {
     socket.on('room-joined', (data) => {
       console.log('✅ Joined room:', data.roomName);
       participants = data.participants || [];
-      
+
       if (roomData) {
         roomData.hostId = { _id: data.hostId, name: data.hostName };
       } else {
@@ -359,45 +330,36 @@ function connectToRoom(token) {
           hostId: { _id: data.hostId, name: data.hostName }
         };
       }
-      
+
       renderParticipants();
       showToast(`Joined ${data.roomName}`, 'success');
-      
       addHostControls();
-      
+
       if (typeof SimplePeer !== 'undefined') {
         initWebRTC(participants);
       } else {
-        console.log('SimplePeer not loaded, using demo mode');
+        console.log('SimplePeer not loaded, voice streaming unavailable');
       }
     });
 
     socket.on('user-joined', (data) => {
       console.log('👤 User joined:', data.userName);
       participants = data.participants || participants;
-      
       addParticipantToUI(data);
-      
       if (data.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
         createPeerConnection(data.userId, true);
       }
-      
       showToast(`${data.userName || 'Someone'} joined`, 'info');
     });
 
     socket.on('user-left', (data) => {
       console.log('👋 User left:', data.userId);
-      
       removeParticipantFromUI(data.userId);
       participants = participants.filter(p => p.userId !== data.userId);
-      
       if (peerConnections[data.userId]) {
-        try {
-          peerConnections[data.userId].destroy();
-        } catch (e) {}
+        try { peerConnections[data.userId].destroy(); } catch (e) {}
         delete peerConnections[data.userId];
       }
-      
       document.getElementById('hdr-count').textContent = participants.length + ' participants';
     });
 
@@ -421,18 +383,14 @@ function connectToRoom(token) {
       console.log('📢 Room ended:', data.message);
       showToast(data.message || 'Room has ended', 'warning');
       cleanupWebRTC();
-      setTimeout(() => {
-        window.location.href = 'voice-rooms.html';
-      }, 3000);
+      setTimeout(() => { window.location.href = 'voice-rooms.html'; }, 3000);
     });
 
     socket.on('server-shutdown', (data) => {
       console.log('🔌 Server shutdown:', data.message);
       showToast(data.message || 'Server is shutting down', 'warning');
       cleanupWebRTC();
-      setTimeout(() => {
-        window.location.href = 'voice-rooms.html';
-      }, 3000);
+      setTimeout(() => { window.location.href = 'voice-rooms.html'; }, 3000);
     });
 
     socket.on('disconnect', (reason) => {
@@ -452,18 +410,15 @@ function connectToRoom(token) {
 
     socket.on('signal', async (data) => {
       const { from, signal } = data;
-      
       try {
         if (!peerConnections[from] && typeof SimplePeer !== 'undefined') {
           await createPeerConnection(from, false);
         }
-        
         if (peerConnections[from]) {
           await peerConnections[from].signal(signal);
         }
       } catch (error) {
         console.error('Error handling signal:', error);
-        
         if (error.message && error.message.includes('Invalid signaling data')) {
           console.log('Retrying with new connection for:', from);
           await recreatePeerConnection(from);
@@ -480,24 +435,21 @@ function connectToRoom(token) {
 /* ===== WEBRTC IMPLEMENTATION ===== */
 async function initWebRTC(existingParticipants) {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ 
+    localStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true
-      } 
+      }
     });
-    
     console.log('✅ Microphone access granted');
     window.localStream = localStream;
     initAudioAnalysis();
-    
     for (const participant of existingParticipants) {
       if (participant.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
         await createPeerConnection(participant.userId, true);
       }
     }
-    
   } catch (error) {
     console.error('Error accessing microphone:', error);
     showToast('Please allow microphone access to join voice chat', 'error');
@@ -512,7 +464,6 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
         console.error('SimplePeer not loaded');
         return reject('SimplePeer not available');
       }
-      
       const peer = new SimplePeer({
         initiator: isInitiator,
         stream: localStream,
@@ -524,21 +475,9 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
             { urls: 'stun:stun4.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-              username: 'openrelayproject',
-              credential: 'openrelayproject'
-            }
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
           ],
           iceCandidatePoolSize: 10
         }
@@ -546,17 +485,12 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
 
       peer.on('signal', (signal) => {
         if (socket && socket.connected) {
-          socket.emit('signal', {
-            to: targetUserId,
-            signal,
-            roomId: roomId
-          });
+          socket.emit('signal', { to: targetUserId, signal, roomId });
         }
       });
 
       peer.on('stream', (stream) => {
         console.log('📡 Received stream from user:', targetUserId);
-        
         let audio = document.getElementById(`audio-${targetUserId}`);
         if (!audio) {
           audio = document.createElement('audio');
@@ -566,7 +500,6 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
           document.body.appendChild(audio);
         }
         audio.srcObject = stream;
-        
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch(e => {
@@ -595,7 +528,6 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
 
       peerConnections[targetUserId] = peer;
       resolve(peer);
-      
     } catch (error) {
       console.error('Error creating peer connection:', error);
       reject(error);
@@ -605,56 +537,40 @@ async function createPeerConnection(targetUserId, isInitiator = false) {
 
 async function recreatePeerConnection(targetUserId) {
   if (peerConnections[targetUserId]) {
-    try {
-      peerConnections[targetUserId].destroy();
-    } catch (e) {}
+    try { peerConnections[targetUserId].destroy(); } catch (e) {}
     delete peerConnections[targetUserId];
   }
-  
   const audio = document.getElementById(`audio-${targetUserId}`);
   if (audio) audio.remove();
-  
   await createPeerConnection(targetUserId, true);
 }
 
 function initAudioAnalysis() {
   if (!localStream) return;
-  
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaStreamSource(localStream);
     source.connect(analyser);
     analyser.fftSize = 256;
-    
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
-    
+
     speakingInterval = setInterval(() => {
       if (!analyser) return;
-      
       analyser.getByteFrequencyData(dataArray);
       let sum = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i];
-      }
+      for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
       const average = sum / bufferLength;
       const isCurrentlySpeaking = average > 20;
-      
       if (window.lastSpeakingStatus !== isCurrentlySpeaking) {
         window.lastSpeakingStatus = isCurrentlySpeaking;
         if (socket && socket.connected) {
-          socket.emit('speaking', {
-            roomId,
-            userId: currentUser.id,
-            isSpeaking: isCurrentlySpeaking
-          });
+          socket.emit('speaking', { roomId, userId: currentUser.id, isSpeaking: isCurrentlySpeaking });
         }
-        
         updateOwnSpeaking(isCurrentlySpeaking);
       }
     }, 100);
-    
   } catch (error) {
     console.error('Error initializing audio analysis:', error);
   }
@@ -662,35 +578,33 @@ function initAudioAnalysis() {
 
 /* ===== UI RENDERING ===== */
 function renderParticipants() {
-  if (!participants || participants.length === 0) {
-    participants = getDemoParticipants();
-  }
-  
-  const featured = participants.find(p => p.featured) || participants[0] || { userId: 'host', name: 'Host', initials: 'H' };
-  const gridPeople = participants.filter(p => !p.featured && p.userId !== currentUser.id);
-  
-  // Extract genre from description
-  let genre = 'Discussion';
-  let description = roomData?.description || '';
-  const genreMatch = description.match(/^\[(.*?)\]/);
-  if (genreMatch) {
-    genre = genreMatch[1];
-  }
-  
+  // FIX: never replace empty participants with demo data — only show real users
+  const allParticipants = participants || [];
+
+  // FIX: compare userId as strings throughout
+  const hostId = roomData?.hostId?._id
+    ? roomData.hostId._id.toString()
+    : roomData?.hostId?.toString();
+  const amHost = hostId === currentUser.id?.toString();
+
   const currentUserParticipant = {
     userId: currentUser.id,
-    name: currentUser.name + (roomData?.hostId && roomData.hostId._id === currentUser.id ? ' (Host)' : ' (You)'),
+    name: currentUser.name + (amHost ? ' (Host)' : ' (You)'),
     initials: getInitials(currentUser.name),
-    isHost: roomData?.hostId && roomData.hostId._id === currentUser.id,
+    isHost: amHost,
     isMuted: !isMicOn,
     handRaised: isHandUp,
     isSpeaking: window.lastSpeakingStatus || false,
     color: '#C9A27B'
   };
-  
+
+  // Featured speaker: first non-current-user participant, or current user if alone
+  const featured = allParticipants.find(p => p.userId?.toString() !== currentUser.id?.toString()) || currentUserParticipant;
+  const gridPeople = allParticipants.filter(p => p.userId?.toString() !== currentUser.id?.toString());
+
   const stageContent = document.getElementById('stage-content');
   if (!stageContent) return;
-  
+
   stageContent.innerHTML = `
     <div class="featured-speaker">
       <div class="featured-ring-wrap">
@@ -716,7 +630,7 @@ function renderParticipants() {
         <div class="pc-name">${escapeHtml(currentUserParticipant.name)}</div>
         <div class="pc-status">${currentUserParticipant.isSpeaking ? 'Speaking' : (!isMicOn ? 'Muted' : 'Listening')}</div>
       </div>
-      
+
       ${gridPeople.map((p, i) => `
         <div class="participant-card" data-user-id="${p.userId}" style="animation-delay:${i * 0.06}s">
           <div class="pc-avatar-wrap">
@@ -735,26 +649,34 @@ function renderParticipants() {
       `).join('')}
     </div>
   `;
-  
+
   renderSidebar();
 }
 
 function renderSidebar() {
-  const host = participants.find(p => p.isHost) || 
-               (roomData?.hostId ? { userId: roomData.hostId._id, name: roomData.hostId.name || 'Host' } : participants[0]);
-  
-  // Extract genre from description
-  let genre = 'Discussion';
+  // FIX: use toString() for hostId comparison
+  const hostId = roomData?.hostId?._id
+    ? roomData.hostId._id.toString()
+    : roomData?.hostId?.toString();
+  const amHost = hostId === currentUser.id?.toString();
+
+  const host = participants.find(p => p.isHost) ||
+    (roomData?.hostId ? { userId: hostId, name: roomData.hostId.name || roomData.hostName || 'Host' } : null);
+
+  // FIX: use room.genre directly; fall back to bracket extraction for legacy rooms
+  let genre = roomData?.genre || 'Discussion';
   let description = roomData?.description || '';
-  const genreMatch = description.match(/^\[(.*?)\]/);
-  if (genreMatch) {
-    genre = genreMatch[1];
-    description = description.replace(/^\[.*?\]\s*/, '');
+  if (!roomData?.genre) {
+    const genreMatch = description.match(/^\[(.*?)\]/);
+    if (genreMatch) {
+      genre = genreMatch[1];
+      description = description.replace(/^\[.*?\]\s*/, '');
+    }
   }
-  
+
   const sidebarBody = document.getElementById('rsb-body');
   if (!sidebarBody) return;
-  
+
   sidebarBody.innerHTML = `
     <div class="rsb-section">
       <div class="rsb-label">About</div>
@@ -767,9 +689,7 @@ function renderSidebar() {
         <div class="rsb-host-av">${getInitials(host?.name || 'Host')}</div>
         <div>
           <div class="rsb-host-name">${escapeHtml(host?.name || 'Host')}</div>
-          <div class="rsb-host-badge">
-            👑 Room Creator
-          </div>
+          <div class="rsb-host-badge">👑 Room Creator</div>
         </div>
       </div>
     </div>
@@ -779,12 +699,12 @@ function renderSidebar() {
       <div class="rsb-p-list">
         <div class="rsb-p-row">
           <div class="rsb-p-av ${window.lastSpeakingStatus ? 'speaking' : ''}">${getInitials(currentUser.name)}</div>
-          <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${roomData?.hostId && roomData.hostId._id === currentUser.id ? '(Host)' : '(You)'}</span>
-          ${roomData?.hostId && roomData.hostId._id === currentUser.id ? '<span class="rsb-p-icon crown">👑</span>' : ''}
+          <span class="rsb-p-name">${escapeHtml(currentUser.name)} ${amHost ? '(Host)' : '(You)'}</span>
+          ${amHost ? '<span class="rsb-p-icon crown">👑</span>' : ''}
           ${isHandUp ? '<span class="rsb-p-icon" style="color: var(--accent-gold);">✋</span>' : ''}
         </div>
-        
-        ${participants.filter(p => p.userId !== currentUser.id).map(p => `
+
+        ${participants.filter(p => p.userId?.toString() !== currentUser.id?.toString()).map(p => `
           <div class="rsb-p-row">
             <div class="rsb-p-av ${p.isSpeaking ? 'speaking' : ''}">${getInitials(p.name)}</div>
             <span class="rsb-p-name">${escapeHtml(p.name)}</span>
@@ -811,7 +731,6 @@ function renderChatReactions() {
 function addParticipantToUI(data) {
   const exists = document.querySelector(`[data-user-id="${data.userId}"]`);
   if (exists) return;
-  
   participants.push({
     userId: data.userId,
     name: data.userName,
@@ -820,7 +739,6 @@ function addParticipantToUI(data) {
     isSpeaking: false,
     color: getRandomColor()
   });
-  
   renderParticipants();
   document.getElementById('hdr-count').textContent = participants.length + 1 + ' participants';
 }
@@ -830,9 +748,7 @@ function removeParticipantFromUI(userId) {
   if (element) {
     element.style.opacity = '0';
     element.style.transform = 'scale(0.8)';
-    setTimeout(() => {
-      element.remove();
-    }, 300);
+    setTimeout(() => { element.remove(); }, 300);
   }
 }
 
@@ -840,13 +756,11 @@ function updateParticipantMute(userId, isMuted) {
   const participant = participants.find(p => p.userId === userId);
   if (participant) {
     participant.isMuted = isMuted;
-    
     const card = document.querySelector(`[data-user-id="${userId}"] .pc-mic`);
     if (card) {
       card.className = `pc-mic ${isMuted ? 'muted' : 'active'}`;
       card.innerHTML = isMuted ? '🔇' : '🎤';
     }
-    
     const status = document.querySelector(`[data-user-id="${userId}"] .pc-status`);
     if (status) {
       status.textContent = isMuted ? 'Muted' : (participant.isSpeaking ? 'Speaking' : 'Listening');
@@ -858,7 +772,6 @@ function updateParticipantHand(userId, raised) {
   const participant = participants.find(p => p.userId === userId);
   if (participant) {
     participant.handRaised = raised;
-    
     const card = document.querySelector(`[data-user-id="${userId}"] .pc-hand`);
     if (raised && !card) {
       const wrap = document.querySelector(`[data-user-id="${userId}"] .pc-avatar-wrap`);
@@ -871,7 +784,6 @@ function updateParticipantHand(userId, raised) {
     } else if (!raised && card) {
       card.remove();
     }
-    
     renderSidebar();
   }
 }
@@ -880,39 +792,25 @@ function updateParticipantSpeaking(userId, isSpeaking) {
   const participant = participants.find(p => p.userId === userId);
   if (participant) {
     participant.isSpeaking = isSpeaking;
-    
     const avatar = document.querySelector(`[data-user-id="${userId}"] .pc-avatar`);
-    if (avatar) {
-      avatar.classList.toggle('speaking', isSpeaking);
-    }
-    
+    if (avatar) avatar.classList.toggle('speaking', isSpeaking);
     const status = document.querySelector(`[data-user-id="${userId}"] .pc-status`);
-    if (status) {
-      status.textContent = isSpeaking ? 'Speaking' : (participant.isMuted ? 'Muted' : 'Listening');
-    }
-    
+    if (status) status.textContent = isSpeaking ? 'Speaking' : (participant.isMuted ? 'Muted' : 'Listening');
     renderSidebar();
   }
 }
 
 function updateOwnSpeaking(isSpeaking) {
   const avatar = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-avatar`);
-  if (avatar) {
-    avatar.classList.toggle('speaking', isSpeaking);
-  }
-  
+  if (avatar) avatar.classList.toggle('speaking', isSpeaking);
   const status = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-status`);
-  if (status) {
-    status.textContent = isSpeaking ? 'Speaking' : (!isMicOn ? 'Muted' : 'Listening');
-  }
-  
+  if (status) status.textContent = isSpeaking ? 'Speaking' : (!isMicOn ? 'Muted' : 'Listening');
   renderSidebar();
 }
 
 /* ===== CHAT FUNCTIONS ===== */
 function sendMessage(text) {
   if (!text.trim()) return;
-  
   const message = {
     roomId,
     message: text.trim(),
@@ -920,15 +818,10 @@ function sendMessage(text) {
     userId: currentUser.id,
     timestamp: new Date().toISOString()
   };
-  
   if (socket && socket.connected) {
     socket.emit('room-message', message);
   }
-  
-  addChatMessage({
-    ...message,
-    id: 'local-' + Date.now()
-  });
+  addChatMessage({ ...message, id: 'local-' + Date.now() });
 }
 
 function sendReaction(reaction) {
@@ -938,12 +831,10 @@ function sendReaction(reaction) {
 function addChatMessage(message) {
   const container = document.getElementById('chat-messages');
   if (!container) return;
-  
   const isOwn = message.userName === currentUser.name || message.userId === currentUser.id;
   const initials = getInitials(message.userName);
   const colors = ['#A8D5BA', '#B4C7E8', '#D4B4E8', '#B4E8D4', '#E8C4B4'];
   const color = colors[Math.floor(Math.random() * colors.length)];
-  
   const messageEl = document.createElement('div');
   messageEl.className = 'chat-msg';
   messageEl.style.animation = 'fadeInUp 0.2s ease both';
@@ -957,7 +848,6 @@ function addChatMessage(message) {
       <p class="chat-msg-text">${escapeHtml(message.message)}</p>
     </div>
   `;
-  
   container.appendChild(messageEl);
   container.scrollTop = container.scrollHeight;
 }
@@ -968,48 +858,34 @@ function toggleMute() {
     showToast('Microphone not available', 'error');
     return;
   }
-  
   const audioTracks = localStream.getAudioTracks();
   if (audioTracks && audioTracks.length > 0) {
     isMicOn = !isMicOn;
     audioTracks[0].enabled = isMicOn;
-    
     const micBtn = document.getElementById('ctrl-mic');
     micBtn.className = `ctrl-btn ${isMicOn ? 'ctrl-mic-active' : 'ctrl-mic-neutral'}`;
     micBtn.setAttribute('aria-pressed', isMicOn);
     document.getElementById('mic-off-svg').style.display = isMicOn ? 'none' : 'block';
     document.getElementById('mic-on-svg').style.display = isMicOn ? 'block' : 'none';
-    
     const micIcon = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-mic`);
     if (micIcon) {
       micIcon.className = `pc-mic ${!isMicOn ? 'muted' : 'active'}`;
       micIcon.innerHTML = !isMicOn ? '🔇' : '🎤';
     }
-    
     const status = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-status`);
-    if (status) {
-      status.textContent = !isMicOn ? 'Muted' : (window.lastSpeakingStatus ? 'Speaking' : 'Listening');
-    }
-    
+    if (status) status.textContent = !isMicOn ? 'Muted' : (window.lastSpeakingStatus ? 'Speaking' : 'Listening');
     renderSidebar();
-    
     if (socket && socket.connected) {
-      socket.emit('toggle-mute', {
-        roomId,
-        userId: currentUser.id,
-        isMuted: !isMicOn
-      });
+      socket.emit('toggle-mute', { roomId, userId: currentUser.id, isMuted: !isMicOn });
     }
   }
 }
 
 function toggleHand() {
   isHandUp = !isHandUp;
-  
   const handBtn = document.getElementById('ctrl-hand');
   handBtn.className = `ctrl-btn ${isHandUp ? 'ctrl-hand-on' : 'ctrl-hand-off'}`;
   handBtn.setAttribute('aria-pressed', isHandUp);
-  
   const wrap = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-avatar-wrap`);
   if (wrap) {
     const existingHand = wrap.querySelector('.pc-hand');
@@ -1022,26 +898,16 @@ function toggleHand() {
       existingHand.remove();
     }
   }
-  
   renderSidebar();
-  
   if (socket && socket.connected) {
-    socket.emit('raise-hand', {
-      roomId,
-      userId: currentUser.id,
-      raised: isHandUp
-    });
+    socket.emit('raise-hand', { roomId, userId: currentUser.id, raised: isHandUp });
   }
 }
 
 function leaveRoom() {
   if (socket && socket.connected) {
-    socket.emit('leave-voice-room', {
-      roomId,
-      userId: currentUser.id
-    });
+    socket.emit('leave-voice-room', { roomId, userId: currentUser.id });
   }
-  
   cleanupWebRTC();
   window.location.href = 'voice-rooms.html';
 }
@@ -1051,17 +917,14 @@ function cleanupWebRTC() {
     try { peer.destroy(); } catch (e) {}
   });
   peerConnections = {};
-  
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
   }
-  
   if (speakingInterval) {
     clearInterval(speakingInterval);
     speakingInterval = null;
   }
-  
   if (audioContext) {
     audioContext.close();
     audioContext = null;
@@ -1085,18 +948,15 @@ function setupEventListeners() {
   document.getElementById('ctrl-mic')?.addEventListener('click', toggleMute);
   document.getElementById('ctrl-hand')?.addEventListener('click', toggleHand);
   document.getElementById('ctrl-leave')?.addEventListener('click', leaveRoom);
-  
   document.getElementById('open-chat-btn')?.addEventListener('click', openChatPanel);
   document.getElementById('chat-back-btn')?.addEventListener('click', closeChatPanel);
-  
+
   const chatInput = document.getElementById('chat-input');
   const chatSend = document.getElementById('chat-send');
-  
   if (chatInput) {
     chatInput.addEventListener('input', () => {
       if (chatSend) chatSend.disabled = !chatInput.value.trim();
     });
-    
     chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && chatInput.value.trim()) {
         e.preventDefault();
@@ -1106,7 +966,6 @@ function setupEventListeners() {
       }
     });
   }
-  
   if (chatSend) {
     chatSend.addEventListener('click', () => {
       if (chatInput && chatInput.value.trim()) {
@@ -1116,18 +975,15 @@ function setupEventListeners() {
       }
     });
   }
-  
+
   document.querySelector('.back-btn')?.addEventListener('click', (e) => {
     e.preventDefault();
     leaveRoom();
   });
-  
+
   window.addEventListener('beforeunload', () => {
     if (socket && socket.connected) {
-      socket.emit('leave-voice-room', {
-        roomId,
-        userId: currentUser.id
-      });
+      socket.emit('leave-voice-room', { roomId, userId: currentUser.id });
     }
     cleanupWebRTC();
   });
@@ -1153,11 +1009,9 @@ function escapeHtml(text) {
 
 function formatTime(timestamp) {
   if (!timestamp) return 'Just now';
-  
   const date = new Date(timestamp);
   const now = new Date();
   const diff = Math.floor((now - date) / 1000);
-  
   if (diff < 60) return 'Just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -1167,7 +1021,6 @@ function formatTime(timestamp) {
 function showToast(message, type = 'info') {
   const existingToast = document.querySelector('.room-toast');
   if (existingToast) existingToast.remove();
-  
   const toast = document.createElement('div');
   toast.className = 'room-toast';
   toast.style.cssText = `
@@ -1186,24 +1039,11 @@ function showToast(message, type = 'info') {
     max-width: 300px;
   `;
   toast.textContent = message;
-  
   document.body.appendChild(toast);
-  
   setTimeout(() => {
     toast.style.animation = 'slideOut 0.3s ease forwards';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
-}
-
-/* ===== DEMO DATA ===== */
-function getDemoParticipants() {
-  return [
-    { userId: 'host1', name: 'Elena Vance', initials: 'EV', isHost: true, isMuted: false, isSpeaking: false, handRaised: false, color: '#7A4030' },
-    { userId: 'user2', name: 'Marcus Chen', initials: 'MC', isHost: false, isMuted: true, isSpeaking: false, handRaised: false, color: '#5A3025' },
-    { userId: 'user3', name: 'Sarah Jenkins', initials: 'SJ', isHost: false, isMuted: false, isSpeaking: true, handRaised: false, color: '#6B3828', featured: true },
-    { userId: 'user4', name: 'David Kim', initials: 'DK', isHost: false, isMuted: false, isSpeaking: false, handRaised: false, color: '#5E3020' },
-    { userId: 'user5', name: 'Aisha Patel', initials: 'AP', isHost: false, isMuted: true, isSpeaking: false, handRaised: true, color: '#4F2A1A' }
-  ];
 }
 
 /* ===== STYLES ===== */
@@ -1245,12 +1085,8 @@ style.textContent = `
     animation: fadeInUp 0.2s ease;
     z-index: 5;
   }
-  .pc-mic {
-    z-index: 5;
-  }
-  .room-toast {
-    z-index: 9999;
-  }
+  .pc-mic { z-index: 5; }
+  .room-toast { z-index: 9999; }
   .ctrl-end-room {
     border-color: var(--live-red);
     background: rgba(232, 93, 74, 0.2);
