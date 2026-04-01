@@ -1,4 +1,3 @@
-// server.js - Complete with Voice Room, Circle, and MATCHING support
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -153,7 +152,7 @@ app.get('/', (req, res) => {
       notifications: '/api/notifications',
       discussions: '/api/discussions',
       voiceRooms: '/api/voice-rooms',
-      matches: '/api/matches', // 👈 NEW: Match endpoints
+      matches: '/api/matches',
       health: '/health'
     },
     features: {
@@ -249,9 +248,10 @@ const startServer = async () => {
     // Initialize WebSocket server with the HTTP server
     socketServer = new SocketServer(server);
     global.io = socketServer.io; // Make accessible globally
+    global.io._litlinkSocketServer = socketServer;
     global.activeRooms = socketServer.activeRooms; // For health checks
     
-    console.log('✅ WebSocket server initialized with voice room support');
+    console.log('✅ WebSocket server initialized with voice room and chat support');
     
     // Start listening
     server.listen(PORT, () => {
@@ -269,13 +269,21 @@ const startServer = async () => {
       console.log('   GET    /api/auth/me - Get current user');
       console.log('='.repeat(70));
       
-      console.log('📌 MATCHING ENDPOINTS: 👈 NEW');
+      console.log('📌 MATCHING ENDPOINTS:');
       console.log('   GET    /api/matches/matches - Get your matches');
       console.log('   GET    /api/matches/matches/:userId - Get match details');
       console.log('   GET    /api/matches/match-suggestions - Get suggestions');
       console.log('   GET    /api/matches/matches/by-book/:bookTitle - Find by book');
       console.log('   GET    /api/matches/global - Global top matches');
       console.log('   PUT    /api/matches/preferences - Update preferences');
+      console.log('='.repeat(70));
+      
+      console.log('📌 CHAT ENDPOINTS:');
+      console.log('   GET    /api/chat/matches - Get your chat matches');
+      console.log('   GET    /api/chat/messages/:matchId - Get messages with a user');
+      console.log('   POST   /api/chat/messages - Send a message');
+      console.log('   POST   /api/chat/conversations - Create/get conversation');
+      console.log('   POST   /api/chat/conversations/:id/messages - Send to conversation');
       console.log('='.repeat(70));
       
       console.log('📌 DISCUSSION ENDPOINTS:');
