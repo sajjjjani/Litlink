@@ -1,8 +1,8 @@
-// routes/discussionRoutes.js - Complete with Circle and Poll support
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const DiscussionThread = require('../models/DiscussionThread');
+const Circle = require('../models/Circle');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -24,7 +24,6 @@ function getTimeAgo(date) {
 
 async function getCommunityHighlights() {
   try {
-    // Most discussed thread this week
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -35,7 +34,6 @@ async function getCommunityHighlights() {
       .sort({ commentCount: -1 })
       .select('title commentCount views');
 
-    // Trending genre (based on thread count in last 3 days)
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
@@ -56,7 +54,6 @@ async function getCommunityHighlights() {
       { $limit: 1 }
     ]);
 
-    // Active users count (users active in last 24h)
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
@@ -109,6 +106,399 @@ async function getCommunityHighlights() {
   }
 }
 
+// ===== CIRCLE DISCOVERY ROUTES =====
+
+// Get all available circles for discovery
+router.get('/circles/all', authMiddleware, async (req, res) => {
+  try {
+    const circles = await Circle.find({})
+      .populate('createdBy', 'name username')
+      .lean();
+    
+    // Get circles user is already a member of
+    const userCircles = await Circle.find({ 'members.user': req.userId }).select('circleId');
+    const userCircleIds = userCircles.map(c => c.circleId);
+    
+    const circlesWithStatus = circles.map(circle => ({
+      id: circle._id,
+      circleId: circle.circleId,
+      name: circle.name,
+      description: circle.description,
+      icon: circle.icon,
+      genre: circle.genre,
+      memberCount: circle.stats.memberCount,
+      threadCount: circle.stats.threadCount,
+      isMember: userCircleIds.includes(circle.circleId),
+      hasPendingRequest: circle.pendingRequests.some(req => req.user.toString() === req.userId),
+      createdBy: circle.createdBy,
+      createdAt: circle.createdAt
+    }));
+    
+    res.json({
+      success: true,
+      circles: circlesWithStatus
+    });
+  } catch (error) {
+    console.error('Error fetching all circles:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching circles',
+      error: error.message 
+    });
+  }
+});
+
+// Get recommended circles based on user's reading preferences
+router.get('/circles/recommended', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('favoriteGenres');
+    const userGenres = user?.favoriteGenres || [];
+    
+    let recommendedCircles = [];
+    
+    if (userGenres.length > 0) {
+      recommendedCircles = await Circle.find({
+        genre: { $in: userGenres },
+        'members.user': { $ne: req.userId }
+      })
+        .limit(5)
+        .lean();
+    }
+    
+    if (recommendedCircles.length < 5) {
+      const popularCircles = await Circle.find({
+        'members.user': { $ne: req.userId }
+      })
+        .sort({ 'stats.memberCount': -1 })
+        .limit(5 - recommendedCircles.length)
+        .lean();
+      
+      recommendedCircles = [...recommendedCircles, ...popularCircles];
+    }
+    
+    res.json({
+      success: true,
+      circles: recommendedCircles.map(circle => ({
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        memberCount: circle.stats.memberCount,
+        threadCount: circle.stats.threadCount
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching recommended circles:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching recommendations',
+      error: error.message 
+    });
+  }
+});
+
+// ===== CIRCLE MEMBERSHIP ROUTES =====
+
+// Get user's circles
+router.get('/user/circles', authMiddleware, async (req, res) => {
+  try {
+    const circles = await Circle.find({
+      'members.user': req.userId
+    }).populate('members.user', 'name username profilePicture');
+    
+    const pendingRequests = await Circle.find({
+      'pendingRequests.user': req.userId
+    }).select('name circleId description icon');
+    
+    res.json({
+      success: true,
+      circles: circles.map(circle => ({
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        memberCount: circle.stats.memberCount,
+        threadCount: circle.stats.threadCount,
+        role: circle.members.find(m => m.user._id.toString() === req.userId)?.role || 'member',
+        joinedAt: circle.members.find(m => m.user._id.toString() === req.userId)?.joinedAt
+      })),
+      pendingRequests: pendingRequests.map(req => ({
+        circleId: req.circleId,
+        name: req.name,
+        description: req.description,
+        icon: req.icon,
+        requestedAt: req.pendingRequests.find(r => r.user.toString() === req.userId)?.requestedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching user circles:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching circles',
+      error: error.message 
+    });
+  }
+});
+
+// Get circle details
+router.get('/circles/:circleId/details', authMiddleware, async (req, res) => {
+  try {
+    const { circleId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId)
+        .populate('members.user', 'name username profilePicture')
+        .populate('createdBy', 'name username profilePicture')
+        .populate('moderators', 'name username profilePicture');
+    } else {
+      circle = await Circle.findOne({ circleId: circleId })
+        .populate('members.user', 'name username profilePicture')
+        .populate('createdBy', 'name username profilePicture')
+        .populate('moderators', 'name username profilePicture');
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+    
+    const isMember = circle.isMember(req.userId);
+    const pendingRequest = circle.pendingRequests.find(r => r.user.toString() === req.userId);
+    const userRole = circle.members.find(m => m.user._id.toString() === req.userId)?.role;
+    
+    res.json({
+      success: true,
+      circle: {
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        createdBy: circle.createdBy,
+        moderators: circle.moderators,
+        settings: circle.settings,
+        stats: circle.stats,
+        createdAt: circle.createdAt,
+        isMember,
+        userRole,
+        pendingRequest: !!pendingRequest,
+        members: circle.members.map(m => ({
+          user: m.user,
+          role: m.role,
+          joinedAt: m.joinedAt
+        })),
+        pendingRequestsCount: circle.pendingRequests.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching circle details:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching circle details',
+      error: error.message 
+    });
+  }
+});
+
+// Request to join circle
+router.post('/circles/:circleId/request', authMiddleware, async (req, res) => {
+  try {
+    const { circleId } = req.params;
+    const { message } = req.body;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+    
+    if (circle.isMember(req.userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You are already a member of this circle' 
+      });
+    }
+    
+    const request = await circle.requestMembership(req.userId, message);
+    
+    try {
+      const io = global.io;
+      if (io) {
+        const user = await User.findById(req.userId).select('name profilePicture');
+        const moderatorIds = circle.members
+          .filter(m => m.role === 'moderator' || m.user.toString() === circle.createdBy.toString())
+          .map(m => m.user.toString());
+        
+        moderatorIds.forEach(modId => {
+          io.to(`user-${modId}`).emit('circle-join-request', {
+            circleId: circle.circleId,
+            circleName: circle.name,
+            userId: req.userId,
+            userName: user.name,
+            userAvatar: user.profilePicture,
+            message: message,
+            requestId: request._id
+          });
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Join request sent successfully',
+      request
+    });
+  } catch (error) {
+    console.error('Error requesting circle membership:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error requesting membership'
+    });
+  }
+});
+
+// Approve circle request
+router.post('/circles/:circleId/requests/:requestId/approve', authMiddleware, async (req, res) => {
+  try {
+    const { circleId, requestId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+    
+    if (!circle.isModerator(req.userId) && circle.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to approve requests' 
+      });
+    }
+    
+    const request = circle.pendingRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Request not found' 
+      });
+    }
+    
+    await circle.approveRequest(request.user, req.userId);
+    
+    try {
+      const io = global.io;
+      if (io) {
+        io.to(`user-${request.user}`).emit('circle-request-approved', {
+          circleId: circle.circleId,
+          circleName: circle.name,
+          message: `Your request to join ${circle.name} has been approved!`
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Request approved successfully'
+    });
+  } catch (error) {
+    console.error('Error approving request:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error approving request'
+    });
+  }
+});
+
+// Decline circle request
+router.post('/circles/:circleId/requests/:requestId/decline', authMiddleware, async (req, res) => {
+  try {
+    const { circleId, requestId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+    
+    if (!circle.isModerator(req.userId) && circle.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to decline requests' 
+      });
+    }
+    
+    const request = circle.pendingRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Request not found' 
+      });
+    }
+    
+    await circle.declineRequest(request.user, req.userId);
+    
+    try {
+      const io = global.io;
+      if (io) {
+        io.to(`user-${request.user}`).emit('circle-request-declined', {
+          circleId: circle.circleId,
+          circleName: circle.name,
+          message: `Your request to join ${circle.name} was declined.`
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Request declined'
+    });
+  } catch (error) {
+    console.error('Error declining request:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error declining request'
+    });
+  }
+});
+
 // ===== CIRCLE THREAD ROUTES =====
 
 // Get threads for a specific circle
@@ -121,33 +511,32 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
       sort = 'latest'
     } = req.query;
 
-    // Map circle ID to actual circle names
-    const circleMap = {
-      'fantasy': 'Fantasy Readers',
-      'mystery': 'Mystery Detectives',
-      'scifi': 'Sci-Fi Enthusiasts',
-      'classics': 'Classics Club',
-      'romance': 'Romance Readers',
-      'poetry': 'Poetry Corner',
-      'historical': 'Historical Fiction',
-      'thriller': 'Thriller Addicts'
-    };
-
-    const circleName = circleMap[circleId];
-    if (!circleName) {
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
       return res.status(404).json({ 
         success: false, 
         message: 'Circle not found' 
       });
     }
 
-    // Build query for circle threads
+    if (!circle.isMember(req.userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be a member to view circle discussions' 
+      });
+    }
+
     const query = { 
-      circle: circleName,
+      circleId: circle._id,
       isDeleted: false 
     };
 
-    // Determine sort order
     let sortOption = {};
     switch (sort) {
       case 'latest':
@@ -166,7 +555,6 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
-    // Get threads with pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const threads = await DiscussionThread.find(query)
       .populate('author', 'name username profilePicture')
@@ -176,22 +564,26 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Get total count for pagination
     const total = await DiscussionThread.countDocuments(query);
-
-    // Add circle context to each thread
-    const threadsWithContext = threads.map(thread => ({
-      ...thread,
-      isCircleThread: true,
-      circleName: circleName,
-      timeAgo: getTimeAgo(thread.createdAt),
-      commentCount: thread.commentCount || 0,
-      likeCount: thread.likeCount || 0
-    }));
 
     res.json({
       success: true,
-      threads: threadsWithContext,
+      threads: threads.map(thread => ({
+        ...thread,
+        isCircleThread: true,
+        circleName: circle.name,
+        timeAgo: getTimeAgo(thread.createdAt),
+        commentCount: thread.commentCount || 0,
+        likeCount: thread.likeCount || 0
+      })),
+      circle: {
+        id: circle._id,
+        name: circle.name,
+        circleId: circle.circleId,
+        description: circle.description,
+        memberCount: circle.stats.memberCount,
+        isMember: true
+      },
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -217,14 +609,13 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       title, 
       content, 
       type, 
-      circle, 
+      circleId,
       circleName, 
       tags, 
       poll, 
       event 
     } = req.body;
 
-    // Validate required fields
     if (!title || !content) {
       return res.status(400).json({ 
         success: false, 
@@ -232,20 +623,40 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       });
     }
 
-    // Create new thread with circle context
+    let circle;
+    if (circleId && mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId || circleName?.toLowerCase().replace(/\s+/g, '-') });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+
+    if (!circle.isMember(req.userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be a member of this circle to post' 
+      });
+    }
+
     const thread = new DiscussionThread({
       title,
       content,
       author: req.userId,
-      circle: circleName,
+      circle: circle.name,
+      circleId: circle._id,
       type: type || 'discussion',
       tags: tags || [],
       isCircleThread: true,
       isPublic: false,
-      genre: 'General'
+      genre: circle.genre
     });
 
-    // Add poll data if type is poll
     if (type === 'poll' && poll) {
       thread.poll = {
         question: poll.question,
@@ -256,7 +667,6 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       };
     }
 
-    // Add event data if type is event
     if (type === 'event' && event) {
       thread.event = {
         date: new Date(event.date),
@@ -268,18 +678,27 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
 
     await thread.save();
 
-    // Populate author info
+    circle.stats.threadCount += 1;
+    await circle.save();
+
     await thread.populate('author', 'name username profilePicture');
 
-    // Emit WebSocket event for new circle thread
     try {
       const io = global.io;
       if (io) {
-        io.to(`circle-${circle}`).emit('new-circle-thread', {
-          thread,
-          circleId: circle,
-          circleName,
-          message: `New ${type} in ${circleName}: "${title}"`
+        const memberUserIds = circle.members.map(m => m.user.toString());
+        
+        memberUserIds.forEach(userId => {
+          io.to(`user-${userId}`).emit('new-circle-thread', {
+            thread: {
+              ...thread.toObject(),
+              isCircleThread: true,
+              circleName: circle.name
+            },
+            circleId: circle.circleId,
+            circleName: circle.name,
+            message: `New ${type} in ${circle.name}: "${title}"`
+          });
         });
       }
     } catch (socketError) {
@@ -310,9 +729,8 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
 // Create a circle poll
 router.post('/circles/polls', authMiddleware, async (req, res) => {
   try {
-    const { circle, circleName, question, options } = req.body;
+    const { circleId, circleName, question, options } = req.body;
 
-    // Validate required fields
     if (!question || !options || options.length < 2) {
       return res.status(400).json({ 
         success: false, 
@@ -320,17 +738,38 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
       });
     }
 
-    // Create poll thread
+    let circle;
+    if (circleId && mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId || circleName?.toLowerCase().replace(/\s+/g, '-') });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Circle not found' 
+      });
+    }
+
+    if (!circle.isMember(req.userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be a member of this circle to create a poll' 
+      });
+    }
+
     const thread = new DiscussionThread({
       title: `📊 POLL: ${question}`,
-      content: `Cast your vote in this ${circleName} poll!`,
+      content: `Cast your vote in this ${circle.name} poll!`,
       author: req.userId,
-      circle: circleName,
+      circle: circle.name,
+      circleId: circle._id,
       type: 'poll',
       tags: ['poll'],
       isCircleThread: true,
       isPublic: false,
-      genre: 'General',
+      genre: circle.genre,
       poll: {
         question,
         options: options.map(opt => ({ 
@@ -342,7 +781,9 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
 
     await thread.save();
 
-    // Populate author info
+    circle.stats.threadCount += 1;
+    await circle.save();
+
     await thread.populate('author', 'name username profilePicture');
 
     res.status(201).json({
@@ -390,7 +831,6 @@ router.post('/threads/:threadId/poll/vote', authMiddleware, async (req, res) => 
 
     await thread.voteInPoll(req.userId, optionIndex);
 
-    // Calculate poll results
     const totalVotes = thread.poll.options.reduce((sum, opt) => sum + opt.votes.length, 0);
     const results = thread.poll.options.map(opt => ({
       text: opt.text,
@@ -470,10 +910,9 @@ router.get('/public', authMiddleware, async (req, res) => {
     const query = { 
       isDeleted: false,
       isPublic: true,
-      circle: { $exists: false } // Only threads without a circle
+      circleId: { $exists: false }
     };
     
-    // Apply filters
     if (genre && genre !== 'All Genres') {
       query.genre = genre;
     }
@@ -486,7 +925,6 @@ router.get('/public', authMiddleware, async (req, res) => {
       query.$text = { $search: search };
     }
 
-    // Determine sort order
     let sortOption = {};
     switch (sort) {
       case 'latest':
@@ -505,7 +943,6 @@ router.get('/public', authMiddleware, async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
-    // Get threads with pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const threads = await DiscussionThread.find(query)
       .populate('author', 'name username profilePicture')
@@ -515,7 +952,6 @@ router.get('/public', authMiddleware, async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Get total count for pagination
     const total = await DiscussionThread.countDocuments(query);
 
     res.json({
@@ -556,7 +992,6 @@ router.get('/all', authMiddleware, async (req, res) => {
 
     const query = { isDeleted: false };
     
-    // Determine sort order
     let sortOption = {};
     switch (sort) {
       case 'latest':
@@ -569,7 +1004,6 @@ router.get('/all', authMiddleware, async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
-    // Get threads with pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const threads = await DiscussionThread.find(query)
       .populate('author', 'name username profilePicture')
@@ -579,15 +1013,14 @@ router.get('/all', authMiddleware, async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Get total count for pagination
     const total = await DiscussionThread.countDocuments(query);
 
     res.json({
       success: true,
       threads: threads.map(thread => ({
         ...thread,
-        isCircleThread: !!thread.circle,
-        isPublic: !thread.circle,
+        isCircleThread: !!thread.circleId,
+        isPublic: !thread.circleId,
         timeAgo: getTimeAgo(thread.createdAt),
         commentCount: thread.commentCount || 0,
         likeCount: thread.likeCount || 0
@@ -628,7 +1061,7 @@ router.get('/highlights', authMiddleware, async (req, res) => {
   }
 });
 
-// ===== EXISTING THREAD ROUTES =====
+// ===== THREAD ROUTES =====
 
 // Get all threads with filtering, sorting, and pagination
 router.get('/threads', authMiddleware, async (req, res) => {
@@ -646,7 +1079,6 @@ router.get('/threads', authMiddleware, async (req, res) => {
 
     const query = { isDeleted: false };
     
-    // Apply filters
     if (genre && genre !== 'All Genres') {
       query.genre = genre;
     }
@@ -667,7 +1099,6 @@ router.get('/threads', authMiddleware, async (req, res) => {
       query.$text = { $search: search };
     }
 
-    // Determine sort order
     let sortOption = {};
     switch (sort) {
       case 'latest':
@@ -689,7 +1120,6 @@ router.get('/threads', authMiddleware, async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
-    // Get pinned threads first
     const pinnedThreads = await DiscussionThread.find({ ...query, isPinned: true })
       .populate('author', 'name username profilePicture')
       .populate('lastCommentBy', 'name username')
@@ -697,7 +1127,6 @@ router.get('/threads', authMiddleware, async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Get regular threads with pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const regularThreads = await DiscussionThread.find({ ...query, isPinned: false })
       .populate('author', 'name username profilePicture')
@@ -707,14 +1136,10 @@ router.get('/threads', authMiddleware, async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Combine pinned and regular threads
     const threads = [...pinnedThreads, ...regularThreads];
-
-    // Get total count for pagination
     const total = await DiscussionThread.countDocuments(query);
     const pinnedCount = await DiscussionThread.countDocuments({ ...query, isPinned: true });
 
-    // Get community highlights
     const highlights = await getCommunityHighlights();
 
     res.json({
@@ -724,8 +1149,8 @@ router.get('/threads', authMiddleware, async (req, res) => {
         timeAgo: getTimeAgo(thread.createdAt),
         commentCount: thread.commentCount || 0,
         likeCount: thread.likeCount || 0,
-        isCircleThread: !!thread.circle,
-        isPublic: !thread.circle
+        isCircleThread: !!thread.circleId,
+        isPublic: !thread.circleId
       })),
       highlights,
       pagination: {
@@ -787,13 +1212,10 @@ router.get('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Increment view count (do this separately)
     await DiscussionThread.findByIdAndUpdate(threadId, { $inc: { views: 1 } });
 
-    // Check if user liked this thread
     const isLiked = thread.likes && thread.likes.includes(req.userId);
 
-    // Calculate poll results if it's a poll
     let pollResults = null;
     if (thread.type === 'poll' && thread.poll) {
       const totalVotes = thread.poll.options.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0);
@@ -814,7 +1236,7 @@ router.get('/threads/:threadId', authMiddleware, async (req, res) => {
       thread: {
         ...thread,
         timeAgo: getTimeAgo(thread.createdAt),
-        isCircleThread: !!thread.circle,
+        isCircleThread: !!thread.circleId,
         poll: pollResults
       },
       isLiked
@@ -834,7 +1256,6 @@ router.post('/threads', authMiddleware, async (req, res) => {
   try {
     const { title, content, genre, tags, bookReferences, category } = req.body;
     
-    // Validate required fields
     if (!title || !content) {
       return res.status(400).json({ 
         success: false, 
@@ -842,7 +1263,6 @@ router.post('/threads', authMiddleware, async (req, res) => {
       });
     }
 
-    // Create new public thread
     const thread = new DiscussionThread({
       title,
       content,
@@ -856,11 +1276,8 @@ router.post('/threads', authMiddleware, async (req, res) => {
     });
 
     await thread.save();
-
-    // Populate author info
     await thread.populate('author', 'name username profilePicture');
 
-    // Emit WebSocket event for new thread
     try {
       const io = global.io;
       if (io) {
@@ -908,7 +1325,6 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Check if user is author
     if (thread.author.toString() !== req.userId) {
       return res.status(403).json({ 
         success: false, 
@@ -916,7 +1332,6 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Update fields
     if (title) thread.title = title;
     if (content) thread.content = content;
     if (genre) thread.genre = genre;
@@ -954,7 +1369,6 @@ router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Check if user is author or admin
     const user = await User.findById(req.userId);
     if (thread.author.toString() !== req.userId && !user.isAdmin) {
       return res.status(403).json({ 
@@ -963,7 +1377,6 @@ router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Soft delete
     thread.isDeleted = true;
     thread.deletedAt = new Date();
     await thread.save();
@@ -1047,7 +1460,6 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
       });
     }
 
-    // Create comment object
     const comment = {
       user: req.userId,
       content,
@@ -1058,7 +1470,6 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
     };
 
     if (parentCommentId) {
-      // Find parent comment and add as reply
       const parentComment = thread.comments.id(parentCommentId);
       if (!parentComment) {
         return res.status(404).json({ 
@@ -1068,7 +1479,6 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
       }
       parentComment.replies.push(comment);
     } else {
-      // Add as top-level comment
       thread.comments.push(comment);
     }
 
@@ -1078,7 +1488,6 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
     
     await thread.save();
 
-    // Get the newly created comment
     let newComment;
     if (parentCommentId) {
       const parentComment = thread.comments.id(parentCommentId);
@@ -1087,7 +1496,6 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
       newComment = thread.comments[thread.comments.length - 1];
     }
 
-    // Populate user info
     const user = await User.findById(req.userId).select('name username profilePicture');
     newComment.user = user;
 
@@ -1121,7 +1529,6 @@ router.post('/threads/:threadId/comments/:commentId/like', authMiddleware, async
       });
     }
 
-    // Find comment
     const comment = thread.comments.id(commentId);
     if (!comment) {
       return res.status(404).json({ 
@@ -1130,7 +1537,6 @@ router.post('/threads/:threadId/comments/:commentId/like', authMiddleware, async
       });
     }
 
-    // Toggle like
     const likeIndex = comment.likes.indexOf(req.userId);
     if (likeIndex === -1) {
       comment.likes.push(req.userId);
@@ -1172,7 +1578,6 @@ router.delete('/threads/:threadId/comments/:commentId', authMiddleware, async (r
       });
     }
 
-    // Find comment
     const comment = thread.comments.id(commentId);
     if (!comment) {
       return res.status(404).json({ 
@@ -1181,7 +1586,6 @@ router.delete('/threads/:threadId/comments/:commentId', authMiddleware, async (r
       });
     }
 
-    // Check if user is author or admin
     const user = await User.findById(req.userId);
     if (comment.user.toString() !== req.userId && !user.isAdmin) {
       return res.status(403).json({ 
@@ -1190,7 +1594,6 @@ router.delete('/threads/:threadId/comments/:commentId', authMiddleware, async (r
       });
     }
 
-    // Soft delete comment
     comment.isDeleted = true;
     comment.deletedAt = new Date();
     comment.content = '[deleted]';
