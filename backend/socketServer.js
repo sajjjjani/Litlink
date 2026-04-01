@@ -1,12 +1,14 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const VoiceRoom = require('./models/VoiceRoom');
 const RoomParticipant = require('./models/RoomParticipant');
 const User = require('./models/User');
+const Conversation = require('./models/Conversation');
 
 class SocketServer {
   constructor(server) {
-    console.log('🔌 Initializing Socket.IO server with Voice Room support...');
+    console.log('🔌 Initializing Socket.IO server with Voice Room and Chat support...');
     
     if (!server) {
       throw new Error('HTTP server instance is required');
@@ -42,12 +44,13 @@ class SocketServer {
       this.activeRooms = new Map(); // roomId -> Set of socketIds
       this.userSockets = new Map(); // userId -> socketId
       this.roomParticipants = new Map(); // roomId -> Map of userId -> socketId
+      this.userStatus = new Map(); // userId -> { online: boolean, lastSeen: Date }
       
       // Admin tracking
       this.adminSockets = new Map(); // socketId -> userId
 
       this.setupEventHandlers();
-      console.log('✅ Socket.IO server is ready with voice room support');
+      console.log('✅ Socket.IO server is ready with voice room and chat support');
       
     } catch (error) {
       console.error('❌ Failed to create Socket.IO server:', error);
@@ -81,7 +84,16 @@ class SocketServer {
           currentUserId = user._id.toString();
           isAdmin = user.isAdmin === true;
           
+          // Always store as trimmed string to avoid key mismatches
           this.userSockets.set(currentUserId, socket.id);
+          this.userStatus.set(currentUserId, { online: true, lastSeen: new Date() });
+          
+          // Remove any stale socket entries for this user (reconnect case)
+          for (const [uid, sid] of this.userSockets.entries()) {
+            if (uid === currentUserId && sid !== socket.id) {
+              this.userSockets.delete(uid);
+            }
+          }
           
           // Track admin connections
           if (isAdmin) {
@@ -113,6 +125,280 @@ class SocketServer {
         }
       });
 
+      // ========== CHAT MESSAGE HANDLERS ==========
+      
+      // Send chat message
+      socket.on('chat:message', async (data) => {
+        try {
+          const { content, conversationId, attachment } = data;
+          // Normalize recipientId to string to match userSockets key format
+          const recipientId = data.recipientId ? data.recipientId.toString().trim() : null;
+          
+          if (!currentUserId) {
+            socket.emit('error', { message: 'Not authenticated' });
+            return;
+          }
+          
+          if (!recipientId) {
+            socket.emit('error', { message: 'Recipient ID required' });
+            return;
+          }
+          
+          if (!content && !attachment) {
+            socket.emit('error', { message: 'Message content required' });
+            return;
+          }
+          
+          // Get sender user
+          const sender = await User.findById(currentUserId);
+          if (!sender) {
+            socket.emit('error', { message: 'User not found' });
+            return;
+          }
+          
+          // Find or create conversation
+          let conversation = null;
+          
+          if (conversationId) {
+            conversation = await Conversation.findById(conversationId);
+          }
+          
+          if (!conversation) {
+            // Find existing conversation between these users
+            conversation = await Conversation.findOne({
+              participants: { $all: [currentUserId, recipientId], $size: 2 }
+            });
+            
+            if (!conversation) {
+              // Create new conversation
+              conversation = new Conversation({
+                participants: [currentUserId, recipientId],
+                messages: [],
+                unreadCount: new Map()
+              });
+              conversation.unreadCount.set(currentUserId, 0);
+              conversation.unreadCount.set(recipientId, 0);
+              await conversation.save();
+            }
+          }
+          
+          // Create message object
+          const messageObj = {
+            _id: new mongoose.Types.ObjectId(),
+            sender: currentUserId,
+            content: content || '',
+            type: attachment ? 'file' : 'text',
+            read: false,
+            readAt: null,
+            createdAt: new Date(),
+            attachment: attachment || null
+          };
+          
+          // Add to conversation
+          conversation.messages.push(messageObj);
+          conversation.lastMessage = new Date();
+          conversation.lastMessagePreview = content ? (content.length > 50 ? content.substring(0, 47) + '...' : content) : '📎 Sent an attachment';
+          
+          // Increment unread count for recipient
+          const currentUnread = conversation.unreadCount.get(recipientId) || 0;
+          conversation.unreadCount.set(recipientId, currentUnread + 1);
+          
+          await conversation.save();
+          
+          // Prepare message for sending
+          const messageToSend = {
+            _id: messageObj._id,
+            senderId: currentUserId,
+            senderName: sender.name,
+            content: content,
+            type: messageObj.type,
+            attachment: attachment,
+            createdAt: messageObj.createdAt,
+            conversationId: conversation._id
+          };
+          
+          // Send to recipient if online
+          const recipientSocketId = this.userSockets.get(recipientId);
+          console.log(`📬 Delivery check — recipient ${recipientId}: socket ${recipientSocketId || 'NOT ONLINE'}`);
+          if (recipientSocketId) {
+            this.io.to(recipientSocketId).emit('chat:message', {
+              ...messageToSend,
+              isFromOthers: true
+            });
+            console.log(`✅ Message delivered to socket ${recipientSocketId}`);
+          } else {
+            console.log(`⚠️  Recipient ${recipientId} is not connected — message saved to DB only`);
+          }
+          
+          // Send confirmation to sender
+          socket.emit('chat:message:sent', {
+            success: true,
+            message: messageToSend,
+            conversationId: conversation._id
+          });
+          
+          console.log(`💬 Message sent from ${sender.name} to ${recipientId}`);
+          
+        } catch (error) {
+          console.error('Error sending chat message:', error);
+          socket.emit('error', { message: 'Failed to send message: ' + error.message });
+        }
+      });
+      
+      // Request chat history
+      socket.on('chat:history', async (data) => {
+        try {
+          const { limit = 50 } = data;
+          const otherUserId = data.otherUserId ? data.otherUserId.toString().trim() : null;
+          
+          if (!currentUserId) {
+            socket.emit('error', { message: 'Not authenticated' });
+            return;
+          }
+          
+          if (!otherUserId) {
+            socket.emit('error', { message: 'Other user ID required' });
+            return;
+          }
+          
+          // Find conversation
+          const conversation = await Conversation.findOne({
+            participants: { $all: [currentUserId, otherUserId], $size: 2 }
+          }).populate('messages.sender', 'name profilePicture');
+          
+          if (!conversation) {
+            socket.emit('chat:history', {
+              conversationId: null,
+              messages: [],
+              error: false
+            });
+            return;
+          }
+          
+          // Mark messages as read for current user
+          let unreadCount = 0;
+          conversation.messages.forEach(msg => {
+            if (msg.sender._id.toString() !== currentUserId && !msg.read) {
+              msg.read = true;
+              msg.readAt = new Date();
+              unreadCount++;
+            }
+          });
+          
+          if (unreadCount > 0) {
+            conversation.unreadCount.set(currentUserId, 0);
+            await conversation.save();
+          }
+          
+          // Get last limit messages
+          const messages = conversation.messages.slice(-limit).map(msg => ({
+            _id: msg._id,
+            sender: msg.sender._id.toString(),
+            senderName: msg.sender.name,
+            content: msg.content,
+            type: msg.type,
+            attachment: msg.attachment,
+            read: msg.read,
+            readAt: msg.readAt,
+            createdAt: msg.createdAt
+          }));
+          
+          socket.emit('chat:history', {
+            conversationId: conversation._id,
+            messages: messages.reverse(),
+            error: false
+          });
+          
+        } catch (error) {
+          console.error('Error fetching chat history:', error);
+          socket.emit('chat:history', {
+            conversationId: null,
+            messages: [],
+            error: true,
+            message: error.message
+          });
+        }
+      });
+      
+      // Typing indicator
+      socket.on('chat:typing', async (data) => {
+        try {
+          const { recipientId, isTyping } = data;
+          
+          if (!currentUserId) return;
+          
+          const recipientSocketId = this.userSockets.get(recipientId);
+          if (recipientSocketId) {
+            this.io.to(recipientSocketId).emit('chat:typing', {
+              senderId: currentUserId,
+              isTyping: isTyping
+            });
+          }
+        } catch (error) {
+          console.error('Error sending typing indicator:', error);
+        }
+      });
+      
+      // Get online status for users
+      socket.on('chat:online', async (data) => {
+        try {
+          const { userIds } = data;
+          
+          if (!currentUserId) return;
+          
+          const onlineStatus = {};
+          userIds.forEach(userId => {
+            const uid = userId ? userId.toString().trim() : userId;
+            const status = this.userStatus.get(uid);
+            onlineStatus[uid] = status ? status.online : false;
+          });
+          
+          socket.emit('chat:online', { online: onlineStatus });
+        } catch (error) {
+          console.error('Error getting online status:', error);
+        }
+      });
+      
+      // Mark messages as read
+      socket.on('chat:mark-read', async (data) => {
+        try {
+          const { conversationId, otherUserId } = data;
+          
+          if (!currentUserId) return;
+          
+          const conversation = await Conversation.findById(conversationId);
+          if (!conversation) return;
+          
+          let unreadMarked = 0;
+          conversation.messages.forEach(msg => {
+            if (msg.sender.toString() !== currentUserId && !msg.read) {
+              msg.read = true;
+              msg.readAt = new Date();
+              unreadMarked++;
+            }
+          });
+          
+          if (unreadMarked > 0) {
+            conversation.unreadCount.set(currentUserId, 0);
+            await conversation.save();
+            
+            // Notify sender that messages were read
+            const senderSocketId = this.userSockets.get(otherUserId);
+            if (senderSocketId) {
+              this.io.to(senderSocketId).emit('chat:read-receipt', {
+                conversationId,
+                readBy: currentUserId,
+                readAt: new Date()
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error marking messages as read:', error);
+        }
+      });
+
+      // ========== VOICE ROOM HANDLERS ==========
+      
       // Join a voice room
       socket.on('join-voice-room', async (data) => {
         try {
@@ -132,7 +418,6 @@ class SocketServer {
 
           // Check room status
           if (room.status !== 'live') {
-            // If room is scheduled and time has passed, start it
             if (room.status === 'scheduled' && room.scheduledFor && room.scheduledFor <= new Date()) {
               room.status = 'live';
               await room.save();
@@ -221,12 +506,11 @@ class SocketServer {
         }
       });
 
-      // WebRTC signaling - using userId instead of socketId
+      // WebRTC signaling
       socket.on('signal', async (data) => {
         const { to, signal, roomId } = data;
         
         try {
-          // Get target socket ID from room participants
           const targetSocketId = this.roomParticipants.get(roomId)?.get(to);
           
           if (targetSocketId) {
@@ -235,8 +519,6 @@ class SocketServer {
               signal,
               fromSocketId: socket.id
             });
-          } else {
-            console.log(`Target user ${to} not found in room ${roomId}`);
           }
         } catch (error) {
           console.error('Error forwarding signal:', error);
@@ -334,7 +616,7 @@ class SocketServer {
         }
       });
 
-      // Leave room
+      // Leave voice room
       socket.on('leave-voice-room', async (data) => {
         await this.handleLeaveRoom(socket, data);
       });
@@ -342,6 +624,12 @@ class SocketServer {
       // Disconnect
       socket.on('disconnect', async () => {
         console.log('❌ Client disconnected:', socket.id);
+        
+        // Update user status
+        if (currentUserId) {
+          this.userStatus.set(currentUserId, { online: false, lastSeen: new Date() });
+          this.userSockets.delete(currentUserId);
+        }
         
         // Remove from admin tracking
         if (this.adminSockets.has(socket.id)) {
@@ -399,11 +687,6 @@ class SocketServer {
               }
             }
           }
-        }
-
-        // Remove from user mapping
-        if (currentUserId) {
-          this.userSockets.delete(currentUserId);
         }
       });
     });
