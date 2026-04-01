@@ -9,8 +9,9 @@ let emojiPicker = null;
 let fileInput = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const API_BASE_URL = 'http://localhost:5002';
 
-// WebSocket config (same server as API)
+// WebSocket config
 const CHAT_WS_HOST = (function () {
     try {
         if (typeof window !== 'undefined' && window.location && window.location.hostname) {
@@ -35,6 +36,24 @@ function getCurrentUserId() {
 
 function isRealUserId(id) {
     return typeof id === 'string' && /^[a-f0-9]{24}$/i.test(id);
+}
+
+// Helper: Parse time string to Date
+function parseTimeToDate(timeStr) {
+    if (!timeStr) return new Date(0);
+    try {
+        const today = new Date();
+        const [time, period] = timeStr.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour = parseInt(hours);
+        if (period === 'PM' && hour !== 12) hour += 12;
+        if (period === 'AM' && hour === 12) hour = 0;
+        const date = new Date(today);
+        date.setHours(hour, parseInt(minutes), 0, 0);
+        return date;
+    } catch (e) {
+        return new Date(0);
+    }
 }
 
 // ===== DOM ELEMENTS =====
@@ -63,8 +82,6 @@ async function initializeChat() {
         if (userStr) {
             currentUser = JSON.parse(userStr);
             console.log('✅ User found:', currentUser.name);
-            
-            // Update sidebar user info
             updateSidebarUserInfo();
         } else {
             console.log('⚠️ No user data found');
@@ -102,15 +119,7 @@ function updateSidebarUserInfo() {
                 : 'Reader';
         }
         
-        if (sidebarUserAvatar) {
-            if (currentUser.profilePicture && currentUser.profilePicture !== 'null' && currentUser.profilePicture !== 'undefined') {
-                sidebarUserAvatar.src = currentUser.profilePicture;
-            } else {
-                // Fallback to avatar with initials
-                const name = currentUser.name || 'User';
-                sidebarUserAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E0B973&color=3B1D14&size=60`;
-            }
-        }
+        if (sidebarUserAvatar) { sidebarUserAvatar.src = getProfilePicture(currentUser, 60); }
     } catch (e) {
         console.error('Error updating sidebar user info:', e);
     }
@@ -124,55 +133,99 @@ function initChatWebSocket() {
         return;
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = protocol + '//' + CHAT_WS_HOST + '/ws/chat?token=' + encodeURIComponent(token);
+    const wsUrl = 'http://localhost:5002';
     
     try {
-        chatSocket = new WebSocket(wsUrl);
-        
-        chatSocket.onopen = function () {
-            console.log('✅ Chat WebSocket connected');
-            reconnectAttempts = 0;
-            showNotification('Connected to chat', 'success');
+        if (typeof io !== 'undefined') {
+            console.log('Initializing Socket.IO connection to:', wsUrl);
             
-            // Request online status for matches
-            if (matches.length > 0) {
-                requestChatOnlineStatus();
-            }
-        };
-        
-        chatSocket.onmessage = function (event) {
-            try {
-                const data = JSON.parse(event.data);
-                handleChatSocketMessage(data);
-            } catch (e) {
-                console.error('Chat WS parse error:', e);
-            }
-        };
-        
-        chatSocket.onclose = function () {
-            console.warn('Chat WebSocket closed');
+            chatSocket = io(wsUrl, {
+                path: '/socket.io',
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+                reconnectionDelay: 1000,
+                timeout: 10000,
+                withCredentials: true
+            });
             
-            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                reconnectAttempts++;
-                showNotification(`Disconnected from chat. Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, 'warning');
-                
-                // Attempt to reconnect after 5 seconds
-                setTimeout(() => {
-                    if (!chatSocket || chatSocket.readyState === WebSocket.CLOSED) {
-                        initChatWebSocket();
+            chatSocket.on('connect', () => {
+                console.log('✅ Chat Socket.IO connected');
+                console.log('Socket ID:', chatSocket.id);
+                chatSocket.emit('authenticate', token);
+            });
+            
+            chatSocket.on('authenticated', (data) => {
+                if (data.success) {
+                    console.log('✅ Authenticated for chat');
+                    console.log('User ID:', data.userId);
+                    reconnectAttempts = 0;
+                    showNotification('Connected to chat', 'success');
+                    
+                    if (matches.length > 0) {
+                        requestChatOnlineStatus();
                     }
-                }, 5000);
-            } else {
-                showNotification('Unable to connect to chat server', 'error');
-            }
-        };
-        
-        chatSocket.onerror = function (err) {
-            console.error('Chat WebSocket error:', err);
-        };
+                } else {
+                    console.error('Authentication failed:', data.error);
+                    showNotification('Authentication failed: ' + data.error, 'error');
+                }
+            });
+            
+            chatSocket.on('chat:message', (data) => {
+                console.log('📨 Received message:', data);
+                handleChatSocketMessage({ type: 'chat:message', ...data });
+            });
+            
+            chatSocket.on('chat:message:sent', (data) => {
+                console.log('✅ Message sent:', data);
+                handleChatSocketMessage({ type: 'chat:message:sent', ...data });
+            });
+            
+            chatSocket.on('chat:typing', (data) => {
+                handleChatSocketMessage({ type: 'chat:typing', ...data });
+            });
+            
+            chatSocket.on('chat:history', (data) => {
+                console.log('📜 Chat history received, messages:', data.messages?.length || 0);
+                handleChatSocketMessage({ type: 'chat:history', ...data });
+            });
+            
+            chatSocket.on('chat:online', (data) => {
+                console.log('🟢 Online status update:', data);
+                handleChatSocketMessage({ type: 'chat:online', ...data });
+            });
+            
+            chatSocket.on('chat:message:unsent', (data) => {
+                console.log('🗑️ Message unsent:', data);
+                handleChatSocketMessage({ type: 'chat:message:unsent', ...data });
+            });
+
+            chatSocket.on('chat:message:deleted', (data) => {
+                console.log('❌ Message deleted for me:', data);
+                handleChatSocketMessage({ type: 'chat:message:deleted', ...data });
+            });
+
+            chatSocket.on('connect_error', (error) => {
+                console.error('Socket.IO connection error:', error);
+                showNotification('Connection error: ' + error.message, 'error');
+            });
+            
+            chatSocket.on('disconnect', (reason) => {
+                console.warn('Chat disconnected:', reason);
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    showNotification(`Disconnected from chat. Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, 'warning');
+                } else {
+                    showNotification('Unable to connect to chat server', 'error');
+                }
+            });
+        } else {
+            console.warn('Socket.IO client not loaded, using fallback');
+            showNotification('Socket.IO not loaded. Chat features may be limited.', 'warning');
+        }
     } catch (e) {
         console.error('Chat WebSocket init error:', e);
+        showNotification('Failed to initialize chat', 'error');
     }
 }
 
@@ -207,7 +260,6 @@ function handleChatSocketMessage(data) {
                     if (m) {
                         m.online = !!data.online[userId];
                         
-                        // Update current match status if active
                         if (m.active && currentStatus) {
                             currentStatus.className = `status-indicator ${m.online ? 'online' : 'offline'}`;
                         }
@@ -215,6 +267,14 @@ function handleChatSocketMessage(data) {
                 });
                 renderMatches();
             }
+            break;
+            
+        case 'chat:message:unsent':
+            onMessageUnsent(data);
+            break;
+            
+        case 'chat:message:deleted':
+            onMessageDeleted(data);
             break;
             
         case 'error':
@@ -227,51 +287,37 @@ function handleChatSocketMessage(data) {
     }
 }
 
+function onMessageUnsent(data) {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) return;
+    
+    refreshCurrentConversation();
+    showNotification('A message was unsent', 'info');
+}
+
+function onMessageDeleted(data) {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) return;
+    
+    refreshCurrentConversation();
+    showNotification('Message deleted', 'info');
+}
+
 function onIncomingChatMessage(data) {
     const senderId = data.senderId || (data.message && data.message.sender);
     const currentMatch = matches.find(function (m) { return m.active; });
     
     if (!currentMatch || (currentMatch._id !== senderId && currentMatch.id !== senderId)) {
-        // Find the match and increment notification
         const match = matches.find(m => m._id === senderId || m.id === senderId);
         if (match) {
-            match.notifications = (match.notifications || 0) + 1;
+            match.unreadCount = (match.unreadCount || 0) + 1;
             renderMatches();
+            showNotification(`New message from ${match.name}`, 'info');
         }
         return;
     }
     
-    const msg = data.message || {};
-    const text = msg.content || '';
-    const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'Just now';
-    
-    if (!currentMatch.messages) currentMatch.messages = [];
-    
-    // Check for file attachment
-    if (msg.attachment) {
-        currentMatch.messages.push({
-            id: msg._id || Date.now(),
-            type: 'received',
-            attachment: msg.attachment,
-            time: time
-        });
-    } else {
-        currentMatch.messages.push({
-            id: msg._id || Date.now(),
-            type: 'received',
-            text: text,
-            time: time
-        });
-    }
-    
-    currentMatch.preview = text ? (text.length > 30 ? text.substring(0, 27) + '...' : text) : '📎 Sent an attachment';
-    
-    renderMatches();
-    renderMessages(currentMatch.messages, currentMatch);
-    
-    // Update message count
-    const totalMessages = matches.reduce((total, match) => total + (match.messages ? match.messages.length : 0), 0);
-    document.getElementById('statMessages').textContent = totalMessages;
+    refreshCurrentConversation();
 }
 
 function onChatMessageSent(data) {
@@ -302,42 +348,64 @@ function onChatHistory(data) {
     
     if (data.error || !currentMatch) {
         if (currentMatch) {
-            // Show empty state for new conversation
             showEmptyConversation(currentMatch);
         }
         return;
     }
     
     const list = data.messages || [];
+    const currentUserId = getCurrentUserId();
     
     if (list.length === 0) {
-        // New conversation - show empty state
         showEmptyConversation(currentMatch);
         return;
     }
     
-    currentMatch.messages = list.map(function (m) {
-        const isSent = (m.sender && m.sender.toString()) === getCurrentUserId();
+    // Filter out messages that are unsent or deleted for current user
+    const visibleMessages = list.filter(function (m) {
+        if (m.unsent) return false;
+        if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+        return true;
+    });
+    
+    currentMatch.messages = visibleMessages.map(function (m) {
+        const isSent = (m.sender && m.sender.toString()) === currentUserId;
+        const createdAt = m.createdAt ? new Date(m.createdAt) : new Date();
         
         const message = {
             id: m._id,
+            _id: m._id,
             type: isSent ? 'sent' : 'received',
-            time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''
+            time: createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+            createdAt: createdAt,
+            sender: m.sender
         };
         
-        if (m.attachment) {
+        if (m.attachment && m.attachment.data) {
             message.attachment = m.attachment;
-        } else {
-            message.text = m.content || '';
+        } else if (m.content) {
+            message.text = m.content;
         }
         
         return message;
     });
     
+    // Update preview
+    if (currentMatch.messages.length > 0) {
+        const lastMsg = currentMatch.messages[currentMatch.messages.length - 1];
+        currentMatch.preview = lastMsg.text ? 
+            (lastMsg.text.length > 30 ? lastMsg.text.substring(0, 27) + '...' : lastMsg.text) : 
+            (lastMsg.attachment ? '📎 Attachment' : 'No messages yet');
+    } else {
+        currentMatch.preview = 'No messages yet';
+    }
+    
+    renderMatches();
     renderMessages(currentMatch.messages, currentMatch);
 }
 
 function showEmptyConversation(match) {
+    if (!messagesContainer) return;
     messagesContainer.innerHTML = `
         <div class="empty-conversation">
             <div class="empty-conversation-icon">
@@ -361,24 +429,18 @@ function showEmptyConversation(match) {
 }
 
 function sendChatWebSocket(recipientId, content, attachment = null) {
-    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
-        showNotification('Not connected to chat server', 'warning');
+    if (!chatSocket || !chatSocket.connected) {
+        console.log('Chat: Not connected, using fallback');
         return false;
     }
     
     try {
-        const payload = {
-            type: 'chat:message',
+        chatSocket.emit('chat:message', {
             recipientId: recipientId,
             content: content,
-            conversationId: currentConversationId || undefined
-        };
-        
-        if (attachment) {
-            payload.attachment = attachment;
-        }
-        
-        chatSocket.send(JSON.stringify(payload));
+            conversationId: currentConversationId || undefined,
+            attachment: attachment
+        });
         return true;
     } catch (e) {
         console.error('sendChatWebSocket error:', e);
@@ -387,28 +449,36 @@ function sendChatWebSocket(recipientId, content, attachment = null) {
 }
 
 function requestChatHistory(otherUserId) {
-    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+    if (!chatSocket || !chatSocket.connected) return;
     
     try {
-        chatSocket.send(JSON.stringify({
-            type: 'chat:history',
+        chatSocket.emit('chat:history', {
             otherUserId: otherUserId,
             limit: 50
-        }));
+        });
     } catch (e) {
         console.error('requestChatHistory error:', e);
     }
 }
 
 function sendChatTyping(recipientId, isTyping) {
-    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+    if (!chatSocket || !chatSocket.connected) return;
     
     try {
-        chatSocket.send(JSON.stringify({
-            type: 'chat:typing',
+        chatSocket.emit('chat:typing', {
             recipientId: recipientId,
             isTyping: !!isTyping
-        }));
+        });
+    } catch (e) {}
+}
+
+function requestChatOnlineStatus() {
+    if (!chatSocket || !chatSocket.connected || !matches.length) return;
+    
+    try {
+        chatSocket.emit('chat:online', {
+            userIds: matches.map(function (m) { return m._id || m.id; })
+        });
     } catch (e) {}
 }
 
@@ -423,65 +493,35 @@ async function loadMatches() {
     try {
         showMessageLoading('Loading matches...');
         
-        const base = window.location.port === '5500' || window.location.port === '3000' ? 'http://localhost:5002' : '';
-        const res = await fetch((base || '') + '/api/chat/matches', {
+        const res = await fetch(`${API_BASE_URL}/api/chat/matches`, {
             headers: { 
                 'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
             }
         });
         
-        if (res.ok) {
-            const data = await res.json();
-            
-            if (data.success && Array.isArray(data.matches)) {
-                // Filter out system admin and any non-real users
-                matches = data.matches
-                    .filter(m => m._id && !m.isSystem && m.name !== 'System Admin' && m.name !== 'Admin' && m.role !== 'admin')
-                    .map(function (m) {
-                        return {
-                            ...m,
-                            id: m._id,
-                            active: false,
-                            messages: m.messages || [],
-                            notifications: m.unreadCount || 0,
-                            online: m.online || false
-                        };
-                    });
-                
-                document.getElementById('statMatches').textContent = matches.length;
-                document.getElementById('statOnline').textContent = matches.filter(function (m) { return m.online; }).length;
-                document.getElementById('statMessages').textContent = matches.reduce((total, m) => total + (m.messages ? m.messages.length : 0), 0);
-                
-                renderMatches();
-                requestChatOnlineStatus();
-                
-                hideMessageLoading();
-            } else {
-                showNotification('No matches found', 'info');
-                hideMessageLoading();
-            }
+        if (res.status === 401) { showNotification('Session expired — please login again.', 'error'); hideMessageLoading(); return; }
+        if (!res.ok) throw new Error('Server error ' + res.status);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.matches)) {
+            matches = data.matches
+                .filter(m => m._id && !m.isSystem && m.name !== 'System Admin' && m.name !== 'Admin' && m.role !== 'admin')
+                .map(m => ({ ...m, id: m._id, active: false, messages: m.messages || [], unreadCount: m.unreadCount || 0, online: m.online || false }));
+            document.getElementById('statMatches').textContent = matches.length;
+            document.getElementById('statOnline').textContent  = matches.filter(m => m.online).length;
+            document.getElementById('statMessages').textContent = matches.reduce((t, m) => t + (m.messages ? m.messages.length : 0), 0);
+            renderMatches();
+            requestChatOnlineStatus();
         } else {
-            console.error('Failed to load matches:', res.status);
-            showNotification('Failed to load matches', 'error');
-            hideMessageLoading();
+            renderMatches();
         }
-    } catch (e) {
-        console.warn('Chat API matches failed:', e);
-        showNotification('Could not connect to server', 'error');
         hideMessageLoading();
+    } catch (e) {
+        console.error('Chat API matches failed:', e);
+        showNotification('Could not connect to server — is it running?', 'error');
+        hideMessageLoading();
+        if (matchesList) matchesList.innerHTML = '<div class="no-matches"><i class="fas fa-exclamation-triangle"></i><p>Failed to load</p><small>' + e.message + '</small><button onclick="LitlinkChat.refreshMatches()" class="explore-btn" style="margin-top:10px">Retry</button></div>';
     }
-}
-
-function requestChatOnlineStatus() {
-    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN || !matches.length) return;
-    
-    try {
-        chatSocket.send(JSON.stringify({
-            type: 'chat:online',
-            userIds: matches.map(function (m) { return m._id || m.id; })
-        }));
-    } catch (e) {}
 }
 
 // ===== RENDER FUNCTIONS =====
@@ -507,24 +547,22 @@ function renderMatches() {
             <div class="avatar-wrapper">
                 <img src="${getProfilePicture(match)}" alt="${match.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(match.name)}&background=E0B973&color=3B1D14&size=48'">
                 <span class="status-indicator ${match.online ? 'online' : 'offline'}"></span>
-                ${match.notifications > 0 ? `<span class="notification-badge">${match.notifications}</span>` : ''}
+                ${match.unreadCount > 0 ? `<span class="notification-badge">${match.unreadCount}</span>` : ''}
             </div>
             <div class="match-info">
-                <h3 class="match-name">${match.name}</h3>
-                <p class="match-genre">${match.genre || 'Reader'}</p>
-                <p class="match-preview">${match.preview || 'No messages yet'}</p>
+                <h3 class="match-name">${escapeHtml(match.name)}</h3>
+                <p class="match-genre">${escapeHtml(match.genre || 'Reader')}</p>
+                <p class="match-preview">${escapeHtml(match.preview || 'No messages yet')}</p>
             </div>
-            <div class="compatibility-badge">${match.compatibility || Math.floor(Math.random() * 30) + 70}%</div>
+            <div class="compatibility-badge">${match.compatibility || 75}%</div>
         </div>
     `).join('');
 
-    // Add click event listeners
     document.querySelectorAll('.match-item').forEach(item => {
         item.addEventListener('click', async () => {
             const matchId = item.dataset.id;
             await switchMatch(matchId);
             
-            // Close sidebar on mobile after selection
             if (window.innerWidth <= 768) {
                 sidebar.classList.remove('open');
             }
@@ -532,11 +570,11 @@ function renderMatches() {
     });
 }
 
-function getProfilePicture(user) {
-    if (user.profilePicture && user.profilePicture !== 'null' && user.profilePicture !== 'undefined') {
-        return user.profilePicture;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0B973&color=3B1D14&size=48`;
+function getProfilePicture(user, size) {
+    const sz = size || 48;
+    const pic = user.profilePicture;
+    if (pic && pic !== 'null' && pic !== 'undefined' && /^(https?:\/\/|\/)/.test(pic)) return pic;
+    return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name || 'User') + '&background=E0B973&color=3B1D14&size=' + sz;
 }
 
 async function switchMatch(matchId) {
@@ -556,36 +594,30 @@ async function switchMatch(matchId) {
         
         currentConversationId = null;
         
-        // Set current user info in header
         currentAvatar.src = getProfilePicture(currentMatch);
         currentAvatar.alt = currentMatch.name;
         currentUserName.textContent = currentMatch.name;
         currentUserGenre.textContent = currentMatch.genre || 'Reader';
         
-        // Update status indicator
         if (currentStatus) {
             currentStatus.className = `status-indicator ${currentMatch.online ? 'online' : 'offline'}`;
         }
         
-        // Clear notifications
-        currentMatch.notifications = 0;
+        currentMatch.unreadCount = 0;
         
         renderMatches();
         
-        // Show appropriate UI
         welcomeState.style.display = 'none';
         messagesContainer.style.display = 'flex';
         messageInputWrapper.style.display = 'flex';
         
-        // Load conversation
-        if (chatSocket && chatSocket.readyState === WebSocket.OPEN && isRealUserId(currentMatch._id || currentMatch.id)) {
+        if (chatSocket && chatSocket.connected && isRealUserId(currentMatch._id || currentMatch.id)) {
             showMessageLoading('Loading conversation...');
             requestChatHistory(currentMatch._id || currentMatch.id);
         } else {
             await loadMessages(currentMatch);
         }
         
-        // Update message count
         const totalMessages = matches.reduce((total, match) => total + (match.messages ? match.messages.length : 0), 0);
         document.getElementById('statMessages').textContent = totalMessages;
         
@@ -599,27 +631,53 @@ async function loadMessages(currentMatch) {
     try {
         showMessageLoading('Loading conversation...');
         
-        // Try to fetch messages from API
         const token = getAuthToken();
+        const currentUserId = getCurrentUserId();
+        
         if (token && currentMatch._id) {
             try {
-                const base = window.location.port === '5500' || window.location.port === '3000' ? 'http://localhost:5002' : '';
-                const res = await fetch((base || '') + `/api/chat/messages/${currentMatch._id}`, {
+                const res = await fetch(`${API_BASE_URL}/api/chat/messages/${currentMatch._id}`, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.success && data.messages) {
-                        currentMatch.messages = data.messages.map(m => ({
+                    if (data.success) {
+                        currentConversationId = data.conversationId;
+                        
+                        // Filter out unsent and deleted messages
+                        const visibleMessages = data.messages.filter(m => {
+                            if (m.unsent) return false;
+                            if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+                            return true;
+                        });
+                        
+                        currentMatch.messages = visibleMessages.map(m => ({
                             id: m._id,
-                            type: m.sender === getCurrentUserId() ? 'sent' : 'received',
+                            _id: m._id,
+                            type: m.sender === currentUserId ? 'sent' : 'received',
                             text: m.content || '',
                             attachment: m.attachment,
-                            time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''
+                            time: m.time || (m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''),
+                            createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+                            sender: m.sender
                         }));
                         
-                        renderMessages(currentMatch.messages, currentMatch);
+                        // Update preview
+                        if (currentMatch.messages.length > 0) {
+                            const lastMsg = currentMatch.messages[currentMatch.messages.length - 1];
+                            currentMatch.preview = lastMsg.text ? 
+                                (lastMsg.text.length > 30 ? lastMsg.text.substring(0, 27) + '...' : lastMsg.text) : 
+                                (lastMsg.attachment ? '📎 Attachment' : 'No messages yet');
+                        } else {
+                            currentMatch.preview = 'No messages yet';
+                        }
+                        
+                        if (currentMatch.messages.length > 0) {
+                            renderMessages(currentMatch.messages, currentMatch);
+                        } else {
+                            showEmptyConversation(currentMatch);
+                        }
                         hideMessageLoading();
                         return;
                     }
@@ -629,7 +687,6 @@ async function loadMessages(currentMatch) {
             }
         }
         
-        // If no messages, show empty state
         if (!currentMatch.messages || currentMatch.messages.length === 0) {
             showEmptyConversation(currentMatch);
         } else {
@@ -645,6 +702,68 @@ async function loadMessages(currentMatch) {
     }
 }
 
+async function refreshCurrentConversation() {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) return;
+    
+    console.log('🔄 Refreshing conversation...');
+    
+    const token = getAuthToken();
+    const currentUserId = getCurrentUserId();
+    
+    if (token && currentMatch._id) {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/chat/messages/${currentMatch._id}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    currentConversationId = data.conversationId;
+                    
+                    const visibleMessages = data.messages.filter(m => {
+                        if (m.unsent) return false;
+                        if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+                        return true;
+                    });
+                    
+                    currentMatch.messages = visibleMessages.map(m => ({
+                        id: m._id,
+                        _id: m._id,
+                        type: m.sender === currentUserId ? 'sent' : 'received',
+                        text: m.content || '',
+                        attachment: m.attachment,
+                        time: m.time || (m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''),
+                        createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+                        sender: m.sender
+                    }));
+                    
+                    if (currentMatch.messages.length > 0) {
+                        const lastMsg = currentMatch.messages[currentMatch.messages.length - 1];
+                        currentMatch.preview = lastMsg.text ? 
+                            (lastMsg.text.length > 30 ? lastMsg.text.substring(0, 27) + '...' : lastMsg.text) : 
+                            (lastMsg.attachment ? '📎 Attachment' : 'No messages yet');
+                    } else {
+                        currentMatch.preview = 'No messages yet';
+                    }
+                    
+                    if (currentMatch.messages.length > 0) {
+                        renderMessages(currentMatch.messages, currentMatch);
+                    } else {
+                        showEmptyConversation(currentMatch);
+                    }
+                    
+                    renderMatches();
+                }
+            }
+        } catch (e) {
+            console.warn('Could not refresh messages:', e);
+        }
+    }
+}
+
+// ===== UPDATED renderMessages function - messages at bottom, only own actions =====
 function renderMessages(messages, currentMatch) {
     if (!messagesContainer || !currentMatch) return;
     
@@ -653,91 +772,150 @@ function renderMessages(messages, currentMatch) {
         return;
     }
     
-    messagesContainer.innerHTML = messages.map(msg => {
-        if (msg.attachment) {
-            // Render attachment message
-            return renderAttachmentMessage(msg, currentMatch);
-        } else {
-            // Render text message
-            return `
-                <div class="message ${msg.type}">
-                    ${msg.type === 'received' ? `
-                        <div class="avatar-wrapper">
-                            <img src="${getProfilePicture(currentMatch)}" alt="${currentMatch.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentMatch.name)}&background=E0B973&color=3B1D14&size=32'">
-                        </div>
-                    ` : ''}
-                    <div class="message-content">
-                        <div class="message-bubble">${escapeHtml(msg.text)}</div>
-                        <div class="message-time">${msg.time}</div>
-                    </div>
+    const currentUserId = getCurrentUserId();
+    
+    // Sort messages by createdAt (oldest first for proper order)
+    const sortedMessages = [...messages].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt) : (a.time ? parseTimeToDate(a.time) : new Date(0));
+        const timeB = b.createdAt ? new Date(b.createdAt) : (b.time ? parseTimeToDate(b.time) : new Date(0));
+        return timeA - timeB;
+    });
+    
+    const messagesHtml = sortedMessages.map(msg => {
+        const msgId = String(msg.id || msg._id || '');
+        const isSent = msg.type === 'sent';
+        
+        // Check if this message belongs to current user
+        const isOwnMessage = isSent || (msg.sender && msg.sender.toString() === currentUserId);
+        
+        // Only show action buttons for user's OWN messages that are real (not pending)
+        let actionsHtml = '';
+        if (isOwnMessage && msgId && !msgId.startsWith('pending-') && !msgId.startsWith('att-')) {
+            actionsHtml = `
+                <div class="msg-actions">
+                    <button class="msg-action-btn msg-unsend" data-id="${msgId}" title="Unsend for everyone">
+                        <i class="fas fa-undo-alt"></i> Unsend
+                    </button>
+                    <button class="msg-action-btn msg-delete" data-id="${msgId}" title="Delete for me">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
                 </div>
             `;
         }
+        
+        if (msg.attachment && msg.attachment.data) {
+            return renderAttachmentMessage(msg, currentMatch, actionsHtml, msgId, isSent);
+        }
+        
+        const avatarHtml = (!isSent) ? `
+            <div class="avatar-wrapper">
+                <img src="${getProfilePicture(currentMatch, 32)}" alt="${currentMatch.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentMatch.name)}&background=E0B973&color=3B1D14&size=32'">
+            </div>
+        ` : '';
+        
+        return `
+            <div class="message ${msg.type}" data-msg-id="${msgId}">
+                ${avatarHtml}
+                <div class="message-content">
+                    ${actionsHtml}
+                    <div class="message-bubble">${escapeHtml(msg.text || '')}</div>
+                    <div class="message-time">${msg.time || ''}</div>
+                </div>
+            </div>
+        `;
     }).join('');
-
-    // Scroll to bottom
+    
+    messagesContainer.innerHTML = messagesHtml;
+    
+    // Scroll to bottom after rendering
     setTimeout(() => {
-        messagesContainer.scrollTo({
-            top: messagesContainer.scrollHeight,
-            behavior: 'smooth'
-        });
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }, 100);
+    
+    // Wire up action buttons
+    messagesContainer.querySelectorAll('.msg-unsend').forEach(btn =>
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            unsendMessage(btn.dataset.id);
+        })
+    );
+    messagesContainer.querySelectorAll('.msg-delete').forEach(btn =>
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteForMe(btn.dataset.id);
+        })
+    );
     
     hideMessageLoading();
 }
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function renderAttachmentMessage(msg, currentMatch) {
-    const attachment = msg.attachment;
+function renderAttachmentMessage(msg, currentMatch, actionsHtml, msgId, isSent) {
+    const att = msg.attachment || {};
+    const caption = escapeHtml(msg.text || att.caption || '');
+    const isImage = att.category === 'image' || att.type === 'image' || (att.mimeType && att.mimeType.startsWith('image/'));
     
-    if (attachment.type === 'image') {
+    // Build data URL for display
+    let imgSrc = '';
+    if (att.data) {
+        imgSrc = `data:${att.mimeType || 'image/jpeg'};base64,${att.data}`;
+    } else if (att.url) {
+        imgSrc = att.url.startsWith('http') ? att.url : API_BASE_URL + att.url;
+    }
+    
+    const avatarHtml = (!isSent) ? `
+        <div class="avatar-wrapper">
+            <img src="${getProfilePicture(currentMatch, 32)}" alt="${currentMatch.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentMatch.name)}&background=E0B973&color=3B1D14&size=32'">
+        </div>
+    ` : '';
+    
+    if (isImage && imgSrc) {
         return `
-            <div class="message ${msg.type}">
-                ${msg.type === 'received' ? `
-                    <div class="avatar-wrapper">
-                        <img src="${getProfilePicture(currentMatch)}" alt="${currentMatch.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentMatch.name)}&background=E0B973&color=3B1D14&size=32'">
-                    </div>
-                ` : ''}
+            <div class="message ${msg.type}" data-msg-id="${msgId}">
+                ${avatarHtml}
                 <div class="message-content">
+                    ${actionsHtml}
                     <div class="message-bubble attachment">
-                        <img src="${attachment.url}" alt="Shared image" class="attachment-image" onclick="window.open('${attachment.url}', '_blank')">
-                        ${attachment.caption ? `<p class="attachment-caption">${escapeHtml(attachment.caption)}</p>` : ''}
+                        <img src="${imgSrc}" alt="Shared image" class="attachment-image" onclick="window.open('${imgSrc}','_blank')" onerror="this.parentElement.innerHTML='<span style=\"color:#d4b5a0;font-size:.85rem\">Image unavailable</span>'">
+                        ${caption ? `<p class="attachment-caption">${caption}</p>` : ''}
                     </div>
-                    <div class="message-time">${msg.time}</div>
-                </div>
-            </div>
-        `;
-    } else {
-        return `
-            <div class="message ${msg.type}">
-                ${msg.type === 'received' ? `
-                    <div class="avatar-wrapper">
-                        <img src="${getProfilePicture(currentMatch)}" alt="${currentMatch.name}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentMatch.name)}&background=E0B973&color=3B1D14&size=32'">
-                    </div>
-                ` : ''}
-                <div class="message-content">
-                    <div class="message-bubble attachment">
-                        <div class="file-attachment" onclick="LitlinkChat.downloadAttachment('${attachment.url}', '${attachment.filename}')">
-                            <i class="fas ${getFileIcon(attachment.filename)}"></i>
-                            <div class="file-info">
-                                <div class="file-name">${escapeHtml(attachment.filename)}</div>
-                                <div class="file-size">${formatFileSize(attachment.size)}</div>
-                            </div>
-                            <i class="fas fa-download download-icon"></i>
-                        </div>
-                        ${attachment.caption ? `<p class="attachment-caption">${escapeHtml(attachment.caption)}</p>` : ''}
-                    </div>
-                    <div class="message-time">${msg.time}</div>
+                    <div class="message-time">${msg.time || ''}</div>
                 </div>
             </div>
         `;
     }
+    
+    // File attachment
+    const filename = att.filename || 'File';
+    const filesize = att.size || 0;
+    const downloadUrl = att.data ? `data:${att.mimeType || 'application/octet-stream'};base64,${att.data}` : (att.url || '#');
+    
+    return `
+        <div class="message ${msg.type}" data-msg-id="${msgId}">
+            ${avatarHtml}
+            <div class="message-content">
+                ${actionsHtml}
+                <div class="message-bubble attachment">
+                    <div class="file-attachment" onclick="LitlinkChat.downloadAttachment('${downloadUrl}', '${escapeHtml(filename)}', '${att.mimeType || ''}')">
+                        <i class="fas ${getFileIcon(filename)}"></i>
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(filename)}</div>
+                            <div class="file-size">${formatFileSize(filesize)}</div>
+                        </div>
+                        <i class="fas fa-download download-icon"></i>
+                    </div>
+                    ${caption ? `<p class="attachment-caption">${caption}</p>` : ''}
+                </div>
+                <div class="message-time">${msg.time || ''}</div>
+            </div>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function getFileIcon(filename) {
@@ -753,6 +931,7 @@ function getFileIcon(filename) {
         jpeg: 'fa-file-image',
         png: 'fa-file-image',
         gif: 'fa-file-image',
+        webp: 'fa-file-image',
         mp3: 'fa-file-audio',
         mp4: 'fa-file-video',
         zip: 'fa-file-archive',
@@ -762,6 +941,7 @@ function getFileIcon(filename) {
 }
 
 function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -778,7 +958,7 @@ async function sendMessage() {
             return;
         }
         
-        if (!text && !fileInput?.files?.length) {
+        if (!text) {
             return;
         }
         
@@ -786,10 +966,9 @@ async function sendMessage() {
         const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         
         const recipientId = currentMatch._id || currentMatch.id;
-        const useWebSocket = chatSocket && chatSocket.readyState === WebSocket.OPEN && isRealUserId(recipientId);
+        const useWebSocket = chatSocket && chatSocket.connected && isRealUserId(recipientId);
         
         if (useWebSocket && text) {
-            // Send text message via WebSocket
             if (sendChatWebSocket(recipientId, text)) {
                 if (!currentMatch.messages) currentMatch.messages = [];
                 
@@ -797,7 +976,8 @@ async function sendMessage() {
                     id: 'pending-' + Date.now(),
                     type: 'sent',
                     text: text,
-                    time: time
+                    time: time,
+                    createdAt: now
                 });
                 
                 messageInput.value = '';
@@ -806,13 +986,17 @@ async function sendMessage() {
                 renderMatches();
                 renderMessages(currentMatch.messages, currentMatch);
                 
-                // Update message count
                 const totalMessages = matches.reduce((total, match) => total + (match.messages ? match.messages.length : 0), 0);
                 document.getElementById('statMessages').textContent = totalMessages;
             }
         } else if (text) {
-            // Fallback for demo/offline mode
-            const newMessage = { id: Date.now(), type: 'sent', text: text, time: time };
+            const newMessage = { 
+                id: Date.now(), 
+                type: 'sent', 
+                text: text, 
+                time: time,
+                createdAt: now
+            };
             
             if (!currentMatch.messages) currentMatch.messages = [];
             currentMatch.messages.push(newMessage);
@@ -826,7 +1010,6 @@ async function sendMessage() {
             const totalMessages = matches.reduce((total, match) => total + (match.messages?.length || 0), 0);
             document.getElementById('statMessages').textContent = totalMessages;
             
-            // Simulate response if online (fallback only)
             if (currentMatch.online && !useWebSocket) {
                 simulateResponse(currentMatch);
             }
@@ -839,20 +1022,13 @@ async function sendMessage() {
 }
 
 function simulateResponse(currentMatch) {
-    // Only used as fallback when WebSocket is not available
-    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) return;
+    if (chatSocket && chatSocket.connected) return;
     
-    // Show typing indicator
-    const typingIndicator = showTypingIndicator(currentMatch);
+    showTypingIndicator(currentMatch);
     
-    // Simulate delay
     setTimeout(() => {
-        // Remove typing indicator
-        if (typingIndicator) {
-            typingIndicator.remove();
-        }
+        removeTypingIndicator();
         
-        // Generate response
         const responses = [
             "That's interesting! I should check that book out.",
             "I completely agree! The author's style is so unique.",
@@ -864,34 +1040,23 @@ function simulateResponse(currentMatch) {
         ];
         
         const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-        
         const now = new Date();
-        const time = now.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-        });
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         
         const responseMessage = {
             id: Date.now() + 1,
             type: 'received',
             text: randomResponse,
-            time: time
+            time: time,
+            createdAt: now
         };
         
-        // Add to messages
         currentMatch.messages.push(responseMessage);
+        currentMatch.preview = randomResponse.length > 30 ? randomResponse.substring(0, 27) + '...' : randomResponse;
         
-        // Update preview
-        currentMatch.preview = randomResponse.length > 30 ? 
-            randomResponse.substring(0, 27) + '...' : 
-            randomResponse;
-        
-        // Re-render
         renderMatches();
         renderMessages(currentMatch.messages, currentMatch);
         
-        // Update message count
         const totalMessages = matches.reduce((total, match) => total + (match.messages?.length || 0), 0);
         document.getElementById('statMessages').textContent = totalMessages;
         
@@ -909,18 +1074,15 @@ function setupEmojiPicker() {
 }
 
 function toggleEmojiPicker() {
-    // Remove existing picker if open
     if (emojiPicker) {
         emojiPicker.remove();
         emojiPicker = null;
         return;
     }
     
-    // Create emoji picker container
     emojiPicker = document.createElement('div');
     emojiPicker.className = 'emoji-picker';
     
-    // Common emojis for book chat
     const emojis = [
         '😊', '😂', '🥰', '😍', '🤔', '😢', '😭', '😤', '😎', '🤓',
         '📚', '📖', '📕', '📗', '📘', '📙', '📔', '📒', '📃', '📜',
@@ -940,7 +1102,6 @@ function toggleEmojiPicker() {
         emojiPicker.appendChild(span);
     });
     
-    // Position near the emoji button
     const rect = emojiBtn.getBoundingClientRect();
     emojiPicker.style.position = 'absolute';
     emojiPicker.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
@@ -948,7 +1109,6 @@ function toggleEmojiPicker() {
     
     document.body.appendChild(emojiPicker);
     
-    // Close when clicking outside
     setTimeout(() => {
         document.addEventListener('click', closeEmojiPickerOnClickOutside);
     }, 100);
@@ -970,12 +1130,9 @@ function insertEmoji(emoji) {
     const text = messageInput.value;
     
     messageInput.value = text.substring(0, start) + emoji + text.substring(end);
-    
-    // Move cursor after inserted emoji
     messageInput.selectionStart = messageInput.selectionEnd = start + emoji.length;
     messageInput.focus();
     
-    // Close picker
     if (emojiPicker) {
         emojiPicker.remove();
         emojiPicker = null;
@@ -983,98 +1140,129 @@ function insertEmoji(emoji) {
 }
 
 // ===== FILE ATTACHMENTS =====
+const ALLOWED_ATTACH_TYPES = {
+    'image/jpeg': 'image', 'image/png': 'image', 'image/gif': 'image', 'image/webp': 'image',
+    'application/pdf': 'document',
+    'application/msword': 'document',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+    'text/plain': 'document'
+};
+const MAX_ATTACH_BYTES = 6 * 1024 * 1024;
+
 function setupFileInput() {
     if (!attachBtn) return;
-    
-    // Create hidden file input
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.style.display = 'none';
-    fileInput.accept = 'image/*,.pdf,.doc,.docx,.txt';
+    fileInput.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,.doc,.docx,.txt';
     fileInput.multiple = false;
-    
     document.body.appendChild(fileInput);
-    
-    attachBtn.addEventListener('click', function() {
+    attachBtn.addEventListener('click', () => {
+        if (!matches.find(m => m.active)) { showNotification('Select a conversation first', 'warning'); return; }
+        fileInput.value = '';
         fileInput.click();
     });
-    
     fileInput.addEventListener('change', handleFileSelect);
 }
 
-async function handleFileSelect(e) {
+function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
-    
+    const category = ALLOWED_ATTACH_TYPES[file.type];
+    if (!category) { showNotification('Only JPEG/PNG/GIF/WebP, PDF, Word, or TXT allowed.', 'error'); fileInput.value = ''; return; }
+    if (file.size > MAX_ATTACH_BYTES) { showNotification('File too large — max 6 MB.', 'error'); fileInput.value = ''; return; }
+    showAttachPreview(file, category);
+}
+
+function showAttachPreview(file, category) {
+    closeAttachPreview();
+    const overlay = document.createElement('div');
+    overlay.id = 'attachPreviewOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#2c1810;border-radius:16px;padding:24px;max-width:440px;width:100%;border:1px solid rgba(245,230,211,0.15);display:flex;flex-direction:column;gap:16px;';
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+    const closeX = document.createElement('button');
+    closeX.innerHTML = '&times;'; closeX.style.cssText = 'background:none;border:none;color:#d4b5a0;font-size:26px;cursor:pointer;line-height:1;padding:0;'; closeX.onclick = closeAttachPreview;
+    hdr.innerHTML = '<span style="font-weight:600;color:#f5e6d3;font-size:1rem;">Send attachment</span>'; hdr.appendChild(closeX);
+    const preview = document.createElement('div');
+    preview.style.cssText = 'background:#1a0f0a;border-radius:10px;padding:16px;display:flex;align-items:center;gap:14px;min-height:80px;';
+    let captionInput = null;
+    if (category === 'image') {
+        const img = document.createElement('img');
+        img.style.cssText = 'max-width:100%;max-height:260px;border-radius:8px;display:block;margin:0 auto;object-fit:contain;'; img.alt = file.name;
+        const reader = new FileReader(); reader.onload = ev => { img.src = ev.target.result; }; reader.readAsDataURL(file);
+        preview.style.justifyContent = 'center'; preview.appendChild(img);
+        captionInput = document.createElement('input'); captionInput.type = 'text'; captionInput.placeholder = 'Add a caption… (optional)'; captionInput.maxLength = 200;
+        captionInput.style.cssText = 'width:100%;padding:10px 14px;border-radius:8px;background:#1a0f0a;border:1px solid #5c3a28;color:#f5e6d3;font-family:inherit;font-size:.9rem;outline:none;';
+        captionInput.addEventListener('focus', () => captionInput.style.borderColor = '#e0b973');
+        captionInput.addEventListener('blur',  () => captionInput.style.borderColor = '#5c3a28');
+    } else {
+        preview.innerHTML = '<div style="width:48px;height:48px;background:#3d2617;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas ' + getFileIcon(file.name) + '" style="font-size:22px;color:#e0b973;"></i></div><div style="overflow:hidden;"><div style="color:#f5e6d3;font-size:.9rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(file.name) + '</div><div style="color:#d4b5a0;font-size:.8rem;margin-top:4px;">' + formatFileSize(file.size) + '</div></div>';
+    }
+    const hint = document.createElement('div'); hint.style.cssText = 'color:#d4b5a0;font-size:.75rem;text-align:center;';
+    hint.textContent = category === 'image' ? 'Images: JPEG · PNG · GIF · WebP — max 6 MB' : 'Docs: PDF · DOC · DOCX · TXT — max 6 MB';
+    const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:10px;';
+    const cancelBtn2 = document.createElement('button'); cancelBtn2.textContent = 'Cancel'; cancelBtn2.style.cssText = 'flex:1;padding:11px;border-radius:8px;border:1px solid #5c3a28;background:transparent;color:#f5e6d3;cursor:pointer;font-size:.9rem;font-weight:500;'; cancelBtn2.onclick = closeAttachPreview;
+    const sendBtn2   = document.createElement('button'); sendBtn2.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; sendBtn2.style.cssText = 'flex:1;padding:11px;border-radius:8px;border:none;background:#e0b973;color:#2c1810;cursor:pointer;font-size:.9rem;font-weight:600;';
+    sendBtn2.onclick = () => sendAttachment(file, category, captionInput ? captionInput.value.trim() : '');
+    btnRow.appendChild(cancelBtn2); btnRow.appendChild(sendBtn2);
+    box.appendChild(hdr); box.appendChild(preview); if (captionInput) box.appendChild(captionInput); box.appendChild(hint); box.appendChild(btnRow);
+    overlay.appendChild(box); document.body.appendChild(overlay);
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) closeAttachPreview(); });
+    overlay._esc = ev => { if (ev.key === 'Escape') closeAttachPreview(); }; document.addEventListener('keydown', overlay._esc);
+}
+
+function closeAttachPreview() {
+    const overlay = document.getElementById('attachPreviewOverlay');
+    if (overlay) { if (overlay._esc) document.removeEventListener('keydown', overlay._esc); overlay.remove(); }
+    if (fileInput) fileInput.value = '';
+}
+
+async function sendAttachment(file, category, caption) {
     const currentMatch = matches.find(m => m.active);
-    if (!currentMatch) {
-        showNotification('No active conversation', 'warning');
-        return;
-    }
-    
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        showNotification('File size must be less than 10MB', 'error');
-        return;
-    }
-    
-    showMessageLoading('Uploading file...');
-    
+    if (!currentMatch) return;
+    closeAttachPreview();
+    const sendBtnEl = document.getElementById('sendBtn');
+    if (sendBtnEl) { sendBtnEl.disabled = true; sendBtnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
     try {
-        // Upload file to server
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('recipientId', currentMatch._id || currentMatch.id);
-        
-        const token = getAuthToken();
-        const base = window.location.port === '5500' || window.location.port === '3000' ? 'http://localhost:5002' : '';
-        
-        const res = await fetch((base || '') + '/api/chat/upload', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token
-            },
-            body: formData
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = ev => resolve(ev.target.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
         });
-        
-        if (res.ok) {
-            const data = await res.json();
-            
-            if (data.success && data.attachment) {
-                // Send attachment via WebSocket
-                if (sendChatWebSocket(currentMatch._id || currentMatch.id, '', data.attachment)) {
-                    const now = new Date();
-                    const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                    
-                    if (!currentMatch.messages) currentMatch.messages = [];
-                    
-                    currentMatch.messages.push({
-                        id: 'attachment-' + Date.now(),
-                        type: 'sent',
-                        attachment: data.attachment,
-                        time: time
-                    });
-                    
-                    currentMatch.preview = '📎 Sent a file';
-                    
-                    renderMatches();
-                    renderMessages(currentMatch.messages, currentMatch);
-                    
-                    const totalMessages = matches.reduce((total, match) => total + (match.messages ? match.messages.length : 0), 0);
-                    document.getElementById('statMessages').textContent = totalMessages;
-                    
-                    showNotification('File sent successfully', 'success');
-                }
-            }
-        } else {
-            showNotification('Failed to upload file', 'error');
-        }
-    } catch (error) {
-        console.error('File upload error:', error);
-        showNotification('Error uploading file', 'error');
+        const token = getAuthToken();
+        const res   = await fetch(API_BASE_URL + '/api/chat/messages/attachment', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipientId: currentMatch._id || currentMatch.id, data: base64, mimeType: file.type, filename: file.name, size: file.size, category, caption })
+        });
+        const result = await res.json();
+        if (!res.ok || !result.success) throw new Error(result.message || 'Send failed');
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        if (!currentMatch.messages) currentMatch.messages = [];
+        currentMatch.messages.push({ 
+            id: result.message._id || ('att-' + Date.now()), 
+            _id: result.message._id,
+            type: 'sent', 
+            attachment: { data: base64, mimeType: file.type, filename: file.name, size: file.size, category }, 
+            text: caption || '', 
+            time,
+            createdAt: now
+        });
+        currentMatch.preview = category === 'image' ? '📷 Sent a photo' : '📎 Sent a file';
+        renderMatches();
+        renderMessages(currentMatch.messages, currentMatch);
+        document.getElementById('statMessages').textContent = matches.reduce((t, m) => t + (m.messages ? m.messages.length : 0), 0);
+        showNotification(category === 'image' ? 'Photo sent!' : 'File sent!', 'success');
+    } catch (err) {
+        console.error('Attachment error:', err);
+        showNotification('Failed to send: ' + err.message, 'error');
     } finally {
-        hideMessageLoading();
-        fileInput.value = ''; // Reset file input
+        if (sendBtnEl) { sendBtnEl.disabled = false; sendBtnEl.innerHTML = '<i class="fas fa-paper-plane"></i>'; }
     }
 }
 
@@ -1113,6 +1301,7 @@ function removeTypingIndicator() {
 
 // ===== LOADING STATES =====
 function showMessageLoading(message = 'Loading...') {
+    if (!messagesContainer) return;
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'message-loading-state';
     loadingDiv.innerHTML = `
@@ -1133,7 +1322,6 @@ function hideMessageLoading() {
 
 // ===== NOTIFICATION SYSTEM =====
 function showNotification(message, type = 'info') {
-    // Remove existing notifications
     const existingNotifications = document.querySelectorAll('.notification');
     existingNotifications.forEach(n => n.remove());
     
@@ -1148,13 +1336,12 @@ function showNotification(message, type = 'info') {
     };
     
     notification.innerHTML = `
-        <span class="notification-icon">${icons[type]}</span>
+        <span class="notification-icon">${icons[type] || 'ℹ️'}</span>
         <span class="notification-message">${message}</span>
     `;
     
     document.body.appendChild(notification);
     
-    // Auto remove after 3 seconds
     setTimeout(() => {
         notification.classList.add('notification-hide');
         setTimeout(() => {
@@ -1165,7 +1352,6 @@ function showNotification(message, type = 'info') {
 
 // ===== EVENT LISTENERS =====
 function initializeEventListeners() {
-    // Send message button
     if (sendBtn) {
         sendBtn.addEventListener('click', sendMessage);
     }
@@ -1193,7 +1379,6 @@ function initializeEventListeners() {
         });
     }
     
-    // Sidebar toggle for mobile
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
             sidebar.classList.toggle('open');
@@ -1206,7 +1391,6 @@ function initializeEventListeners() {
         });
     }
     
-    // Close sidebar when clicking outside on mobile
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768 && 
             sidebar.classList.contains('open') && 
@@ -1217,7 +1401,6 @@ function initializeEventListeners() {
         }
     });
     
-    // Handle window resize
     window.addEventListener('resize', () => {
         if (window.innerWidth > 768) {
             sidebar.classList.remove('open');
@@ -1225,23 +1408,74 @@ function initializeEventListeners() {
     });
 }
 
+// ===== MESSAGE ACTIONS =====
+async function unsendMessage(messageId) {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) return;
+    
+    if (!confirm('Unsend this message for everyone? This cannot be undone.')) return;
+    
+    try {
+        const token = getAuthToken();
+        const res = await fetch(API_BASE_URL + '/api/chat/messages/' + messageId + '/unsend', { 
+            method: 'DELETE', 
+            headers: { 'Authorization': 'Bearer ' + token } 
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+        
+        await refreshCurrentConversation();
+        
+        showNotification('Message unsent for everyone', 'success');
+    } catch (err) { 
+        console.error('Unsend error:', err);
+        showNotification('Could not unsend: ' + err.message, 'error'); 
+    }
+}
+
+async function deleteForMe(messageId) {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) return;
+    
+    if (!confirm('Delete this message only for yourself? The other person will still see it.')) return;
+    
+    try {
+        const token = getAuthToken();
+        const res = await fetch(API_BASE_URL + '/api/chat/messages/' + messageId + '/delete-for-me', { 
+            method: 'DELETE', 
+            headers: { 'Authorization': 'Bearer ' + token } 
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+        
+        await refreshCurrentConversation();
+        
+        showNotification('Message deleted for you', 'info');
+    } catch (err) { 
+        console.error('Delete error:', err);
+        showNotification('Could not delete: ' + err.message, 'error'); 
+    }
+}
+
 // ===== STARTUP =====
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('📚 Litlink Chat loading...');
-    
     try {
         await initializeChat();
-    } catch (error) {
-        console.error('❌ Failed to initialize chat:', error);
+        const targetUserId = new URLSearchParams(window.location.search).get('userId');
+        if (targetUserId) {
+            const trySwitch = async (n) => {
+                const m = matches.find(x => (x._id || x.id) === targetUserId);
+                if (m) await switchMatch(targetUserId);
+                else if (n > 0) setTimeout(() => trySwitch(n - 1), 400);
+            };
+            await trySwitch(12);
+        }
+    } catch (err) {
+        console.error('Failed to initialize chat:', err);
         showNotification('Failed to load chat interface', 'error');
     }
-    
-    // Focus input after load
-    setTimeout(() => {
-        if (messageInput) {
-            messageInput.focus();
-        }
-    }, 500);
+    setTimeout(() => { if (messageInput) messageInput.focus(); }, 500);
 });
 
 // ===== UTILITY FUNCTIONS =====
@@ -1258,6 +1492,8 @@ window.LitlinkChat = {
     toggleSidebar,
     refreshMatches: loadMatches,
     showSettings: () => showNotification('Settings coming soon!', 'info'),
+    unsendMessage,
+    deleteForMe,
     useSuggestedMessage: (message) => {
         if (messageInput) {
             messageInput.value = message;
@@ -1265,13 +1501,25 @@ window.LitlinkChat = {
             sendMessage();
         }
     },
-    downloadAttachment: (url, filename) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    downloadAttachment: (url, filename, mimeType) => {
+        try {
+            if (url.startsWith('data:')) {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else if (url.startsWith('http')) {
+                window.open(url, '_blank');
+            } else {
+                console.warn('Invalid download URL');
+                showNotification('Could not download file', 'warning');
+            }
+        } catch (err) {
+            console.error('Download error:', err);
+            showNotification('Failed to download file', 'error');
+        }
     }
 };
 
