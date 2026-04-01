@@ -165,9 +165,8 @@ async function loadLiveRooms() {
     }
   } catch (error) {
     console.error('Error loading live rooms:', error);
-    showToast('Failed to load rooms. Using demo data.', 'warning');
-    const demoRooms = getDemoRooms();
-    renderRooms(demoRooms);
+    showToast('Could not reach server. Is the backend running?', 'error');
+    renderRooms([]);
   }
 }
 
@@ -185,8 +184,7 @@ async function loadUpcomingRooms() {
     }
   } catch (error) {
     console.error('Error loading upcoming rooms:', error);
-    const demoUpcoming = getDemoUpcoming();
-    renderUpcoming(demoUpcoming);
+    renderUpcoming([]);
   }
 }
 
@@ -194,20 +192,15 @@ async function createRoom(roomData) {
   try {
     const token = localStorage.getItem('authToken');
     
-    // Convert frontend data to backend expected format
+    // Send all fields the backend schema requires
     const backendData = {
       name: roomData.name,
+      genre: roomData.genre,
       description: roomData.description || '',
       maxParticipants: 50,
       isPublic: true,
-      scheduledStart: roomData.scheduledFor ? new Date(roomData.scheduledFor).toISOString() : null,
-      scheduledEnd: null
+      scheduledFor: roomData.scheduledFor ? new Date(roomData.scheduledFor).toISOString() : null
     };
-    
-    // Add genre to description if provided (since genre isn't in model)
-    if (roomData.genre && roomData.genre !== '') {
-      backendData.description = `[${roomData.genre}] ${backendData.description}`.trim();
-    }
     
     console.log('Creating room with data:', backendData);
     
@@ -259,13 +252,15 @@ function renderRooms(rooms) {
   }
 
   list.innerHTML = liveRooms.map(room => {
-    // Extract genre from description if it exists
-    let genre = 'Discussion';
+    // Use genre field directly; fall back to bracket extraction for legacy rooms
+    let genre = room.genre || 'Discussion';
     let description = room.description || '';
-    const genreMatch = description.match(/^\[(.*?)\]/);
-    if (genreMatch) {
-      genre = genreMatch[1];
-      description = description.replace(/^\[.*?\]\s*/, '');
+    if (!room.genre) {
+      const genreMatch = description.match(/^\[(.*?)\]/);
+      if (genreMatch) {
+        genre = genreMatch[1];
+        description = description.replace(/^\[.*?\]\s*/, '');
+      }
     }
     
     const hostName = room.hostId?.name || 'Host';
@@ -312,16 +307,15 @@ function renderUpcoming(rooms) {
   }
 
   list.innerHTML = rooms.map(room => {
-    // Extract genre from description
-    let genre = 'Discussion';
-    let description = room.description || '';
-    const genreMatch = description.match(/^\[(.*?)\]/);
-    if (genreMatch) {
-      genre = genreMatch[1];
+    // Use genre field directly; fall back to bracket extraction for legacy rooms
+    let genre = room.genre || 'Discussion';
+    if (!room.genre) {
+      const genreMatch = (room.description || '').match(/^\[(.*?)\]/);
+      if (genreMatch) genre = genreMatch[1];
     }
     
     const hostName = room.hostId?.name || 'Host';
-    const scheduledTime = room.scheduledStart ? formatScheduledTime(room.scheduledStart) : 'Soon';
+    const scheduledTime = room.scheduledFor ? formatScheduledTime(room.scheduledFor) : 'Soon';
     
     return `
       <div class="upcoming-card">
@@ -564,23 +558,6 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
-
-/* ===== DEMO FALLBACK DATA ===== */
-function getDemoRooms() {
-  return [
-    { _id: '1', name: 'Fantasy World Debate', description: '[Fantasy] Join us to discuss epic fantasy novels', status: 'live', participantCount: 12, hostId: { name: 'Elena Vance' } },
-    { _id: '2', name: 'Mystery Book Analysis', description: '[Mystery] Analyzing the latest thriller releases', status: 'live', participantCount: 8, hostId: { name: 'James Hardy' } },
-    { _id: '3', name: 'Poetry Reading Circle', description: '[Poetry] Share and discuss your favorite poems', status: 'live', participantCount: 5, hostId: { name: 'Amara Singh' } },
-    { _id: '4', name: 'Sci-Fi Predictions', description: '[Sci-Fi] Future tech and speculative fiction', status: 'live', participantCount: 15, hostId: { name: 'Leo Nakamura' } },
-  ];
-}
-
-function getDemoUpcoming() {
-  return [
-    { _id: 'u1', name: 'Classic Literature Hour', description: '[Classic] Exploring timeless literary works', scheduledStart: new Date(Date.now() + 2 * 60 * 60 * 1000), hostId: { name: 'Marcus' } },
-    { _id: 'u2', name: 'Horror Stories Night', description: '[Horror] Spine-chilling tales and discussion', scheduledStart: new Date(Date.now() + 24 * 60 * 60 * 1000), hostId: { name: 'Elena' } },
-  ];
-}
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
