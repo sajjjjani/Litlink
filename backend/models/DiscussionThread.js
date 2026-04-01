@@ -1,4 +1,3 @@
-// models/DiscussionThread.js - Complete with Circle and Poll support
 const mongoose = require('mongoose');
 
 const commentSchema = new mongoose.Schema({
@@ -14,13 +13,13 @@ const commentSchema = new mongoose.Schema({
 });
 
 const discussionThreadSchema = new mongoose.Schema({
-  // Core fields
   title: { type: String, required: true },
   content: { type: String, required: true },
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
-  // Circle support (NEW)
+  // Circle support
   circle: { type: String, required: false },
+  circleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Circle', required: false },
   isCircleThread: { type: Boolean, default: false },
   isPublic: { type: Boolean, default: true },
   
@@ -38,7 +37,7 @@ const discussionThreadSchema = new mongoose.Schema({
     default: 'discussion'
   },
   
-  // Poll support (NEW)
+  // Poll support
   poll: {
     question: String,
     options: [{
@@ -47,7 +46,7 @@ const discussionThreadSchema = new mongoose.Schema({
     }]
   },
   
-  // Event support (NEW)
+  // Event support
   event: {
     date: Date,
     duration: Number,
@@ -81,7 +80,6 @@ const discussionThreadSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false },
   deletedAt: Date,
   
-  // Timestamps
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -134,13 +132,11 @@ discussionThreadSchema.methods.addComment = async function(userId, content, pare
   };
 
   if (parentCommentId) {
-    // Find parent comment and add as reply
     const parentComment = this.comments.id(parentCommentId);
     if (parentComment) {
       parentComment.replies.push(comment);
     }
   } else {
-    // Add as top-level comment
     this.comments.push(comment);
   }
 
@@ -150,7 +146,6 @@ discussionThreadSchema.methods.addComment = async function(userId, content, pare
   
   await this.save();
   
-  // Return the newly created comment
   return parentCommentId 
     ? this.comments.id(parentCommentId).replies[this.comments.id(parentCommentId).replies.length - 1]
     : this.comments[this.comments.length - 1];
@@ -167,7 +162,6 @@ discussionThreadSchema.methods.voteInPoll = async function(userId, optionIndex) 
     throw new Error('Invalid poll option');
   }
   
-  // Remove user's vote from all options
   this.poll.options.forEach(opt => {
     const voteIndex = opt.votes.indexOf(userId);
     if (voteIndex > -1) {
@@ -175,7 +169,6 @@ discussionThreadSchema.methods.voteInPoll = async function(userId, optionIndex) 
     }
   });
   
-  // Add vote to selected option
   option.votes.push(userId);
   
   await this.save();
@@ -203,11 +196,9 @@ discussionThreadSchema.methods.rsvpToEvent = async function(userId) {
 discussionThreadSchema.pre('save', function(next) {
   this.updatedAt = new Date();
   
-  // Update comment counts for any modified comments
   if (this.comments) {
     this.commentCount = this.comments.filter(c => !c.isDeleted).length;
     
-    // Update like counts for comments
     this.comments.forEach(comment => {
       comment.likeCount = comment.likes.length;
       if (comment.replies) {
