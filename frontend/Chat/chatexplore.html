@@ -455,89 +455,22 @@ function viewProfile(userId) {
   window.location.href = `../Profile/view-profile.html?id=${userId}`;
 }
 
-// Open message modal
+// Open message modal — now goes directly to the chat page
 function openMessageModal(userId, userName) {
-  currentRecipientId = userId;
-  currentRecipientName = userName;
-  document.getElementById('messageText').value = '';
-  document.getElementById('modalTitle').textContent = `Message ${userName}`;
-  const modal = document.getElementById('messageModal');
-  modal.style.display = 'flex';
+  // Redirect straight to chat with the target user pre-selected
+  window.location.href = `../Chat/chat.html?userId=${userId}`;
 }
 
-// Close modal
+// Keep these stubs so existing HTML references don't break
 function closeModal() {
   document.getElementById('messageModal').style.display = 'none';
   currentRecipientId = null;
   currentRecipientName = '';
 }
 
-// Send message
 async function sendMessage() {
-  const messageText = document.getElementById('messageText').value.trim();
-  
-  if (!messageText) {
-    alert('Please enter a message');
-    return;
-  }
-  
-  if (!currentRecipientId) {
-    alert('No recipient selected');
-    return;
-  }
-  
-  try {
-    const token = localStorage.getItem('litlink_token');
-    
-    // First, check if conversation exists or create one
-    const conversationResponse = await fetch('http://localhost:5002/api/chat/conversations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ participantId: currentRecipientId })
-    });
-    
-    if (!conversationResponse.ok) {
-      throw new Error('Failed to create conversation');
-    }
-    
-    const conversationData = await conversationResponse.json();
-    const conversationId = conversationData.conversation?._id || conversationData._id;
-    
-    if (!conversationId) {
-      throw new Error('No conversation ID returned');
-    }
-    
-    // Send message
-    const messageResponse = await fetch(`http://localhost:5002/api/chat/conversations/${conversationId}/messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ content: messageText })
-    });
-    
-    if (messageResponse.ok) {
-      alert(`✅ Message sent to ${currentRecipientName}!`);
-      closeModal();
-      
-      // Ask if user wants to go to chat
-      const goToChat = confirm('Message sent! Would you like to continue the conversation in chat?');
-      if (goToChat) {
-        window.location.href = `../Chat/chat.html?userId=${currentRecipientId}`;
-      }
-    } else {
-      const errorData = await messageResponse.json();
-      throw new Error(errorData.message || 'Failed to send message');
-    }
-    
-  } catch (error) {
-    console.error('Error sending message:', error);
-    alert(`Failed to send message: ${error.message}\n\nPlease try again later.`);
-  }
+  // No longer used — messaging happens in chat.html
+  closeModal();
 }
 
 // Helper function to escape HTML
