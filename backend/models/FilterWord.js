@@ -21,7 +21,7 @@ const filterWordSchema = new mongoose.Schema({
   action: {
     type: String,
     enum: ['warn', 'flag', 'auto_delete', 'require_review'],
-    default: 'flag'
+    default: 'warn'
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -48,10 +48,54 @@ const filterWordSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add indexes
 filterWordSchema.index({ word: 1 });
 filterWordSchema.index({ category: 1 });
 filterWordSchema.index({ severity: 1 });
 filterWordSchema.index({ isActive: 1 });
+
+filterWordSchema.statics.checkText = async function(text) {
+  if (!text || typeof text !== 'string') return { hasViolation: false, matches: [] };
+  
+  const lowerText = text.toLowerCase();
+  const activeWords = await this.find({ isActive: true });
+  const matches = [];
+  
+  for (const filterWord of activeWords) {
+    // Create regex that matches whole words or word boundaries
+    // Handle special characters in filter words
+    const escapedWord = filterWord.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordPattern = new RegExp(`\\b${escapedWord}\\b|${escapedWord}(?=\\s|$)|(?<=^|\\s)${escapedWord}`, 'gi');
+    if (wordPattern.test(lowerText)) {
+      matches.push(filterWord);
+    }
+  }
+  
+  return {
+    hasViolation: matches.length > 0,
+    matches: matches
+  };
+};
+
+// Method to get all active filter words (cached)
+let cachedFilterWords = null;
+let lastCacheUpdate = null;
+const CACHE_TTL = 60000; // 1 minute
+
+filterWordSchema.statics.getActiveFilterWords = async function(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedFilterWords && lastCacheUpdate && (now - lastCacheUpdate) < CACHE_TTL) {
+    return cachedFilterWords;
+  }
+  
+  cachedFilterWords = await this.find({ isActive: true });
+  lastCacheUpdate = now;
+  return cachedFilterWords;
+};
+
+// Method to clear cache (call when filter words are added/updated/deleted)
+filterWordSchema.statics.clearCache = function() {
+  cachedFilterWords = null;
+  lastCacheUpdate = null;
+};
 
 module.exports = mongoose.model('FilterWord', filterWordSchema);

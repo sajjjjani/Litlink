@@ -2,6 +2,19 @@ const User = require('../models/User');
 const matchService = require('../services/matchService');
 
 class MatchController {
+  constructor() {
+    // Express passes handlers as plain callbacks, so bind instance methods
+    // once to preserve `this` for internal helper calls.
+    this.getMatches = this.getMatches.bind(this);
+    this.getMatchDetails = this.getMatchDetails.bind(this);
+    this.getFilteredMatches = this.getFilteredMatches.bind(this);
+    this.getMatchSuggestions = this.getMatchSuggestions.bind(this);
+    this.getMatchesByBook = this.getMatchesByBook.bind(this);
+    this.getGlobalMatches = this.getGlobalMatches.bind(this);
+    this.updatePreferences = this.updatePreferences.bind(this);
+    this.getMatchStats = this.getMatchStats.bind(this);
+  }
+
   /**
    * Get matches for current user
    */

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Litlink - Circle Requests</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #24160f; color: #f5e6d3; }
+    .page { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .back { color: #e8d4c0; text-decoration: none; border: 1px solid rgba(232,212,192,.25); border-radius: 8px; padding: 8px 12px; }
+    .list { display: grid; gap: 12px; }
+    .card { background: rgba(0,0,0,.2); border: 1px solid rgba(232,212,192,.12); border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center; }
+    .meta { color: #c4a891; font-size: 13px; margin-top: 4px; }
+    .actions { display: flex; gap: 8px; }
+    .btn { border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; color: #fff; }
+    .accept { background: #2e7d32; }
+    .reject { background: #b71c1c; }
+    .empty { padding: 24px; text-align: center; color: #c4a891; border: 1px dashed rgba(232,212,192,.2); border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="top">
+      <h1><i class="fas fa-envelope-open-text"></i> Circle Requests</h1>
+      <a class="back" href="../Discussion Board/discussion.html">Back to Discussions</a>
+    </div>
+    <div id="requestsList" class="list">
+      <div class="empty">Loading pending requests...</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="../utils/modal.js"></script>
+  <script src="../utils/notificationClient.js"></script>
+  <script src="circle-requests.js"></script>
+</body>
+</html>

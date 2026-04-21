@@ -340,3 +340,50 @@ a{text-decoration:none;color:inherit}
   width: 24px;
   height: 24px;
 }
+/* ================================================================
+   ROTATING SPEAKER MODE — appended to voice.css
+   (Fixes: was previously a separate file that caused MIME error)
+   ================================================================ */
+.room-mode-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-left:8px;letter-spacing:.03em;transition:all .3s}
+.room-mode-badge.free{background:rgba(201,162,123,.15);color:var(--text-muted);border:1px solid var(--border)}
+.room-mode-badge.rotating{background:rgba(201,162,64,.2);color:var(--accent-gold);border:1px solid rgba(201,162,64,.4)}
+.room-mode-badge .mode-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse-live 1.5s ease-in-out infinite}
+.speaker-timer-bar{width:240px;height:6px;background:var(--border);border-radius:3px;margin:12px auto 4px;overflow:hidden}
+.speaker-timer-fill{height:100%;background:linear-gradient(90deg,var(--accent-gold),var(--accent));border-radius:3px;transition:width 1s linear}
+.speaker-timer-text{font-size:12px;color:var(--text-dim);text-align:center}
+@keyframes speakerGlow{0%,100%{box-shadow:0 0 0 0 rgba(201,162,64,.55)}50%{box-shadow:0 0 0 10px rgba(201,162,64,0)}}
+.participant-card.is-current-speaker{outline:2px solid var(--accent-gold);background:rgba(201,162,64,.07);border-radius:10px;animation:speakerGlow 2s ease infinite}
+.your-turn-badge{display:inline-block;margin-top:8px;background:linear-gradient(135deg,#10b981,#059669);color:white;font-size:13px;font-weight:700;padding:4px 16px;border-radius:20px;animation:fadeInUp .3s ease both}
+.pc-queue-badge{position:absolute;bottom:-4px;right:-4px;width:20px;height:20px;border-radius:50%;background:var(--accent-gold);display:flex;align-items:center;justify-content:center;font-size:11px;z-index:5}
+.rsb-current-speaker{display:flex;align-items:center;gap:10px;padding:10px;background:rgba(201,162,64,.12);border:1px solid rgba(201,162,64,.3);border-radius:8px;margin-bottom:8px}
+.rcs-av{width:36px;height:36px;border-radius:50%;background:var(--accent-gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg-primary);flex-shrink:0}
+.rcs-name{font-size:13px;font-weight:600;color:var(--sidebar-text)}
+.rcs-badge{font-size:11px;color:var(--sidebar-muted)}
+.rcs-timer-bar{width:100%;height:5px;background:rgba(0,0,0,.1);border-radius:3px;margin:6px 0 2px;overflow:hidden}
+.rcs-timer-fill{height:100%;background:var(--accent-gold);border-radius:3px;transition:width 1s linear}
+.rcs-timer-text{font-size:11px;color:var(--sidebar-muted);text-align:right}
+.rsb-queue-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.rsb-queue-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sidebar-text);padding:4px 0}
+.rsb-queue-item.is-you{font-weight:600}
+.rsb-queue-pos{width:20px;height:20px;border-radius:50%;background:var(--sidebar-text);color:var(--sidebar-bg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.rsb-vote-skip-btn,.rsb-skip-turn-btn{width:100%;padding:8px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:8px;cursor:pointer;transition:all .2s}
+.rsb-vote-skip-btn{background:rgba(59,29,20,.12);border:1px solid rgba(59,29,20,.2);color:var(--sidebar-text)}
+.rsb-vote-skip-btn:hover{background:rgba(59,29,20,.22)}
+.rsb-skip-turn-btn{background:var(--accent-gold);border:none;color:var(--bg-primary)}
+.rsb-skip-turn-btn:hover{opacity:.85}
+.rsb-topic-prompt{font-size:12px;color:var(--sidebar-muted);background:rgba(59,29,20,.08);border-radius:6px;padding:6px 10px;margin-bottom:10px;border-left:3px solid var(--accent-gold)}
+.rsb-emoji-bar{display:flex;gap:6px;justify-content:center;padding:8px 0}
+.rsb-emoji-btn{font-size:18px;padding:4px 6px;border-radius:6px;transition:transform .1s;cursor:pointer}
+.rsb-emoji-btn:hover{transform:scale(1.3)}
+@keyframes floatEmoji{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.4)}}
+.floating-emoji{position:fixed;pointer-events:none;z-index:9000;animation:floatEmoji 2.5s ease forwards;font-size:28px}
+.ctrl-rotate-on{border-color:var(--accent-gold)!important;background:rgba(201,162,64,.2)!important;color:var(--accent-gold)!important}
+.ctrl-rotate-off{border-color:var(--border);color:var(--text-muted)}
+.ctrl-rotate-on:hover,.ctrl-rotate-off:hover{border-color:var(--accent-gold)!important;color:var(--accent-gold)!important}
+.ctrl-topic{border-color:var(--border);color:var(--text-muted)}
+.ctrl-topic:hover{border-color:var(--accent);color:var(--accent)}
+.ctrl-end-room{border-color:var(--live-red);background:rgba(232,93,74,.2);color:var(--live-red);transition:all .2s}
+.ctrl-end-room:hover{background:var(--live-red)!important;color:white!important;transform:scale(1.05)}
+.ctrl-end-room svg{width:24px;height:24px}
+.pc-hand{position:absolute;top:-4px;right:-4px;width:28px;height:28px;border-radius:50%;background:var(--accent-gold);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--bg-primary);animation:fadeInUp .2s ease;z-index:5}
+.pc-crown{position:absolute;top:-8px;left:-4px;font-size:20px;animation:fadeInUp .2s ease;z-index:5}

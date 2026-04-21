@@ -2134,18 +2134,6 @@ body {
     border-left: 4px solid #2196f3;
 }
 
-.notification-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff4444;
-    color: white;
-    font-size: 10px;
-    padding: 2px 5px;
-    border-radius: 10px;
-    min-width: 18px;
-    text-align: center;
-}
 
 .empty-state {
     text-align: center;
@@ -2515,4 +2503,191 @@ body {
 ::selection {
     background: rgba(232, 212, 192, 0.3);
     color: #fff;
+}
+
+/* Circle Creation and Management Styles */
+.create-circle-quick-btn {
+    width: 100%;
+    margin-top: 10px;
+    background: rgba(139, 69, 40, 0.3);
+    border: 1px solid rgba(232, 212, 192, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    color: #e8d4c0;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.create-circle-quick-btn:hover {
+    background: rgba(139, 69, 40, 0.5);
+    transform: translateY(-2px);
+}
+
+.my-circles-section {
+    background: rgba(139, 69, 40, 0.15);
+    border: 1px solid rgba(232, 212, 192, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 20px;
+    transition: all 0.3s;
+}
+
+.my-circles-section:hover {
+    background: rgba(139, 69, 40, 0.2);
+}
+
+.my-circle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    transition: all 0.3s;
+}
+
+.my-circle-item:hover {
+    transform: translateX(5px);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.icon-selector {
+    background: rgba(139, 69, 40, 0.3);
+    border: 1px solid rgba(232, 212, 192, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.icon-selector:hover {
+    background: rgba(139, 69, 40, 0.5);
+    transform: scale(1.1);
+}
+
+.icon-selector.active {
+    background: rgba(232, 212, 192, 0.3);
+    border-color: #e8d4c0;
+    transform: scale(1.1);
+}
+
+.member-management-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    transition: all 0.3s;
+}
+
+.member-management-item:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.request-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    transition: all 0.3s;
+}
+
+.request-item:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.btn-danger {
+    background: rgba(255, 68, 68, 0.2);
+    border: 1px solid #ff4444;
+    border-radius: 10px;
+    padding: 12px;
+    color: #ff6b6b;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 600;
+}
+
+.btn-danger:hover {
+    background: rgba(255, 68, 68, 0.3);
+    transform: translateY(-2px);
+}
+
+.create-circle-btn-header {
+    background: rgba(139, 69, 40, 0.3);
+    border: 1px solid rgba(232, 212, 192, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    color: #e8d4c0;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.create-circle-btn-header:hover {
+    background: rgba(139, 69, 40, 0.5);
+    transform: translateY(-2px);
+}
+
+/* Empty State for Highlights */
+.highlight-card .btn-primary {
+    background: linear-gradient(135deg, rgba(139, 69, 40, 0.8), rgba(120, 60, 35, 0.8));
+    border: 1px solid rgba(232, 212, 192, 0.3);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.highlight-card .btn-primary:hover {
+    background: linear-gradient(135deg, rgba(139, 69, 40, 1), rgba(120, 60, 35, 1));
+    transform: translateY(-2px);
+}
+
+/* Feed Empty State */
+.feed-item .feed-content {
+    text-align: center;
+    padding: 20px;
+    color: #c4a891;
+}
+
+.feed-item .feed-content i {
+    font-size: 24px;
+    margin-bottom: 10px;
+    display: block;
+    color: #a88b76;
+}
+
+@media (max-width: 768px) {
+    .member-management-item {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .request-item {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .my-circle-item {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .highlight-card .btn-primary {
+        width: 100%;
+    }
 }

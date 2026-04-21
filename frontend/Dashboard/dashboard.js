@@ -1,5 +1,3 @@
-// ===== AUTHENTICATION & SESSION FUNCTIONS =====
-
 function checkAuth() {
     const token = localStorage.getItem('litlink_token');
     const user = JSON.parse(localStorage.getItem('litlink_user') || 'null');
@@ -101,9 +99,23 @@ function toggleMobileMenu() {
 }
 
 function logout() {
-    if (confirm('Are you sure you want to logout?')) {
+    const performLogout = () => {
         localStorage.clear();
+        sessionStorage.clear();
         window.location.href = '../Homepage/index.html';
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal(
+            'Log Out',
+            'Do you want to log out from Litlink?',
+            performLogout
+        );
+        return;
+    }
+
+    if (confirm('Are you sure you want to logout?')) {
+        performLogout();
     }
 }
 
@@ -265,16 +277,28 @@ function populateNotifications(notifications, unreadCount) {
             notificationItem.dataset.type = notif.type;
             
             const iconColors = {
-                'match': 'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
-                'message': 'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
-                'board': 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-                'voice': 'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
-                'achievement': 'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
-                'warning': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-                'info': 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
-                'success': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                'error': 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-                'system': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
+                'follow':              'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+                'unfollow':            'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                'thread_create':       'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'like':                'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+                'comment':             'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                'circle_request':      'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                'circle_accept':       'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                'thread_liked':        'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+                'thread_commented':    'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                'circle_new_thread':   'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'circle_join_request': 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                'circle_accepted':     'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                'match':        'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
+                'message':      'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
+                'board':        'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+                'voice':        'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
+                'achievement':  'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
+                'warning':      'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                'info':         'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
+                'success':      'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'error':        'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                'system':       'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
             };
             
             const iconColor = iconColors[notif.type] || iconColors.info;
@@ -294,7 +318,7 @@ function populateNotifications(notifications, unreadCount) {
             `;
             
             notificationItem.addEventListener('click', function() {
-                handleNotificationClick(notif.id, notif.actionUrl, notif.type);
+                handleNotificationClick(notif);
             });
             
             notificationsList.appendChild(notificationItem);
@@ -312,8 +336,102 @@ function populateNotifications(notifications, unreadCount) {
     }
 }
 
-async function handleNotificationClick(notificationId, actionUrl, type) {
+function resolveNotificationPath(notification) {
+    const type = notification.type || notification.legacyType;
+    const referenceId = notification.referenceId || notification.targetId || notification.relatedEntityId || null;
+    const metadata = notification.metadata || {};
+
+    if (notification.actionUrl) {
+        const actionUrl = notification.actionUrl;
+
+        // Translate backend API-style routes to static frontend pages.
+        if (actionUrl.includes('/circles/') && actionUrl.includes('/threads/')) {
+            const parts = actionUrl.split('/').filter(Boolean);
+            const threadsIdx = parts.indexOf('threads');
+            const threadId = threadsIdx !== -1 ? parts[threadsIdx + 1] : null;
+            return threadId
+                ? `../Discussion Board/discussion.html?threadId=${threadId}`
+                : '../Discussion Board/discussion.html';
+        }
+        if (actionUrl.startsWith('/frontend/circles/') && actionUrl.includes('/threads/')) {
+            const parts = actionUrl.split('/').filter(Boolean);
+            const threadsIdx = parts.indexOf('threads');
+            const threadId = threadsIdx !== -1 ? parts[threadsIdx + 1] : null;
+            return threadId
+                ? `../Discussion Board/discussion.html?threadId=${threadId}`
+                : '../Discussion Board/discussion.html';
+        }
+        if (actionUrl.startsWith('/circles/')) {
+            return '../Discussion Board/discussion.html';
+        }
+
+        if (actionUrl.startsWith('/discussions/')) {
+            const threadId = actionUrl.split('/').filter(Boolean)[1];
+            return threadId
+                ? `../Discussion Board/discussion.html?threadId=${threadId}`
+                : '../Discussion Board/discussion.html';
+        }
+        if (actionUrl.startsWith('/circles/') && actionUrl.endsWith('/requests')) {
+            return '../Circle Requests/circle-requests.html';
+        }
+        if (actionUrl === '/circle-requests') {
+            return '../Circle Requests/circle-requests.html';
+        }
+        if (actionUrl.startsWith('/voice-rooms/')) {
+            const roomId = actionUrl.split('/').filter(Boolean)[1];
+            return roomId
+                ? `../Voice Room/room.html?id=${roomId}`
+                : '../Voice Room/voice-rooms.html';
+        }
+        if (actionUrl.startsWith('/profile/')) {
+            const userId = actionUrl.split('/').filter(Boolean)[1];
+            return userId
+                ? `../Profile/view-profile.html?id=${userId}`
+                : '../Profile/profile.html';
+        }
+        if (actionUrl === '/discussion-board') {
+            return '../Discussion Board/discussion.html';
+        }
+
+        return actionUrl;
+    }
+
+    const threadId = referenceId || metadata.threadId;
+    const roomId = referenceId || metadata.roomId;
+    const userId = referenceId || metadata.followerId || metadata.userId;
+
+    switch (type) {
+        case 'follow':
+            return userId ? `../Profile/view-profile.html?id=${userId}` : '../Profile/profile.html';
+        case 'voice_room_created':
+        case 'voice':
+            return '../Voice Room/voice-rooms.html';
+        case 'like':
+        case 'comment':
+        case 'thread_liked':
+        case 'thread_commented':
+        case 'thread_create':
+            return threadId ? `../Discussion Board/discussion.html?threadId=${threadId}` : '../Discussion Board/discussion.html';
+        case 'circle_new_thread':
+            return '../Discussion Board/discussion.html';
+        case 'circle_created':
+            return '../Discussion Board/discussion.html';
+        case 'circle_request':
+        case 'circle_join_request':
+            return '../Circle Requests/circle-requests.html';
+        case 'circle_accept':
+        case 'circle_accepted':
+            return '../Discussion Board/discussion.html?tab=my-circles';
+        case 'message':
+            return '../Chat/chat.html';
+        default:
+            return null;
+    }
+}
+
+async function handleNotificationClick(notification) {
     try {
+        const notificationId = notification.id;
         const notificationsEnabled = localStorage.getItem('notificationsEnabled');
         if (notificationsEnabled !== 'false') {
             const token = localStorage.getItem('litlink_token');
@@ -335,31 +453,17 @@ async function handleNotificationClick(notificationId, actionUrl, type) {
             }
         }
         
-        if (actionUrl) {
-            if (actionUrl.startsWith('/')) {
-                window.location.href = `..${actionUrl}`;
-            } else if (actionUrl.startsWith('http')) {
-                window.open(actionUrl, '_blank');
+        const targetPath = resolveNotificationPath(notification);
+        if (targetPath) {
+            if (targetPath.startsWith('/')) {
+                window.location.href = `..${targetPath}`;
+            } else if (targetPath.startsWith('http')) {
+                window.open(targetPath, '_blank');
             } else {
-                window.location.href = actionUrl;
+                window.location.href = targetPath;
             }
         } else {
-            switch(type) {
-                case 'match':
-                    document.querySelector('.matches-grid')?.scrollIntoView({ behavior: 'smooth' });
-                    break;
-                case 'message':
-                    window.location.href = '../Chat/chat.html';
-                    break;
-                case 'board':
-                    window.location.href = '../Discussion Board/discussion.html';
-                    break;
-                case 'voice':
-                    window.location.href = '../Voice Room/voice-rooms.html';
-                    break;
-                default:
-                    showNotification('Notification opened', 'info');
-            }
+            showNotification('This notification has no destination yet.', 'info');
         }
         
         const menu = document.getElementById('notificationsMenu');
@@ -440,6 +544,13 @@ function viewAllNotifications() {
 let pollingInterval = null;
 
 function startNotificationPolling() {
+    // Skip polling when the WebSocket client is active — it pushes counts in real-time.
+    // Polling only kicks in as a fallback when NotificationClient is unavailable.
+    if (typeof NotificationClient !== 'undefined') {
+        console.log('ℹ️ WebSocket active — skipping REST polling');
+        return;
+    }
+
     if (pollingInterval) {
         clearInterval(pollingInterval);
     }
@@ -471,13 +582,8 @@ function startNotificationPolling() {
                 const badge = document.getElementById('notificationBadge');
                 const currentCount = badge ? parseInt(badge.textContent) || 0 : 0;
                 
-                if (data.unreadCount > currentCount) {
+                if (data.unreadCount !== currentCount) {
                     updateNotificationBadge(data.unreadCount - currentCount);
-                    
-                    const notificationsMenu = document.getElementById('notificationsMenu');
-                    if (!notificationsMenu || !notificationsMenu.classList.contains('active')) {
-                        showNotification('New notification received', 'info');
-                    }
                 }
             }
         } catch (error) {
@@ -528,70 +634,239 @@ function getMockNotifications() {
     ];
 }
 
-// ===== USER WEBSOCKET =====
-let userSocket = null;
-let userSocketReconnectTimer = null;
+// ===== USER WEBSOCKET (Socket.IO via NotificationClient) =====
+// Requires: <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+// Requires: <script src="../utils/notificationClient.js"></script>
+
+let _notifClient = null;
 
 function initUserWebSocket(token) {
     if (!token) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = 'localhost:5002';
-    const wsUrl = `${protocol}://${host}?token=${encodeURIComponent(token)}`;
-
-    try {
-        userSocket = new WebSocket(wsUrl);
-
-        userSocket.onopen = () => {
-            console.log('✅ User WebSocket connected');
-            userSocket.send(JSON.stringify({ type: 'get-unread-count' }));
-        };
-
-        userSocket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                handleUserSocketMessage(data);
-            } catch (e) {
-                console.error('Error parsing WebSocket message:', e);
-            }
-        };
-
-        userSocket.onclose = () => {
-            console.warn('User WebSocket closed');
-            scheduleUserSocketReconnect(token);
-        };
-
-        userSocket.onerror = (error) => {
-            console.error('User WebSocket error:', error);
-        };
-    } catch (error) {
-        console.error('Failed to open WebSocket:', error);
-        scheduleUserSocketReconnect(token);
+    // If NotificationClient isn't loaded yet, fall back to polling only
+    if (typeof NotificationClient === 'undefined') {
+        console.warn('⚠️ NotificationClient not found — using polling fallback. ' +
+            'Add socket.io CDN and notificationClient.js to dashboard.html');
+        return;
     }
-}
 
-function scheduleUserSocketReconnect(token) {
-    if (userSocketReconnectTimer) return;
-    userSocketReconnectTimer = setTimeout(() => {
-        userSocketReconnectTimer = null;
-        initUserWebSocket(token);
-    }, 5000);
-}
+    _notifClient = new NotificationClient({
+        serverUrl:  'http://localhost:5002',
+        token:      token,
+        isAdmin:    false,
+        showToasts: true   // use NotificationClient's own toast system for real-time events
+    });
 
-function handleUserSocketMessage(data) {
-    if (!data || !data.type) return;
+    // ── Generic fallback: any notification type not handled below ─────────
+    _notifClient.on('notification', (data) => {
+        console.log('🔔 Real-time notification:', data.type, data);
 
-    switch (data.type) {
-        case 'user-authenticated':
-            console.log('WebSocket authenticated as:', data.userName);
-            break;
-        case 'notification-count':
-        case 'notification':
+        // Refresh the dropdown list if it's open
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) {
             loadNotifications();
-            break;
+        }
+        // Optimistic insert into dropdown
+        _prependNotificationItem({
+            id:        data.id || ('rt_' + Date.now()),
+            type:      data.type,
+            title:     data.title,
+            message:   data.message,
+            timestamp: 'Just now',
+            read:      false,
+            icon:      data.icon || '🔔',
+            actionUrl: data.actionUrl || _defaultActionUrl(data.type, data.metadata)
+        });
+    });
+
+    // ── Badge count pushed from server on connect (replaces REST polling) ─
+    _notifClient.on('badge-updated', ({ count }) => {
+        // NotificationClient already updated #notificationBadge via _setUserBadge,
+        // so nothing extra to do here — just keep in sync with local state.
+        console.log('🔢 Badge count updated:', count);
+    });
+
+    // ── Named type handlers: the 5 required notification types ────────────
+
+    _notifClient.on('follow', (data) => {
+        console.log('👤 Follow notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'follow',
+            title: data.title || 'New Follower',
+            message: data.message || `${data.metadata?.followerName || 'Someone'} followed you`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '👤',
+            actionUrl: data.actionUrl || _defaultActionUrl('follow', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.on('circle_new_thread', (data) => {
+        console.log('💬 Circle new thread notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'circle_new_thread',
+            title: data.title || 'New Circle Post',
+            message: data.message || `New post in ${data.metadata?.circleName || 'your circle'}`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '💬',
+            actionUrl: data.actionUrl || _defaultActionUrl('circle_new_thread', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.on('circle_join_request', (data) => {
+        console.log('🔔 Circle join request notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'circle_join_request',
+            title: data.title || 'Join Request',
+            message: data.message || `New join request for ${data.metadata?.circleName || 'your circle'}`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '🔔',
+            actionUrl: data.actionUrl || _defaultActionUrl('circle_join_request', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.on('circle_accepted', (data) => {
+        console.log('✅ Circle accepted notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'circle_accepted',
+            title: data.title || 'Circle Request Accepted',
+            message: data.message || `You were accepted into ${data.metadata?.circleName || 'a circle'}`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '✅',
+            actionUrl: data.actionUrl || _defaultActionUrl('circle_accepted', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.on('thread_liked', (data) => {
+        console.log('❤️ Thread liked notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'thread_liked',
+            title: data.title || 'Post Liked',
+            message: data.message || `${data.metadata?.likerName || 'Someone'} liked your post`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '❤️',
+            actionUrl: data.actionUrl || _defaultActionUrl('thread_liked', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.on('thread_commented', (data) => {
+        console.log('💭 Thread commented notification:', data);
+        _prependNotificationItem({
+            id: data.id || ('rt_' + Date.now()),
+            type: 'thread_commented',
+            title: data.title || 'New Comment',
+            message: data.message || `${data.metadata?.commenterName || 'Someone'} commented on your post`,
+            timestamp: 'Just now',
+            read: false,
+            icon: '💭',
+            actionUrl: data.actionUrl || _defaultActionUrl('thread_commented', data.metadata)
+        });
+        const menu = document.getElementById('notificationsMenu');
+        if (menu && menu.classList.contains('active')) loadNotifications();
+    });
+
+    _notifClient.connect();
+}
+
+// Derive a sensible URL when the server didn't send one
+function _defaultActionUrl(type, metadata) {
+    switch (type) {
+        case 'follow':
+            return metadata?.followerId ? `/profile/${metadata.followerId}` : null;
+        case 'thread_liked':
+        case 'thread_commented':
+        case 'thread_create':
+        case 'like':
+        case 'comment':
+            return metadata?.threadId ? `/discussions/${metadata.threadId}` : '../Discussion Board/discussion.html';
+        case 'circle_new_thread':
+            return metadata?.threadId ? `/discussions/${metadata.threadId}` : '/discussions';
+        case 'circle_join_request':
+        case 'circle_request':
+            return '/circle-requests';
+        case 'circle_accepted':
+        case 'circle_accept':
+            return metadata?.circleId ? `/circles/${metadata.circleId}` : '../Discussion Board/discussion.html';
+        case 'message':
+            return '../Chat/chat.html';
         default:
-            break;
+            return null;
     }
+}
+
+// Insert a new notification at the top of the dropdown without a full reload
+function _prependNotificationItem(notif) {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+
+    // Remove the "no notifications" placeholder if present
+    const empty = list.querySelector('.notification-item.empty');
+    if (empty) empty.remove();
+
+    const iconColors = {
+        follow:              'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+        thread_liked:        'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+        thread_commented:    'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        thread_create:       'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        like:                'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+        comment:             'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        circle_new_thread:   'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        circle_join_request: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+        circle_accepted:     'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+        circle_request:      'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+        circle_accept:       'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+        unfollow:            'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+        match:               'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
+        message:             'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
+        board:               'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+        voice:               'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
+        system:              'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        info:                'linear-gradient(135deg, #4b5563 0%, #374151 100%)'
+    };
+
+    const item = document.createElement('div');
+    item.className = 'notification-item unread';
+    item.dataset.notificationId = notif.id;
+    item.dataset.type = notif.type;
+
+    item.innerHTML = `
+        <div class="notification-icon" style="background: ${iconColors[notif.type] || iconColors.info}">
+            ${notif.icon || '🔔'}
+        </div>
+        <div class="notification-content">
+            <div class="notification-title">
+                <span>${escapeHtml(notif.title || 'Notification')}</span>
+                <span class="notification-time">${notif.timestamp || 'Just now'}</span>
+            </div>
+            <div class="notification-message">${escapeHtml(notif.message || '')}</div>
+        </div>
+        <div class="notification-dot"></div>
+    `;
+
+    item.addEventListener('click', () => {
+        handleNotificationClick(notif);
+    });
+
+    list.insertBefore(item, list.firstChild);
 }
 
 // ===== MAIN DASHBOARD LOADING =====
@@ -713,14 +988,27 @@ function loadTrendingBoards() {
 
 async function loadActiveChats(token) {
     try {
-        const response = await fetch('http://localhost:5002/api/chat/conversations', {
+        // /api/chat/conversations does not exist — use /api/chat/matches which
+        // returns the list of users you have conversations with
+        const response = await fetch('http://localhost:5002/api/chat/matches', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
             const data = await response.json();
-            if (data.success && data.conversations) {
-                populateActiveChats(data.conversations);
+            // Shape: { success, matches: [{ userId, name, profilePicture,
+            //   lastMessage, unreadCount, … }] }
+            if (data.success && data.matches && data.matches.length > 0) {
+                // Adapt to the format populateActiveChats expects
+                const conversations = data.matches.map(m => ({
+                    id:          m.userId || m._id,
+                    name:        m.name,
+                    avatar:      m.profilePicture || null,
+                    lastMessage: m.lastMessage || '',
+                    unreadCount: m.unreadCount || 0,
+                    updatedAt:   m.lastMessageAt || new Date()
+                }));
+                populateActiveChats(conversations);
             } else {
                 populateActiveChats([]);
             }
@@ -735,14 +1023,24 @@ async function loadActiveChats(token) {
 
 async function loadRecentActivity(token) {
     try {
-        const response = await fetch('http://localhost:5002/api/activity/recent', {
+        // /api/activity/recent does not exist on the server.
+        // Build recent activity from the notifications endpoint instead —
+        // it already tracks follows, likes, comments, circle events, etc.
+        const response = await fetch('http://localhost:5002/api/notifications?limit=5&sort=-createdAt', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
             const data = await response.json();
-            if (data.success && data.activities) {
-                populateRecentActivity(data.activities);
+            if (data.success && data.notifications && data.notifications.length > 0) {
+                // Map notification shape → activity shape
+                const activities = data.notifications.map(n => ({
+                    icon:        n.icon || '🔔',
+                    description: n.message || n.title,
+                    timestamp:   n.createdAt ? new Date(n.createdAt) : new Date(),
+                    actionUrl:   n.actionUrl || null
+                }));
+                populateRecentActivity(activities);
             } else {
                 populateRecentActivity([]);
             }
@@ -788,21 +1086,25 @@ async function loadVoiceRooms(token) {
 
 async function loadSuggestedReaders(token) {
     try {
-        const response = await fetch('http://localhost:5002/api/users/suggested', {
+        // /api/users/suggested crashes (500). Use /api/matches/match-suggestions
+        // which is the correct working endpoint for reader recommendations.
+        const response = await fetch('http://localhost:5002/api/matches/match-suggestions?limit=5', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
             const data = await response.json();
-            if (data.success && data.users) {
-                // Filter out system admin
-                const filteredUsers = data.users.filter(u => 
-                    u.name !== 'System Admin' && 
-                    u.name !== 'Admin' && 
+            // Shape: { success, suggestions: [{ userId, name, profilePicture,
+            //   favoriteGenres, matchScore, … }] }
+            const users = data.suggestions || data.users || data.matches || [];
+            if (data.success && users.length > 0) {
+                const filtered = users.filter(u =>
+                    u.name !== 'System Admin' &&
+                    u.name !== 'Admin' &&
                     !u.isSystem &&
                     u.role !== 'admin'
                 );
-                populateSuggestedReaders(filteredUsers);
+                populateSuggestedReaders(filtered);
             } else {
                 populateSuggestedReaders([]);
             }

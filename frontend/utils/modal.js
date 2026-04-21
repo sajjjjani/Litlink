@@ -530,3 +530,13 @@ window.closeLitlinkModal = closeLitlinkModal;
 window.handleLitlinkConfirm = handleLitlinkConfirm;
 window.handleLitlinkPrompt = handleLitlinkPrompt;
 
+// Unified global API for consistent system messages.
+window.SystemModal = {
+    info: (title, message, callback) => showMessageModal(title, message, 'info', callback),
+    success: (title, message, callback) => showMessageModal(title, message, 'success', callback),
+    error: (title, message, callback) => showMessageModal(title, message, 'error', callback),
+    confirm: (title, message, onConfirm, onCancel) => showConfirmModal(title, message, onConfirm, onCancel),
+    prompt: (title, message, defaultValue, onConfirm, onCancel) =>
+        showPromptModal(title, message, defaultValue, onConfirm, onCancel)
+};
+

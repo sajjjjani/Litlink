@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
+const FilterService = require('../services/filterService');
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 function getUnread(conv, userId) {
@@ -25,18 +26,44 @@ function notifySocket(userIdStr, event, payload) {
   try {
     const ss = global.io && global.io._litlinkSocketServer;
     if (!ss) return;
-    const sid = ss.userSockets.get(userIdStr);
-    if (sid) global.io.to(sid).emit(event, payload);
+    const sids = ss.userSockets.get(userIdStr);
+    if (sids) {
+      for (const sid of sids) {
+        global.io.to(sid).emit(event, payload);
+      }
+    }
   } catch (_) {}
 }
 
 // Helper to check if message is visible to user
 function isMessageVisibleToUser(message, userId) {
-  // If message is unsent, it's gone for everyone
   if (message.unsent) return false;
-  // If user is in deletedFor list, it's hidden for them
   if (message.deletedFor && message.deletedFor.some(id => id.toString() === userId)) return false;
   return true;
+}
+
+// Helper to check if user is blocked
+async function isBlocked(userId, targetId) {
+  const user = await User.findById(userId).select('blockedUsers');
+  if (!user) return false;
+  return user.blockedUsers && user.blockedUsers.some(id => id.toString() === targetId);
+}
+
+// Helper to check if user is suspended
+async function isUserSuspended(userId) {
+  const user = await User.findById(userId);
+  if (!user) return false;
+  if (user.isSuspended && user.suspensionEnds && new Date() < user.suspensionEnds) {
+    return true;
+  }
+  if (user.isSuspended && user.suspensionEnds && new Date() >= user.suspensionEnds) {
+    user.isSuspended = false;
+    user.suspensionEnds = null;
+    user.suspensionReason = null;
+    await user.save();
+    return false;
+  }
+  return false;
 }
 
 // ─── GET /api/chat/matches ─────────────────────────────────────────────────
@@ -44,10 +71,14 @@ router.get('/matches', authenticate, async (req, res) => {
   try {
     const me = req.user._id.toString();
 
+    const currentUser = await User.findById(me).select('blockedUsers');
+    const blockedUserIds = (currentUser && currentUser.blockedUsers) ? 
+      currentUser.blockedUsers.map(id => id.toString()) : [];
+
     const users = await User.find({
-      _id:     { $ne: me },
+      _id: { $ne: me, $nin: blockedUserIds },
       isBanned: { $ne: true },
-      isAdmin:  { $ne: true }
+      isAdmin: { $ne: true }
     }).select('name username profilePicture favoriteGenres favoriteBooks lastLogin').lean();
 
     const conversations = await Conversation.find({ participants: me }).sort({ lastMessage: -1 });
@@ -56,7 +87,6 @@ router.get('/matches', authenticate, async (req, res) => {
     conversations.forEach(conv => {
       const other = conv.participants.find(p => p.toString() !== me);
       if (other) {
-        // Get visible messages for current user
         const visibleMessages = conv.messages.filter(msg => isMessageVisibleToUser(msg, me));
         
         const lastMsg = visibleMessages[visibleMessages.length - 1];
@@ -117,13 +147,17 @@ router.get('/messages/:matchId', authenticate, async (req, res) => {
     const me    = req.user._id.toString();
     const limit = parseInt(req.query.limit) || 50;
 
+    const isMatchBlocked = await isBlocked(me, req.params.matchId);
+    if (isMatchBlocked) {
+      return res.json({ success: true, messages: [], conversationId: null, blocked: true });
+    }
+
     const conv = await Conversation.findOne({
       participants: { $all: [me, req.params.matchId], $size: 2 }
     }).populate('messages.sender', 'name profilePicture');
 
     if (!conv) return res.json({ success: true, messages: [], conversationId: null });
 
-    // Mark unread messages as read (only visible ones)
     let marked = 0;
     conv.messages.forEach(msg => {
       const senderId = msg.sender._id ? msg.sender._id.toString() : msg.sender.toString();
@@ -138,7 +172,6 @@ router.get('/messages/:matchId', authenticate, async (req, res) => {
       await conv.save();
     }
 
-    // Filter visible messages for current user
     const visibleMessages = conv.messages.filter(msg => isMessageVisibleToUser(msg, me));
 
     const messages = visibleMessages
@@ -161,14 +194,14 @@ router.get('/messages/:matchId', authenticate, async (req, res) => {
         };
       });
 
-    res.json({ success: true, messages: messages.reverse(), conversationId: conv._id });
+    res.json({ success: true, messages: messages, conversationId: conv._id });
   } catch (err) {
     console.error('Error fetching messages:', err);
     res.status(500).json({ success: false, message: 'Error fetching messages' });
   }
 });
 
-// ─── POST /api/chat/messages — text message HTTP fallback ─────────────────
+// ─── POST /api/chat/messages — text message HTTP fallback with filter ─────
 router.post('/messages', authenticate, async (req, res) => {
   try {
     const me = req.user._id.toString();
@@ -177,36 +210,100 @@ router.post('/messages', authenticate, async (req, res) => {
     if (!matchId)  return res.status(400).json({ success: false, message: 'Recipient ID required' });
     if (!content)  return res.status(400).json({ success: false, message: 'Message content required' });
 
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(me);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(me);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended. You cannot send messages.',
+        suspended: true
+      });
+    }
+
+    // Check if recipient is blocked
+    const isRecipientBlocked = await isBlocked(me, matchId);
+    if (isRecipientBlocked) {
+      return res.status(403).json({ success: false, message: 'You cannot message a blocked user' });
+    }
+
+    // Check if current user is blocked by recipient
+    const isBlockedByRecipient = await isBlocked(matchId, me);
+    if (isBlockedByRecipient) {
+      return res.status(403).json({ success: false, message: 'You cannot message this user' });
+    }
+
+    // Apply content filtering
+    const filterResult = await FilterService.checkAndProcess(content, me, 'chat', matchId);
+    
+    if (!filterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: filterResult.message,
+        warningIssued: filterResult.warningIssued,
+        warningCount: filterResult.warningCount,
+        suspended: filterResult.suspended
+      });
+    }
+
     let conv = await Conversation.findOne({ participants: { $all: [me, matchId], $size: 2 } });
     if (!conv) {
       conv = new Conversation({ participants: [me, matchId], messages: [], unreadCount: {} });
     }
 
+    // Use censored text if there was a violation
+    const finalContent = filterResult.hasViolation ? filterResult.censoredText : content;
+    const wasFiltered = filterResult.hasViolation;
+
     const msg = { 
       _id: new mongoose.Types.ObjectId(), 
       sender: me, 
-      content, 
+      content: finalContent, 
       type, 
       read: false, 
       createdAt: new Date(),
       unsent: false,
-      deletedFor: []
+      deletedFor: [],
+      wasFiltered: wasFiltered
     };
     conv.messages.push(msg);
     conv.lastMessage = new Date();
-    conv.lastMessagePreview = content.length > 50 ? content.substring(0, 47) + '...' : content;
+    conv.lastMessagePreview = finalContent.length > 50 ? finalContent.substring(0, 47) + '...' : finalContent;
     setUnread(conv, matchId, getUnread(conv, matchId) + 1);
     await conv.save();
 
     const sender = await User.findById(me).select('name profilePicture');
-    res.json({ success: true, message: { _id: msg._id, sender: me, senderName: sender.name, content, type, read: false, createdAt: msg.createdAt }, conversationId: conv._id });
+    
+    const responseMessage = {
+      _id: msg._id,
+      sender: me,
+      senderName: sender.name,
+      content: finalContent,
+      type,
+      read: false,
+      createdAt: msg.createdAt,
+      wasFiltered: wasFiltered
+    };
+    
+    if (filterResult.warningIssued) {
+      responseMessage.warning = filterResult.message;
+      responseMessage.warningCount = filterResult.warningCount;
+    }
+    
+    res.json({ 
+      success: true, 
+      message: responseMessage,
+      conversationId: conv._id,
+      warningIssued: filterResult.warningIssued,
+      warningMessage: filterResult.message
+    });
   } catch (err) {
     console.error('Error sending message:', err);
     res.status(500).json({ success: false, message: 'Error sending message' });
   }
 });
 
-// ─── POST /api/chat/messages/attachment — base64 attachment ───────────────
+// ─── POST /api/chat/messages/attachment — base64 attachment with filter ───
 router.post('/messages/attachment', authenticate, async (req, res) => {
   try {
     const me = req.user._id.toString();
@@ -215,6 +312,47 @@ router.post('/messages/attachment', authenticate, async (req, res) => {
     if (!recipientId) return res.status(400).json({ success: false, message: 'Recipient ID required' });
     if (!data || !mimeType) return res.status(400).json({ success: false, message: 'File data required' });
     if (data.length > 9 * 1024 * 1024) return res.status(400).json({ success: false, message: 'File too large (max 6 MB)' });
+
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(me);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(me);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended.',
+        suspended: true
+      });
+    }
+
+    // Check if recipient is blocked
+    const isRecipientBlocked = await isBlocked(me, recipientId);
+    if (isRecipientBlocked) {
+      return res.status(403).json({ success: false, message: 'You cannot message a blocked user' });
+    }
+
+    // Check if current user is blocked by recipient
+    const isBlockedByRecipient = await isBlocked(recipientId, me);
+    if (isBlockedByRecipient) {
+      return res.status(403).json({ success: false, message: 'You cannot message this user' });
+    }
+
+    // Apply content filtering to caption if present
+    let finalCaption = caption || '';
+    let filterResult = null;
+    
+    if (finalCaption && finalCaption.trim()) {
+      filterResult = await FilterService.checkAndProcess(finalCaption, me, 'chat', recipientId);
+      if (!filterResult.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: filterResult.message,
+          warningIssued: filterResult.warningIssued,
+          warningCount: filterResult.warningCount,
+          suspended: filterResult.suspended
+        });
+      }
+      finalCaption = filterResult.hasViolation ? filterResult.censoredText : finalCaption;
+    }
 
     let conv = await Conversation.findOne({ participants: { $all: [me, recipientId], $size: 2 } });
     if (!conv) {
@@ -225,7 +363,7 @@ router.post('/messages/attachment', authenticate, async (req, res) => {
     const msg = {
       _id:        new mongoose.Types.ObjectId(),
       sender:     me,
-      content:    caption || '',
+      content:    finalCaption,
       type:       msgType,
       attachment: { data, mimeType, filename, size, category },
       read:       false,
@@ -242,18 +380,25 @@ router.post('/messages/attachment', authenticate, async (req, res) => {
 
     const sender = await User.findById(me).select('name profilePicture');
 
-    // Real-time delivery to recipient (only if message is not unsent)
     notifySocket(recipientId.toString(), 'chat:message', {
       _id: msg._id, senderId: me, senderName: sender.name,
-      content: caption || '', type: msgType,
+      content: finalCaption, type: msgType,
       attachment: { data, mimeType, filename, size, category },
       createdAt: msg.createdAt, conversationId: conv._id, isFromOthers: true
     });
 
-    res.json({
+    const responseData = {
       success: true,
-      message: { _id: msg._id, sender: me, content: caption || '', type: msgType, attachment: { data, mimeType, filename, size, category }, createdAt: msg.createdAt, conversationId: conv._id }
-    });
+      message: { _id: msg._id, sender: me, content: finalCaption, type: msgType, attachment: { data, mimeType, filename, size, category }, createdAt: msg.createdAt, conversationId: conv._id }
+    };
+    
+    if (filterResult && filterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = filterResult.message;
+      responseData.warningCount = filterResult.warningCount;
+    }
+    
+    res.json(responseData);
   } catch (err) {
     console.error('Attachment error:', err);
     res.status(500).json({ success: false, message: err.message || 'Failed to send attachment' });
@@ -267,6 +412,11 @@ router.post('/conversations', authenticate, async (req, res) => {
     const { participantId } = req.body;
     if (!participantId) return res.status(400).json({ success: false, message: 'Participant ID required' });
 
+    const isParticipantBlocked = await isBlocked(me, participantId);
+    if (isParticipantBlocked) {
+      return res.status(403).json({ success: false, message: 'Cannot create conversation with blocked user' });
+    }
+
     let conv = await Conversation.findOne({ participants: { $all: [me, participantId], $size: 2 } });
     if (!conv) {
       conv = new Conversation({ participants: [me, participantId], messages: [], unreadCount: {} });
@@ -279,7 +429,7 @@ router.post('/conversations', authenticate, async (req, res) => {
   }
 });
 
-// ─── POST /api/chat/conversations/:id/messages ────────────────────────────
+// ─── POST /api/chat/conversations/:id/messages with filter ────────────────
 router.post('/conversations/:conversationId/messages', authenticate, async (req, res) => {
   try {
     const me   = req.user._id.toString();
@@ -287,13 +437,49 @@ router.post('/conversations/:conversationId/messages', authenticate, async (req,
     if (!conv) return res.status(404).json({ success: false, message: 'Conversation not found' });
     if (!conv.participants.some(p => p.toString() === me)) return res.status(403).json({ success: false, message: 'Not authorized' });
 
+    const recipientId = conv.participants.find(p => p.toString() !== me).toString();
+
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(me);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(me);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended.',
+        suspended: true
+      });
+    }
+
+    const isRecipientBlocked = await isBlocked(me, recipientId);
+    if (isRecipientBlocked) {
+      return res.status(403).json({ success: false, message: 'You cannot message a blocked user' });
+    }
+
     const { content } = req.body;
-    const recipientId = conv.participants.find(p => p.toString() !== me);
+    
+    if (!content) {
+      return res.status(400).json({ success: false, message: 'Message content required' });
+    }
+
+    // Apply content filtering
+    const filterResult = await FilterService.checkAndProcess(content, me, 'chat', recipientId);
+    
+    if (!filterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: filterResult.message,
+        warningIssued: filterResult.warningIssued,
+        warningCount: filterResult.warningCount,
+        suspended: filterResult.suspended
+      });
+    }
+
+    const finalContent = filterResult.hasViolation ? filterResult.censoredText : content;
 
     const msg = { 
       _id: new mongoose.Types.ObjectId(), 
       sender: me, 
-      content: content || '', 
+      content: finalContent, 
       type: 'text', 
       read: false, 
       createdAt: new Date(),
@@ -302,19 +488,31 @@ router.post('/conversations/:conversationId/messages', authenticate, async (req,
     };
     conv.messages.push(msg);
     conv.lastMessage = new Date();
-    conv.lastMessagePreview = content ? (content.length > 50 ? content.substring(0, 47) + '...' : content) : '';
-    setUnread(conv, recipientId.toString(), getUnread(conv, recipientId.toString()) + 1);
+    conv.lastMessagePreview = finalContent.length > 50 ? finalContent.substring(0, 47) + '...' : finalContent;
+    setUnread(conv, recipientId, getUnread(conv, recipientId) + 1);
     await conv.save();
 
     const sender = await User.findById(me).select('name profilePicture');
-    res.json({ success: true, message: { _id: msg._id, sender: me, senderName: sender.name, content: content || '', type: 'text', read: false, createdAt: msg.createdAt } });
+    
+    const responseData = { 
+      success: true, 
+      message: { _id: msg._id, sender: me, senderName: sender.name, content: finalContent, type: 'text', read: false, createdAt: msg.createdAt } 
+    };
+    
+    if (filterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = filterResult.message;
+      responseData.warningCount = filterResult.warningCount;
+    }
+    
+    res.json(responseData);
   } catch (err) {
     console.error('Error sending message:', err);
     res.status(500).json({ success: false, message: 'Error sending message' });
   }
 });
 
-// ─── DELETE /api/chat/messages/:id/delete-for-me — hide for current user ─
+// ─── DELETE /api/chat/messages/:id/delete-for-me ──────────────────────────
 router.delete('/messages/:messageId/delete-for-me', authenticate, async (req, res) => {
   try {
     const me   = req.user._id.toString();
@@ -324,24 +522,19 @@ router.delete('/messages/:messageId/delete-for-me', authenticate, async (req, re
     const msg = conv.messages.id(req.params.messageId);
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
 
-    // Don't allow deleting already unsent messages
     if (msg.unsent) {
       return res.status(400).json({ success: false, message: 'Message already unsent for everyone' });
     }
 
-    // Initialize deletedFor array if it doesn't exist
     if (!msg.deletedFor) {
       msg.deletedFor = [];
     }
 
-    // Add current user to deletedFor array if not already there
     const alreadyDeleted = msg.deletedFor.some(id => id.toString() === me);
     if (!alreadyDeleted) {
       msg.deletedFor.push(new mongoose.Types.ObjectId(me));
-      console.log(`✅ Added user ${me} to deletedFor for message ${req.params.messageId}`);
     }
 
-    // Update preview if the last visible message was deleted
     const visibleMessages = conv.messages.filter(m => isMessageVisibleToUser(m, me));
     
     if (visibleMessages.length > 0) {
@@ -356,9 +549,7 @@ router.delete('/messages/:messageId/delete-for-me', authenticate, async (req, re
     }
 
     await conv.save();
-    console.log(`✅ Saved conversation after delete-for-me. Message ${req.params.messageId} hidden for user ${me}`);
 
-    // Notify current user about deletion
     notifySocket(me, 'chat:message:deleted', { 
       messageId: req.params.messageId, 
       conversationId: conv._id 
@@ -371,7 +562,7 @@ router.delete('/messages/:messageId/delete-for-me', authenticate, async (req, re
   }
 });
 
-// ─── DELETE /api/chat/messages/:id/unsend — remove for EVERYONE ──────────
+// ─── DELETE /api/chat/messages/:id/unsend ──────────────────────────────────
 router.delete('/messages/:messageId/unsend', authenticate, async (req, res) => {
   try {
     const me  = req.user._id.toString();
@@ -385,15 +576,11 @@ router.delete('/messages/:messageId/unsend', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only unsend your own messages' });
     }
 
-    // Mark as unsent and clear content
     msg.unsent = true;
     msg.content = '';
     msg.attachment = null;
-    msg.deletedFor = []; // Clear deletedFor since it's unsent for everyone
+    msg.deletedFor = [];
 
-    console.log(`✅ Marked message ${req.params.messageId} as unsent by user ${me}`);
-
-    // Update preview from last visible message for each participant
     const allVisibleMessages = conv.messages.filter(m => !m.unsent);
     if (allVisibleMessages.length > 0) {
       const lastMsg = allVisibleMessages[allVisibleMessages.length - 1];
@@ -408,7 +595,6 @@ router.delete('/messages/:messageId/unsend', authenticate, async (req, res) => {
 
     await conv.save();
 
-    // Notify all participants
     conv.participants.forEach(pid => {
       notifySocket(pid.toString(), 'chat:message:unsent', { 
         messageId: req.params.messageId, 
@@ -420,6 +606,183 @@ router.delete('/messages/:messageId/unsend', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Unsend error:', err);
     res.status(500).json({ success: false, message: 'Failed to unsend: ' + err.message });
+  }
+});
+
+// ─── POST /api/chat/block/:userId ─────────────────────────────────────────
+router.post('/block/:userId', authenticate, async (req, res) => {
+  try {
+    const me       = req.user._id.toString();
+    const targetId = req.params.userId;
+
+    if (me === targetId) {
+      return res.status(400).json({ success: false, message: 'You cannot block yourself' });
+    }
+
+    const target = await User.findById(targetId).select('name email profilePicture');
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const currentUser = await User.findById(me);
+    
+    if (currentUser.blockedUsers && currentUser.blockedUsers.includes(targetId)) {
+      return res.status(400).json({ success: false, message: 'User is already blocked' });
+    }
+
+    if (!currentUser.blockedUsers) currentUser.blockedUsers = [];
+    currentUser.blockedUsers.push(targetId);
+    await currentUser.save();
+
+    try {
+      const io = global.io;
+      if (io && io.broadcastToAdmins) {
+        io.broadcastToAdmins({
+          type: 'admin-notification',
+          notificationType: 'admin_user_blocked',
+          title: 'User Blocked',
+          message: `${currentUser.name} has blocked ${target.name}`,
+          timestamp: new Date(),
+          priority: 'low',
+          metadata: {
+            blockerId: me,
+            blockerName: currentUser.name,
+            blockedId: targetId,
+            blockedName: target.name
+          }
+        });
+      }
+    } catch (socketErr) {
+      console.error('Block WebSocket notify error:', socketErr);
+    }
+
+    res.json({ success: true, message: `You have blocked ${target.name}` });
+  } catch (err) {
+    console.error('Block user error:', err);
+    res.status(500).json({ success: false, message: 'Failed to block user' });
+  }
+});
+
+// ─── DELETE /api/chat/unblock/:userId ─────────────────────────────────────
+router.delete('/unblock/:userId', authenticate, async (req, res) => {
+  try {
+    const me       = req.user._id.toString();
+    const targetId = req.params.userId;
+
+    const currentUser = await User.findById(me);
+    
+    if (!currentUser.blockedUsers || !currentUser.blockedUsers.includes(targetId)) {
+      return res.status(400).json({ success: false, message: 'User is not blocked' });
+    }
+
+    currentUser.blockedUsers = currentUser.blockedUsers.filter(id => id.toString() !== targetId);
+    await currentUser.save();
+
+    const target = await User.findById(targetId);
+    const targetName = target ? target.name : 'User';
+
+    res.json({ success: true, message: `You have unblocked ${targetName}` });
+  } catch (err) {
+    console.error('Unblock user error:', err);
+    res.status(500).json({ success: false, message: 'Failed to unblock user' });
+  }
+});
+
+// ─── GET /api/chat/blocked/list ───────────────────────────────────────────
+router.get('/blocked/list', authenticate, async (req, res) => {
+  try {
+    const me = req.user._id.toString();
+    
+    const currentUser = await User.findById(me).populate('blockedUsers', 'name username profilePicture favoriteGenres');
+    
+    const blockedList = currentUser.blockedUsers || [];
+    
+    res.json({
+      success: true,
+      blockedUsers: blockedList,
+      total: blockedList.length
+    });
+  } catch (err) {
+    console.error('Get blocked users error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch blocked users' });
+  }
+});
+
+// ─── POST /api/chat/report/:userId ────────────────────────────────────────
+router.post('/report/:userId', authenticate, async (req, res) => {
+  try {
+    const me       = req.user._id.toString();
+    const targetId = req.params.userId;
+
+    if (me === targetId) {
+      return res.status(400).json({ success: false, message: 'You cannot report yourself' });
+    }
+
+    const { reason, category = 'harassment', description = '' } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, message: 'A reason is required' });
+    }
+
+    const target = await User.findById(targetId).select('name email profilePicture');
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const Report = require('../models/Report');
+
+    const duplicate = await Report.findOne({
+      reporter: me,
+      reportedUser: targetId,
+      status: 'pending'
+    });
+    if (duplicate) {
+      return res.status(400).json({ success: false, message: 'You already have a pending report against this user' });
+    }
+
+    const validCategories = [
+      'inappropriate_content', 'harassment', 'hate_speech',
+      'spam', 'fake_account', 'impersonation',
+      'privacy_violation', 'copyright', 'other'
+    ];
+    const safeCategory = validCategories.includes(category) ? category : 'other';
+
+    const report = new Report({
+      reporter:         me,
+      reportedUser:     targetId,
+      reportedItemId:   targetId,
+      reportedItemType: 'user',
+      reason:           reason.trim(),
+      category:         safeCategory,
+      description:      description.trim(),
+      status:           'pending',
+      priority:         'medium'
+    });
+    report.wasNew = true;
+    await report.save();
+
+    res.json({ success: true, message: 'Report submitted. Our moderation team will review it shortly.' });
+  } catch (err) {
+    console.error('Report user error:', err);
+    res.status(500).json({ success: false, message: 'Failed to submit report' });
+  }
+});
+
+// ─── GET /api/chat/check-message — preview filter check ────────────────────
+router.post('/check-message', authenticate, async (req, res) => {
+  try {
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.json({ success: true, hasViolation: false, censoredText: content });
+    }
+    
+    const result = await FilterService.checkOnly(content);
+    
+    res.json({
+      success: true,
+      hasViolation: result.hasViolation,
+      censoredText: result.censoredText,
+      matches: result.matches.map(m => ({ word: m.word, severity: m.severity, category: m.category }))
+    });
+  } catch (err) {
+    console.error('Check message error:', err);
+    res.status(500).json({ success: false, message: 'Error checking message' });
   }
 });
 

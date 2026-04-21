@@ -5,6 +5,7 @@ const VoiceRoom = require('../models/VoiceRoom');
 const RoomParticipant = require('../models/RoomParticipant');
 const User = require('../models/User');
 const AdminNotificationService = require('../services/adminNotificationService');
+const UNS = require('../services/UserNotificationService');
 
 // ── Helper: get live participants for a room ──────────────────────────────
 async function getParticipantsForRoom(roomId) {
@@ -94,6 +95,15 @@ router.post('/rooms', authenticate, async (req, res) => {
                 status: room.status,
                 participantCount: 0
             });
+        }
+
+        // Notify followers when a host starts a live room.
+        if (!isScheduled) {
+            try {
+                await UNS.onVoiceRoomStarted(host, room);
+            } catch (unsErr) {
+                console.error('[UNS] onVoiceRoomStarted error:', unsErr.message);
+            }
         }
 
         res.json({ success: true, message: 'Voice room created successfully', room });

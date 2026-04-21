@@ -4,6 +4,7 @@ const router = express.Router();
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
 const matchService = require('../services/matchService');
+const UNS = require('../services/UserNotificationService');
 
 // Helper: Get book cover URL
 function getBookCoverUrl(bookId, coverId, isbn) {
@@ -29,7 +30,7 @@ router.get('/', authenticate, async (req, res) => {
       _id: { $ne: req.user._id },
       isBanned: false,
       isSuspended: false,
-      isAdmin: false  // Exclude admin users
+      isAdmin: false
     }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry -adminLevel -adminPermissions');
     
     res.json({
@@ -102,7 +103,6 @@ router.get('/search', authenticate, async (req, res) => {
       .limit(parseInt(limit))
       .sort({ lastLogin: -1 });
     
-    // Calculate match percentages for each user
     const usersWithMatches = users.map(user => {
       const match = matchService.calculateMatchScore(req.user, user);
       return {
@@ -141,7 +141,6 @@ router.get('/:userId/matches', authenticate, async (req, res) => {
     
     const currentUser = req.user;
     
-    // Get all other users
     const allUsers = await User.find({
       _id: { $ne: currentUser._id },
       isBanned: false,
@@ -149,12 +148,10 @@ router.get('/:userId/matches', authenticate, async (req, res) => {
       isAdmin: false
     }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
     
-    // Calculate matches
     const matches = allUsers.map(user => matchService.calculateMatchScore(currentUser, user))
       .sort((a, b) => b.matchPercentage - a.matchPercentage)
       .slice(0, limit);
     
-    // Get user details for each match
     const matchesWithDetails = await Promise.all(
       matches.map(async (match) => {
         const user = await User.findById(match.userId)
@@ -193,7 +190,6 @@ router.get('/:userId/suggested', authenticate, async (req, res) => {
     
     const currentUser = req.user;
     
-    // Get all other users
     const allUsers = await User.find({
       _id: { $ne: currentUser._id },
       isBanned: false,
@@ -201,10 +197,8 @@ router.get('/:userId/suggested', authenticate, async (req, res) => {
       isAdmin: false
     }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
     
-    // Get match suggestions
     const suggestions = matchService.getMatchSuggestions(currentUser, allUsers, limit);
     
-    // Add user details
     const suggestionsWithDetails = await Promise.all(
       suggestions.map(async (suggestion) => {
         const user = await User.findById(suggestion.userId)
@@ -238,6 +232,153 @@ router.get('/:userId/suggested', authenticate, async (req, res) => {
   }
 });
 
+// ==================== BLOCK/UNBLOCK ENDPOINTS ====================
+
+// POST /api/users/:userId/block - Block a user
+router.post('/:userId/block', authenticate, async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const targetUserId = req.params.userId;
+    
+    if (currentUserId.toString() === targetUserId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You cannot block yourself' 
+      });
+    }
+    
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    const currentUser = await User.findById(currentUserId);
+    
+    // Check if already blocked
+    if (currentUser.blockedUsers && currentUser.blockedUsers.includes(targetUserId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User is already blocked' 
+      });
+    }
+    
+    // Add to blocked users
+    if (!currentUser.blockedUsers) {
+      currentUser.blockedUsers = [];
+    }
+    currentUser.blockedUsers.push(targetUserId);
+    await currentUser.save();
+    
+    console.log(`🔒 User ${currentUser.name} blocked ${targetUser.name}`);
+    
+    // Send real-time notification to admins about block
+    try {
+      const io = global.io;
+      if (io && io.broadcastToAdmins) {
+        io.broadcastToAdmins({
+          type: 'admin-notification',
+          notificationType: 'admin_user_blocked',
+          title: 'User Blocked',
+          message: `${currentUser.name} has blocked ${targetUser.name}`,
+          timestamp: new Date(),
+          priority: 'low',
+          metadata: {
+            blockerId: currentUserId.toString(),
+            blockerName: currentUser.name,
+            blockedId: targetUserId,
+            blockedName: targetUser.name
+          }
+        });
+      }
+    } catch (socketErr) {
+      console.error('Block WebSocket notify error:', socketErr);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `${targetUser.name} has been blocked`,
+      blockedUser: {
+        id: targetUser._id,
+        name: targetUser.name,
+        username: targetUser.username,
+        profilePicture: targetUser.profilePicture
+      }
+    });
+    
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to block user: ' + error.message 
+    });
+  }
+});
+
+// DELETE /api/users/:userId/unblock - Unblock a user
+router.delete('/:userId/unblock', authenticate, async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const targetUserId = req.params.userId;
+    
+    const currentUser = await User.findById(currentUserId);
+    
+    if (!currentUser.blockedUsers || !currentUser.blockedUsers.includes(targetUserId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User is not blocked' 
+      });
+    }
+    
+    // Remove from blocked users
+    currentUser.blockedUsers = currentUser.blockedUsers.filter(
+      id => id.toString() !== targetUserId
+    );
+    await currentUser.save();
+    
+    const targetUser = await User.findById(targetUserId);
+    const targetName = targetUser ? targetUser.name : 'User';
+    
+    console.log(`🔓 User ${currentUser.name} unblocked ${targetName}`);
+    
+    res.json({ 
+      success: true, 
+      message: `${targetName} has been unblocked` 
+    });
+    
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to unblock user: ' + error.message 
+    });
+  }
+});
+
+// GET /api/users/blocked/list - Get list of blocked users
+router.get('/blocked/list', authenticate, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user._id).populate('blockedUsers', 'name username profilePicture bio favoriteGenres');
+    
+    const blockedList = currentUser.blockedUsers || [];
+    
+    res.json({
+      success: true,
+      blockedUsers: blockedList,
+      total: blockedList.length
+    });
+    
+  } catch (error) {
+    console.error('Get blocked users error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch blocked users: ' + error.message 
+    });
+  }
+});
+
 // ==================== BOOK ENDPOINTS ====================
 
 // POST /api/users/:userId/books - Add book to user profile
@@ -264,7 +405,6 @@ router.post('/:userId/books', authenticate, async (req, res) => {
     let bookCover = '';
     let bookAuthor = '';
     
-    // Get book cover from Open Library
     if (bookId) {
       try {
         let workKey = bookId;
@@ -318,7 +458,6 @@ router.post('/:userId/books', authenticate, async (req, res) => {
       }
     }
     
-    // Use placeholder if no cover found
     if (!bookCover) {
       const safeTitle = encodeURIComponent(bookTitle.substring(0, 20));
       bookCover = `https://placehold.co/150x200/3d2617/f5e6d3?text=${safeTitle}&font=montserrat`;
@@ -491,7 +630,6 @@ router.post('/:userId/follow', authenticate, async (req, res) => {
     
     const currentUser = req.user;
     
-    // Check if already following
     if (currentUser.following && currentUser.following.includes(userId)) {
       return res.status(400).json({
         success: false,
@@ -499,15 +637,20 @@ router.post('/:userId/follow', authenticate, async (req, res) => {
       });
     }
     
-    // Add to following list
     if (!currentUser.following) currentUser.following = [];
     currentUser.following.push(userId);
     await currentUser.save();
     
-    // Add to followers list of the other user
     if (!userToFollow.followers) userToFollow.followers = [];
     userToFollow.followers.push(req.user._id);
     await userToFollow.save();
+
+    // ── Notify the followed user ───────────────────────────────────────────
+    try {
+      await UNS.onFollow(currentUser, userId);
+    } catch (unsErr) {
+      console.error('[UNS] onFollow error:', unsErr.message);
+    }
     
     res.json({
       success: true,
@@ -528,6 +671,13 @@ router.post('/:userId/unfollow', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUser = req.user;
+
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot unfollow yourself'
+      });
+    }
     
     if (currentUser.following) {
       currentUser.following = currentUser.following.filter(id => id.toString() !== userId);
@@ -538,6 +688,12 @@ router.post('/:userId/unfollow', authenticate, async (req, res) => {
     if (userToUnfollow && userToUnfollow.followers) {
       userToUnfollow.followers = userToUnfollow.followers.filter(id => id.toString() !== req.user._id.toString());
       await userToUnfollow.save();
+
+      try {
+        await UNS.onUnfollow(currentUser, userId);
+      } catch (unsErr) {
+        console.error('[UNS] onUnfollow error:', unsErr.message);
+      }
     }
     
     res.json({
@@ -634,7 +790,6 @@ router.get('/:userId/stats', authenticate, async (req, res) => {
       });
     }
     
-    // Get all other users for match statistics
     const allUsers = await User.find({
       _id: { $ne: user._id },
       isBanned: false,

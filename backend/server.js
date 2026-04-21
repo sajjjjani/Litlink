@@ -27,7 +27,10 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const discussionRoutes = require('./routes/discussionRoutes');
 const openLibraryRoutes = require('./routes/openLibraryRoutes');
 const voiceRoomRoutes = require('./routes/voiceRoomRoutes');
-const matchRoutes = require('./routes/matchRoutes'); 
+const matchRoutes = require('./routes/matchRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const circleRequestRoutes = require('./routes/circleRequestRoutes');
+
 
 // Import WebSocket server
 const SocketServer = require('./socketServer');
@@ -70,7 +73,6 @@ const connectDB = async () => {
     });
     console.log('✅ MongoDB Connected Successfully');
     
-    // Log database stats
     const userCount = await User.countDocuments();
     const threadCount = await DiscussionThread.countDocuments();
     const filterWordCount = await FilterWord.countDocuments();
@@ -87,7 +89,6 @@ const connectDB = async () => {
     console.log(`   Conversations: ${conversationCount}`);
     console.log(`   Voice Rooms: ${voiceRoomCount} (${activeVoiceRooms} live)`);
     
-    // Check for admin user
     const adminExists = await User.findOne({ email: 'admin@litlink.com' });
     if (!adminExists) {
       console.log('⚠️  Admin user not found. Run: node seed-admin.js');
@@ -111,8 +112,10 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/discussions', discussionRoutes);
 app.use('/api/openlibrary', openLibraryRoutes);
 app.use('/api/voice-rooms', voiceRoomRoutes);
-app.use('/api/matches', matchRoutes); 
+app.use('/api/matches', matchRoutes);
 app.use('/api', miscRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/circle-requests', circleRequestRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -171,17 +174,9 @@ app.use((req, res) => {
     success: false,
     message: `Cannot ${req.method} ${req.url}`,
     availableEndpoints: [
-      '/api/auth',
-      '/api/books',
-      '/api/users',
-      '/api/dashboard',
-      '/api/chat',
-      '/api/admin',
-      '/api/notifications',
-      '/api/discussions',
-      '/api/voice-rooms',
-      '/api/matches',
-      '/health'
+      '/api/auth', '/api/books', '/api/users', '/api/dashboard',
+      '/api/chat', '/api/admin', '/api/notifications', '/api/discussions',
+      '/api/voice-rooms', '/api/matches', '/health'
     ]
   });
 });
@@ -190,7 +185,6 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('Server Error:', err.stack);
   
-  // Mongoose validation error
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
@@ -199,7 +193,6 @@ app.use((err, req, res, next) => {
     });
   }
   
-  // Mongoose duplicate key error
   if (err.code === 11000) {
     return res.status(400).json({
       success: false,
@@ -208,22 +201,14 @@ app.use((err, req, res, next) => {
     });
   }
   
-  // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
+    return res.status(401).json({ success: false, message: 'Invalid token' });
   }
   
   if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
+    return res.status(401).json({ success: false, message: 'Token expired' });
   }
   
-  // Default error
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -234,7 +219,6 @@ app.use((err, req, res, next) => {
 // ===== START SERVER =====
 const PORT = process.env.PORT || 5002;
 
-// Keep references for graceful shutdown
 let socketServer = null;
 let server = null;
 
@@ -242,94 +226,81 @@ const startServer = async () => {
   try {
     await connectDB();
     
-    // IMPORTANT: Create HTTP server explicitly for Socket.IO
     server = http.createServer(app);
     
-    // Initialize WebSocket server with the HTTP server
+    // Initialize WebSocket server
     socketServer = new SocketServer(server);
-    global.io = socketServer.io; // Make accessible globally
+
+    // ─── Expose socket helpers globally ───────────────────────────────────────
+    // global.io is the raw Socket.IO instance (for room broadcasts etc.)
+    global.io = socketServer.io;
+
+    // Bind the two notification helpers so any file can call them without
+    // importing SocketServer directly.
+    global.io.sendToUser = (userId, data) => socketServer.sendToUser(userId, data);
+    global.io.broadcastToAdmins = (data) => socketServer.broadcastToAdmins(data);
+
+    // Keep the full socketServer reference accessible for edge cases
     global.io._litlinkSocketServer = socketServer;
-    global.activeRooms = socketServer.activeRooms; // For health checks
+    global.activeRooms = socketServer.activeRooms;
+    // ──────────────────────────────────────────────────────────────────────────
+
+    console.log('✅ WebSocket server initialized with voice room, chat and notification support');
     
-    console.log('✅ WebSocket server initialized with voice room and chat support');
-    
-    // Start listening
     server.listen(PORT, () => {
       console.log('='.repeat(70));
       console.log('🚀 Litlink Backend Server Started!');
       console.log('='.repeat(70));
-      console.log(`🌐 HTTP Server: http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket Server: ws://localhost:${PORT}/socket.io`);
-      console.log(`🔌 API Base: http://localhost:${PORT}/api`);
+      console.log(`🌐 HTTP Server:    http://localhost:${PORT}`);
+      console.log(`🔌 WebSocket:      ws://localhost:${PORT}/socket.io`);
+      console.log(`🔌 API Base:       http://localhost:${PORT}/api`);
       console.log('='.repeat(70));
-      
+
       console.log('📌 MAIN ENDPOINTS:');
-      console.log('   POST   /api/auth/signup - Register new user');
-      console.log('   POST   /api/auth/login - Login user');
-      console.log('   GET    /api/auth/me - Get current user');
+      console.log('   POST   /api/auth/signup');
+      console.log('   POST   /api/auth/login');
+      console.log('   GET    /api/auth/me');
       console.log('='.repeat(70));
-      
+
+      console.log('📌 NOTIFICATION ENDPOINTS:');
+      console.log('   GET    /api/notifications               - User notifications');
+      console.log('   GET    /api/notifications/admin         - Admin notifications');
+      console.log('   GET    /api/notifications/unread-count  - Unread badge count');
+      console.log('   POST   /api/notifications/read/:id      - Mark one read');
+      console.log('   POST   /api/notifications/read-all      - Mark all read');
+      console.log('   POST   /api/notifications/create        - Create notification');
+      console.log('   DELETE /api/notifications/:id           - Archive notification');
+      console.log('='.repeat(70));
+
       console.log('📌 MATCHING ENDPOINTS:');
-      console.log('   GET    /api/matches/matches - Get your matches');
-      console.log('   GET    /api/matches/matches/:userId - Get match details');
-      console.log('   GET    /api/matches/match-suggestions - Get suggestions');
-      console.log('   GET    /api/matches/matches/by-book/:bookTitle - Find by book');
-      console.log('   GET    /api/matches/global - Global top matches');
-      console.log('   PUT    /api/matches/preferences - Update preferences');
+      console.log('   GET    /api/matches/matches');
+      console.log('   GET    /api/matches/match-suggestions');
+      console.log('   GET    /api/matches/global');
+      console.log('   PUT    /api/matches/preferences');
       console.log('='.repeat(70));
-      
+
       console.log('📌 CHAT ENDPOINTS:');
-      console.log('   GET    /api/chat/matches - Get your chat matches');
-      console.log('   GET    /api/chat/messages/:matchId - Get messages with a user');
-      console.log('   POST   /api/chat/messages - Send a message');
-      console.log('   POST   /api/chat/conversations - Create/get conversation');
-      console.log('   POST   /api/chat/conversations/:id/messages - Send to conversation');
+      console.log('   GET    /api/chat/matches');
+      console.log('   GET    /api/chat/messages/:matchId');
+      console.log('   POST   /api/chat/messages');
       console.log('='.repeat(70));
-      
-      console.log('📌 DISCUSSION ENDPOINTS:');
-      console.log('   GET    /api/discussions/threads - Get all threads');
-      console.log('   GET    /api/discussions/threads/:threadId - Get single thread');
-      console.log('   POST   /api/discussions/threads - Create public discussion');
-      console.log('   GET    /api/discussions/public - Get public discussions');
-      console.log('   GET    /api/discussions/all - Get all activity');
-      console.log('   GET    /api/discussions/highlights - Get community highlights');
-      console.log('   POST   /api/discussions/threads/:threadId/like - Like thread');
-      console.log('   POST   /api/discussions/threads/:threadId/comments - Add comment');
-      console.log('   GET    /api/discussions/stats/genres - Genre statistics');
-      console.log('='.repeat(70));
-      
-      console.log('📌 CIRCLE ENDPOINTS:');
-      console.log('   GET    /api/discussions/circles/:circleId/threads - Get circle threads');
-      console.log('   POST   /api/discussions/circles/threads - Create circle thread');
-      console.log('   POST   /api/discussions/circles/polls - Create circle poll');
-      console.log('='.repeat(70));
-      
+
       console.log('📌 VOICE ROOM ENDPOINTS:');
-      console.log('   GET    /api/voice-rooms/rooms/live - Get all live rooms');
-      console.log('   GET    /api/voice-rooms/rooms/scheduled - Get scheduled rooms');
-      console.log('   GET    /api/voice-rooms/rooms/:roomId - Get room details');
-      console.log('   POST   /api/voice-rooms/rooms - Create new room');
+      console.log('   GET    /api/voice-rooms/rooms/live');
+      console.log('   GET    /api/voice-rooms/rooms/scheduled');
+      console.log('   POST   /api/voice-rooms/rooms');
       console.log('='.repeat(70));
-      
+
       console.log('📌 ADMIN ENDPOINTS:');
-      console.log('   GET    /api/admin/dashboard/stats - Dashboard statistics');
-      console.log('   GET    /api/admin/users - List all users');
-      console.log('   GET    /api/admin/filter-words - List filter words');
-      console.log('   GET    /api/admin/reports - List reports');
+      console.log('   GET    /api/admin/dashboard/stats');
+      console.log('   GET    /api/admin/users');
+      console.log('   GET    /api/admin/reports');
       console.log('='.repeat(70));
-      
-      console.log('📌 OTHER ENDPOINTS:');
-      console.log('   GET    /api/books/search - Search books');
-      console.log('   GET    /api/dashboard/:userId - User dashboard');
-      console.log('   GET    /api/notifications - User notifications');
-      console.log('   GET    /health - Health check');
-      console.log('='.repeat(70));
-      
+
       console.log(`🕐 Server started at: ${new Date().toLocaleString()}`);
       console.log('='.repeat(70));
     });
     
-    // Handle graceful shutdown
     process.on('SIGINT', gracefulShutdown);
     process.on('SIGTERM', gracefulShutdown);
     process.on('uncaughtException', (error) => {
@@ -347,17 +318,14 @@ const startServer = async () => {
   }
 };
 
-// Graceful shutdown function
 function gracefulShutdown() {
   console.log('\n🔄 Shutting down gracefully...');
   
-  // Set a timeout to force shutdown if cleanup takes too long
   const forceShutdownTimeout = setTimeout(() => {
     console.error('❌ Could not close connections in time, forcing shutdown');
     process.exit(1);
   }, 10000);
   
-  // Track completed operations
   let webSocketClosed = false;
   let httpServerClosed = false;
   let mongoClosed = false;
@@ -370,13 +338,11 @@ function gracefulShutdown() {
     }
   }
   
-  // Close WebSocket server
   if (socketServer && socketServer.io) {
     console.log('Closing WebSocket server...');
     
-    // Notify all users in voice rooms
     if (global.activeRooms) {
-      for (const [roomId, sockets] of global.activeRooms.entries()) {
+      for (const [roomId] of global.activeRooms.entries()) {
         socketServer.io.to(`room-${roomId}`).emit('server-shutdown', {
           message: 'Server is shutting down. Rooms will be closed.'
         });
@@ -393,7 +359,6 @@ function gracefulShutdown() {
     checkAllClosed();
   }
   
-  // Close HTTP server
   if (server) {
     console.log('Closing HTTP server...');
     server.close(() => {
@@ -401,8 +366,6 @@ function gracefulShutdown() {
       httpServerClosed = true;
       checkAllClosed();
     });
-    
-    // Also close all keep-alive connections
     server.closeAllConnections?.();
     server.closeIdleConnections?.();
   } else {
@@ -410,7 +373,6 @@ function gracefulShutdown() {
     checkAllClosed();
   }
   
-  // Close MongoDB connection
   console.log('Closing MongoDB connection...');
   mongoose.connection.close()
     .then(() => {
@@ -425,7 +387,6 @@ function gracefulShutdown() {
     });
 }
 
-// Start the server
 startServer();
 
 module.exports = app;

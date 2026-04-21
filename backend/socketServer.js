@@ -5,27 +5,77 @@ const VoiceRoom = require('./models/VoiceRoom');
 const RoomParticipant = require('./models/RoomParticipant');
 const User = require('./models/User');
 const Conversation = require('./models/Conversation');
+const FilterService = require('./services/filterService');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RotatingRoomState — in-memory state for a single rotating-mode room
+// ─────────────────────────────────────────────────────────────────────────────
+class RotatingRoomState {
+  constructor(roomId, timeLimit = 90) {
+    this.roomId         = roomId;
+    this.timeLimit      = timeLimit;
+    this.queue          = [];          // [{ userId, userName }, ...]
+    this.currentSpeaker = null;        // { userId, userName } | null
+    this.timerInterval  = null;
+    this.secondsLeft    = 0;
+    this.voteSkipVoters = new Set();
+  }
+
+  joinQueue(userId, userName) {
+    if (this.isInQueue(userId) || this.isCurrentSpeaker(userId)) return null;
+    this.queue.push({ userId, userName });
+    return this.queue.length;
+  }
+
+  leaveQueue(userId) {
+    const idx = this.queue.findIndex(u => u.userId === userId);
+    if (idx !== -1) this.queue.splice(idx, 1);
+  }
+
+  isInQueue(userId)        { return this.queue.some(u => u.userId === userId); }
+  isCurrentSpeaker(userId) { return this.currentSpeaker?.userId === userId; }
+
+  advanceTurn() {
+    this.currentSpeaker = this.queue.length > 0 ? this.queue.shift() : null;
+    this.secondsLeft    = this.timeLimit;
+    this.voteSkipVoters.clear();
+    return this.currentSpeaker;
+  }
+
+  snapshot() {
+    return {
+      currentSpeaker : this.currentSpeaker,
+      queue          : [...this.queue],
+      secondsLeft    : this.secondsLeft,
+      timeLimit      : this.timeLimit,
+      voteSkipCount  : this.voteSkipVoters.size,
+      voteSkipNeeded : Math.max(1, Math.ceil((this.queue.length + 2) / 2))
+    };
+  }
+
+  destroy() {
+    if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SocketServer
+// ─────────────────────────────────────────────────────────────────────────────
 class SocketServer {
   constructor(server) {
-    console.log('🔌 Initializing Socket.IO server with Voice Room and Chat support...');
-    
-    if (!server) {
-      throw new Error('HTTP server instance is required');
-    }
-    
+    console.log('🔌 Initializing Socket.IO server with Voice Room, Chat, and Rotating Speaker support...');
+
+    if (!server) throw new Error('HTTP server instance is required');
+
     try {
       this.io = new Server(server, {
         cors: {
           origin: [
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://localhost:5500',
-            'http://127.0.0.1:5500',
-            'http://localhost:5002',
-            'http://127.0.0.1:5002',
-            'http://localhost:5000',
-            'http://127.0.0.1:5000',
+            'http://localhost:3000', 'http://127.0.0.1:3000',
+            'http://localhost:5500', 'http://127.0.0.1:5500',
+            'http://localhost:8080', 'http://127.0.0.1:8080',
+            'http://localhost:5002', 'http://127.0.0.1:5002',
+            'http://localhost:5000', 'http://127.0.0.1:5000',
             /^http:\/\/localhost:\d+$/,
             /^http:\/\/127\.0\.0\.1:\d+$/
           ],
@@ -40,32 +90,77 @@ class SocketServer {
         pingInterval: 25000
       });
 
-      // Store active rooms and users
-      this.activeRooms = new Map(); // roomId -> Set of socketIds
-      this.userSockets = new Map(); // userId -> socketId
-      this.roomParticipants = new Map(); // roomId -> Map of userId -> socketId
-      this.userStatus = new Map(); // userId -> { online: boolean, lastSeen: Date }
-      
-      // Admin tracking
-      this.adminSockets = new Map(); // socketId -> userId
+      this.userSockets      = new Map(); // userId -> Set<socketId>
+      this.socketUsers      = new Map(); // socketId -> userId
+      this.activeRooms      = new Map(); // roomId -> Set<socketId>
+      this.roomParticipants = new Map(); // roomId -> Map<userId, Set<socketId>>
+      this.userStatus       = new Map(); // userId -> { online, lastSeen }
+      this.adminSockets     = new Map(); // socketId -> userId
+      this.rotatingRooms    = new Map(); // roomId -> RotatingRoomState
 
       this.setupEventHandlers();
-      console.log('✅ Socket.IO server is ready with voice room and chat support');
-      
+      console.log('✅ Socket.IO server is ready with voice room, chat, and rotating speaker support');
+
     } catch (error) {
       console.error('❌ Failed to create Socket.IO server:', error);
       throw error;
     }
   }
 
+  // ── Multi-socket helpers ─────────────────────────────────────────────────
+
+  _addUserSocket(userId, socketId) {
+    const uid = userId.toString().trim();
+    if (!this.userSockets.has(uid)) this.userSockets.set(uid, new Set());
+    this.userSockets.get(uid).add(socketId);
+    this.socketUsers.set(socketId, uid);
+  }
+
+  _removeUserSocket(socketId) {
+    const uid = this.socketUsers.get(socketId);
+    if (!uid) return null;
+    this.socketUsers.delete(socketId);
+    const sids = this.userSockets.get(uid);
+    if (sids) {
+      sids.delete(socketId);
+      if (sids.size === 0) {
+        this.userSockets.delete(uid);
+        this.userStatus.set(uid, { online: false, lastSeen: new Date() });
+      }
+    }
+    return uid;
+  }
+
+  _isUserOnline(userId) {
+    const sids = this.userSockets.get(userId.toString().trim());
+    return sids ? sids.size > 0 : false;
+  }
+
+  _emitToUser(userId, event, data) {
+    const sids = this.userSockets.get(userId.toString().trim());
+    if (!sids || sids.size === 0) return false;
+    for (const sid of sids) this.io.to(sid).emit(event, data);
+    return true;
+  }
+
+  _getRoomForSocket(socketId) {
+    for (const [roomId, set] of this.activeRooms.entries()) {
+      if (set.has(socketId)) return roomId;
+    }
+    return null;
+  }
+
+  // ── setupEventHandlers ───────────────────────────────────────────────────
   setupEventHandlers() {
     this.io.on('connection', (socket) => {
-      console.log('✅ Client connected:', socket.id);
-      
+      console.log('✅ Client connected:', socket.id, `transport=${socket.conn.transport.name}`);
+
       let currentUserId = null;
       let isAdmin = false;
 
-      // Authenticate user
+      // ─────────────────────────────────────────
+      // AUTHENTICATE
+      // ─────────────────────────────────────────
       socket.on('authenticate', async (token) => {
         try {
           if (!token) {
@@ -74,103 +169,154 @@ class SocketServer {
           }
 
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-          const user = await User.findById(decoded.userId);
-          
+          const user    = await User.findById(decoded.userId);
+
           if (!user) {
             socket.emit('authenticated', { success: false, error: 'User not found' });
             return;
           }
-          
+
           currentUserId = user._id.toString();
-          isAdmin = user.isAdmin === true;
-          
-          // Always store as trimmed string to avoid key mismatches
-          this.userSockets.set(currentUserId, socket.id);
+          isAdmin       = user.isAdmin === true;
+
+          this._addUserSocket(currentUserId, socket.id);
           this.userStatus.set(currentUserId, { online: true, lastSeen: new Date() });
-          
-          // Remove any stale socket entries for this user (reconnect case)
-          for (const [uid, sid] of this.userSockets.entries()) {
-            if (uid === currentUserId && sid !== socket.id) {
-              this.userSockets.delete(uid);
-            }
-          }
-          
-          // Track admin connections
+
+          // ── Join personal notification room so io.to(`user-${id}`) works ──
+          socket.join(`user-${currentUserId}`);
+
           if (isAdmin) {
             this.adminSockets.set(socket.id, currentUserId);
             console.log(`👑 Admin connected: ${user.name}`);
-            
-            // Send admin status to the client
             socket.emit('admin-authenticated', {
               success: true,
               userName: user.name,
               connectedAdmins: this.adminSockets.size
             });
           }
-          
-          socket.emit('authenticated', { 
-            success: true, 
+
+          socket.emit('authenticated', {
+            success: true,
             userId: currentUserId,
             isAdmin: isAdmin
           });
-          
-          console.log(`🔐 User ${user.name} authenticated${isAdmin ? ' (Admin)' : ''}`);
-          
+
+          console.log(`🔐 User ${user.name} authenticated (socket ${socket.id})${isAdmin ? ' (Admin)' : ''}`);
+
         } catch (error) {
           console.error('Authentication error:', error);
-          socket.emit('authenticated', { 
-            success: false, 
-            error: error.message 
-          });
+          socket.emit('authenticated', { success: false, error: error.message });
         }
       });
 
-      // ========== CHAT MESSAGE HANDLERS ==========
-      
-      // Send chat message
+      socket.conn.on('upgrade', () => {
+        console.log(`🔄 Transport upgraded for ${socket.id}: ${socket.conn.transport.name}`);
+      });
+
+      // ─────────────────────────────────────────
+      // CHAT MESSAGE HANDLERS
+      // ─────────────────────────────────────────
+
       socket.on('chat:message', async (data) => {
         try {
           const { content, conversationId, attachment } = data;
-          // Normalize recipientId to string to match userSockets key format
           const recipientId = data.recipientId ? data.recipientId.toString().trim() : null;
-          
+
           if (!currentUserId) {
             socket.emit('error', { message: 'Not authenticated' });
             return;
           }
-          
+
           if (!recipientId) {
             socket.emit('error', { message: 'Recipient ID required' });
             return;
           }
-          
+
           if (!content && !attachment) {
             socket.emit('error', { message: 'Message content required' });
             return;
           }
-          
-          // Get sender user
+
           const sender = await User.findById(currentUserId);
           if (!sender) {
             socket.emit('error', { message: 'User not found' });
             return;
           }
-          
-          // Find or create conversation
+
+          // ── Check suspension ──────────────────────────────────────────────
+          if (sender.isSuspended && sender.suspensionEnds) {
+            if (new Date() < sender.suspensionEnds) {
+              const daysLeft = Math.ceil((sender.suspensionEnds - new Date()) / (1000 * 60 * 60 * 24));
+              socket.emit('message-blocked', {
+                suspended: true,
+                warning: `⛔ Your account is suspended for ${daysLeft} more day(s) due to multiple content violations. Please review our community guidelines.`,
+                suspensionEnds: sender.suspensionEnds,
+                daysLeft
+              });
+              return;
+            } else {
+              // Suspension expired — lift it automatically
+              sender.isSuspended = false;
+              sender.suspensionEnds = null;
+              sender.suspensionReason = null;
+              await sender.save();
+            }
+          }
+
+          // ── Content filter (text messages only) ──────────────────────────
+          let finalContent = content || '';
+          let filterWarning = null;
+
+          if (finalContent && finalContent.trim()) {
+            const filterResult = await FilterService.checkAndProcess(
+              finalContent,
+              currentUserId,
+              'chat',
+              recipientId
+            );
+
+            if (!filterResult.allowed) {
+              // Suspended or blocked — reject the message entirely
+              socket.emit('message-blocked', {
+                originalMessage: finalContent,
+                warning: filterResult.message,
+                warningIssued: filterResult.warningIssued,
+                warningCount: filterResult.warningCount,
+                suspended: filterResult.suspended
+              });
+              return;
+            }
+
+            if (filterResult.hasViolation) {
+              // Allowed but with a warning — use censored text and notify sender
+              finalContent = filterResult.censoredText;
+              filterWarning = {
+                message: filterResult.message,
+                warningCount: filterResult.warningCount,
+                warningIssued: filterResult.warningIssued
+              };
+              socket.emit('content-warning', {
+                type: 'content_warning',
+                title: 'Content Warning',
+                message: filterResult.message,
+                warningNumber: filterResult.warningCount,
+                timestamp: new Date()
+              });
+            }
+          }
+
           let conversation = null;
-          
+
           if (conversationId) {
             conversation = await Conversation.findById(conversationId);
           }
-          
+
           if (!conversation) {
-            // Find existing conversation between these users
             conversation = await Conversation.findOne({
               participants: { $all: [currentUserId, recipientId], $size: 2 }
             });
-            
+
             if (!conversation) {
-              // Create new conversation
               conversation = new Conversation({
                 participants: [currentUserId, recipientId],
                 messages: [],
@@ -181,134 +327,141 @@ class SocketServer {
               await conversation.save();
             }
           }
-          
-          // Create message object
+
           const messageObj = {
             _id: new mongoose.Types.ObjectId(),
             sender: currentUserId,
-            content: content || '',
+            content: finalContent,
             type: attachment ? 'file' : 'text',
             read: false,
             readAt: null,
             createdAt: new Date(),
-            attachment: attachment || null
+            attachment: attachment || null,
+            wasFiltered: filterWarning !== null
           };
-          
-          // Add to conversation
+
           conversation.messages.push(messageObj);
           conversation.lastMessage = new Date();
-          conversation.lastMessagePreview = content ? (content.length > 50 ? content.substring(0, 47) + '...' : content) : '📎 Sent an attachment';
-          
-          // Increment unread count for recipient
+          conversation.lastMessagePreview = finalContent
+            ? (finalContent.length > 50 ? finalContent.substring(0, 47) + '...' : finalContent)
+            : '📎 Sent an attachment';
+
           const currentUnread = conversation.unreadCount.get(recipientId) || 0;
           conversation.unreadCount.set(recipientId, currentUnread + 1);
-          
+
           await conversation.save();
-          
-          // Prepare message for sending
+
           const messageToSend = {
             _id: messageObj._id,
             senderId: currentUserId,
             senderName: sender.name,
-            content: content,
+            content: finalContent,
             type: messageObj.type,
             attachment: attachment,
             createdAt: messageObj.createdAt,
-            conversationId: conversation._id
+            conversationId: conversation._id,
+            wasFiltered: filterWarning !== null
           };
-          
-          // Send to recipient if online
-          const recipientSocketId = this.userSockets.get(recipientId);
-          console.log(`📬 Delivery check — recipient ${recipientId}: socket ${recipientSocketId || 'NOT ONLINE'}`);
-          if (recipientSocketId) {
-            this.io.to(recipientSocketId).emit('chat:message', {
-              ...messageToSend,
-              isFromOthers: true
-            });
-            console.log(`✅ Message delivered to socket ${recipientSocketId}`);
+
+          const recipientSids = this.userSockets.get(recipientId);
+          if (recipientSids && recipientSids.size > 0) {
+            for (const sid of recipientSids) {
+              this.io.to(sid).emit('chat:message', { ...messageToSend, isFromOthers: true });
+            }
+            console.log(`📬 Message delivered to ${recipientSids.size} socket(s) for recipient ${recipientId}`);
           } else {
             console.log(`⚠️  Recipient ${recipientId} is not connected — message saved to DB only`);
           }
-          
-          // Send confirmation to sender
+
           socket.emit('chat:message:sent', {
             success: true,
             message: messageToSend,
-            conversationId: conversation._id
+            conversationId: conversation._id,
+            warningIssued: filterWarning !== null,
+            warningMessage: filterWarning ? filterWarning.message : null,
+            warningCount: filterWarning ? filterWarning.warningCount : null
           });
-          
+
           console.log(`💬 Message sent from ${sender.name} to ${recipientId}`);
-          
+
         } catch (error) {
           console.error('Error sending chat message:', error);
           socket.emit('error', { message: 'Failed to send message: ' + error.message });
         }
       });
-      
-      // Request chat history
+
+      // Chat history
       socket.on('chat:history', async (data) => {
         try {
           const { limit = 50 } = data;
           const otherUserId = data.otherUserId ? data.otherUserId.toString().trim() : null;
-          
+
           if (!currentUserId) {
             socket.emit('error', { message: 'Not authenticated' });
             return;
           }
-          
+
           if (!otherUserId) {
             socket.emit('error', { message: 'Other user ID required' });
             return;
           }
-          
-          // Find conversation
+
           const conversation = await Conversation.findOne({
             participants: { $all: [currentUserId, otherUserId], $size: 2 }
           }).populate('messages.sender', 'name profilePicture');
-          
+
           if (!conversation) {
-            socket.emit('chat:history', {
-              conversationId: null,
-              messages: [],
-              error: false
-            });
+            socket.emit('chat:history', { conversationId: null, messages: [], error: false });
             return;
           }
-          
-          // Mark messages as read for current user
+
           let unreadCount = 0;
           conversation.messages.forEach(msg => {
-            if (msg.sender._id.toString() !== currentUserId && !msg.read) {
+            if (msg.unsent) return;
+            const senderId = msg.sender._id ? msg.sender._id.toString() : msg.sender.toString();
+            if (senderId !== currentUserId && !msg.read) {
               msg.read = true;
               msg.readAt = new Date();
               unreadCount++;
             }
           });
-          
+
           if (unreadCount > 0) {
-            conversation.unreadCount.set(currentUserId, 0);
+            if (typeof conversation.unreadCount.set === 'function') {
+              conversation.unreadCount.set(currentUserId, 0);
+            } else {
+              conversation.unreadCount[currentUserId] = 0;
+              conversation.markModified('unreadCount');
+            }
             await conversation.save();
           }
-          
-          // Get last limit messages
-          const messages = conversation.messages.slice(-limit).map(msg => ({
+
+          const visibleMessages = conversation.messages.filter(msg => {
+            if (msg.unsent) return false;
+            if (msg.deletedFor && msg.deletedFor.some(id => id.toString() === currentUserId)) return false;
+            return true;
+          });
+
+          const messages = visibleMessages.slice(-limit).map(msg => ({
             _id: msg._id,
-            sender: msg.sender._id.toString(),
+            sender: msg.sender._id ? msg.sender._id.toString() : msg.sender.toString(),
             senderName: msg.sender.name,
             content: msg.content,
             type: msg.type,
-            attachment: msg.attachment,
+            attachment: msg.attachment && msg.attachment.data ? msg.attachment : null,
             read: msg.read,
             readAt: msg.readAt,
-            createdAt: msg.createdAt
+            createdAt: msg.createdAt,
+            unsent: msg.unsent || false,
+            deletedFor: msg.deletedFor || []
           }));
-          
+
           socket.emit('chat:history', {
             conversationId: conversation._id,
-            messages: messages.reverse(),
+            messages: messages,
             error: false
           });
-          
+
         } catch (error) {
           console.error('Error fetching chat history:', error);
           socket.emit('chat:history', {
@@ -319,56 +472,46 @@ class SocketServer {
           });
         }
       });
-      
+
       // Typing indicator
       socket.on('chat:typing', async (data) => {
         try {
           const { recipientId, isTyping } = data;
-          
           if (!currentUserId) return;
-          
-          const recipientSocketId = this.userSockets.get(recipientId);
-          if (recipientSocketId) {
-            this.io.to(recipientSocketId).emit('chat:typing', {
-              senderId: currentUserId,
-              isTyping: isTyping
-            });
-          }
+          const rid = recipientId ? recipientId.toString().trim() : null;
+          if (rid) this._emitToUser(rid, 'chat:typing', { senderId: currentUserId, isTyping });
         } catch (error) {
           console.error('Error sending typing indicator:', error);
         }
       });
-      
-      // Get online status for users
+
+      // Online status
       socket.on('chat:online', async (data) => {
         try {
           const { userIds } = data;
-          
           if (!currentUserId) return;
-          
+
           const onlineStatus = {};
           userIds.forEach(userId => {
             const uid = userId ? userId.toString().trim() : userId;
-            const status = this.userStatus.get(uid);
-            onlineStatus[uid] = status ? status.online : false;
+            onlineStatus[uid] = this._isUserOnline(uid);
           });
-          
+
           socket.emit('chat:online', { online: onlineStatus });
         } catch (error) {
           console.error('Error getting online status:', error);
         }
       });
-      
+
       // Mark messages as read
       socket.on('chat:mark-read', async (data) => {
         try {
           const { conversationId, otherUserId } = data;
-          
           if (!currentUserId) return;
-          
+
           const conversation = await Conversation.findById(conversationId);
           if (!conversation) return;
-          
+
           let unreadMarked = 0;
           conversation.messages.forEach(msg => {
             if (msg.sender.toString() !== currentUserId && !msg.read) {
@@ -377,15 +520,13 @@ class SocketServer {
               unreadMarked++;
             }
           });
-          
+
           if (unreadMarked > 0) {
             conversation.unreadCount.set(currentUserId, 0);
             await conversation.save();
-            
-            // Notify sender that messages were read
-            const senderSocketId = this.userSockets.get(otherUserId);
-            if (senderSocketId) {
-              this.io.to(senderSocketId).emit('chat:read-receipt', {
+
+            if (otherUserId) {
+              this._emitToUser(otherUserId.toString(), 'chat:read-receipt', {
                 conversationId,
                 readBy: currentUserId,
                 readAt: new Date()
@@ -397,26 +538,26 @@ class SocketServer {
         }
       });
 
-      // ========== VOICE ROOM HANDLERS ==========
-      
-      // Join a voice room
+      // ─────────────────────────────────────────
+      // VOICE ROOM HANDLERS
+      // ─────────────────────────────────────────
+
       socket.on('join-voice-room', async (data) => {
         try {
-          const { roomId, userId, userName } = data;
-          
-          if (!userId) {
+          const { roomId, userName } = data;
+
+          if (!currentUserId) {
             socket.emit('error', { message: 'Authentication required' });
             return;
           }
+          const verifiedUserId = currentUserId;
 
-          // Check if room exists
           const room = await VoiceRoom.findById(roomId);
           if (!room) {
             socket.emit('error', { message: 'Room not found' });
             return;
           }
 
-          // Check room status
           if (room.status !== 'live') {
             if (room.status === 'scheduled' && room.scheduledFor && room.scheduledFor <= new Date()) {
               room.status = 'live';
@@ -427,31 +568,22 @@ class SocketServer {
             }
           }
 
-          // Add to Socket.IO room
           socket.join(`room-${roomId}`);
-          
-          // Track in memory
-          if (!this.activeRooms.has(roomId)) {
-            this.activeRooms.set(roomId, new Set());
-          }
-          this.activeRooms.get(roomId).add(socket.id);
-          
-          if (!this.roomParticipants.has(roomId)) {
-            this.roomParticipants.set(roomId, new Map());
-          }
-          this.roomParticipants.get(roomId).set(userId, socket.id);
 
-          // Add/update participant in database
-          let participant = await RoomParticipant.findOne({ 
-            roomId, 
-            userId,
-            leftAt: null 
-          });
+          if (!this.activeRooms.has(roomId)) this.activeRooms.set(roomId, new Set());
+          this.activeRooms.get(roomId).add(socket.id);
+
+          if (!this.roomParticipants.has(roomId)) this.roomParticipants.set(roomId, new Map());
+          const pMap = this.roomParticipants.get(roomId);
+          if (!pMap.has(verifiedUserId)) pMap.set(verifiedUserId, new Set());
+          pMap.get(verifiedUserId).add(socket.id);
+
+          let participant = await RoomParticipant.findOne({ roomId, userId: verifiedUserId, leftAt: null });
 
           if (!participant) {
             participant = new RoomParticipant({
               roomId,
-              userId,
+              userId: verifiedUserId,
               userName,
               socketId: socket.id,
               joinedAt: new Date()
@@ -462,33 +594,29 @@ class SocketServer {
           }
           await participant.save();
 
-          // Update room participant count
-          const participantCount = await RoomParticipant.countDocuments({ 
-            roomId, 
-            leftAt: null 
-          });
-          await VoiceRoom.findByIdAndUpdate(roomId, { 
-            participantCount 
-          });
+          const participantCount = await RoomParticipant.countDocuments({ roomId, leftAt: null });
+          await VoiceRoom.findByIdAndUpdate(roomId, { participantCount });
 
-          // Get all participants in room
-          const participants = await RoomParticipant.find({ 
-            roomId, 
-            leftAt: null 
-          }).select('userId userName isMuted handRaised isSpeaking');
+          const participants = await RoomParticipant.find({ roomId, leftAt: null })
+            .select('userId userName isMuted handRaised isSpeaking');
 
-          // Notify existing participants
           socket.to(`room-${roomId}`).emit('user-joined', {
-            userId,
+            userId: verifiedUserId,
             userName,
             timestamp: new Date()
           });
 
-          // Send current participants to new user
+          const rotatingState = this.rotatingRooms.has(roomId)
+            ? this.rotatingRooms.get(roomId).snapshot()
+            : null;
+
           socket.emit('room-joined', {
             roomId,
             roomName: room.name,
             hostId: room.hostId.toString(),
+            hostName: room.hostName,
+            mode: rotatingState ? 'rotating' : 'free',
+            rotatingState,
             participants: participants.map(p => ({
               userId: p.userId.toString(),
               name: p.userName,
@@ -498,8 +626,8 @@ class SocketServer {
             }))
           });
 
-          console.log(`👤 User ${userName} joined room ${room.name}`);
-          
+          console.log(`👤 User ${userName} (${verifiedUserId}) joined room ${room.name}`);
+
         } catch (error) {
           console.error('Error joining room:', error);
           socket.emit('error', { message: 'Failed to join room' });
@@ -509,16 +637,17 @@ class SocketServer {
       // WebRTC signaling
       socket.on('signal', async (data) => {
         const { to, signal, roomId } = data;
-        
         try {
-          const targetSocketId = this.roomParticipants.get(roomId)?.get(to);
-          
-          if (targetSocketId) {
-            this.io.to(targetSocketId).emit('signal', {
-              from: currentUserId,
-              signal,
-              fromSocketId: socket.id
-            });
+          if (!currentUserId) return;
+          const targetSids = this.roomParticipants.get(roomId)?.get(to);
+          if (targetSids) {
+            for (const sid of targetSids) {
+              this.io.to(sid).emit('signal', {
+                from: currentUserId,
+                signal,
+                fromSocketId: socket.id
+              });
+            }
           }
         } catch (error) {
           console.error('Error forwarding signal:', error);
@@ -528,15 +657,16 @@ class SocketServer {
       // Mute toggle
       socket.on('toggle-mute', async (data) => {
         try {
-          const { roomId, userId, isMuted } = data;
-          
+          const { roomId, isMuted } = data;
+          if (!currentUserId) return;
+
           await RoomParticipant.findOneAndUpdate(
-            { roomId, userId, leftAt: null },
+            { roomId, userId: currentUserId, leftAt: null },
             { isMuted }
           );
 
           this.io.to(`room-${roomId}`).emit('user-muted', {
-            userId,
+            userId: currentUserId,
             isMuted,
             timestamp: new Date()
           });
@@ -548,18 +678,59 @@ class SocketServer {
       // Raise hand
       socket.on('raise-hand', async (data) => {
         try {
-          const { roomId, userId, raised } = data;
-          
+          const { roomId, raised, userName } = data;
+          if (!currentUserId) return;
+
           await RoomParticipant.findOneAndUpdate(
-            { roomId, userId, leftAt: null },
+            { roomId, userId: currentUserId, leftAt: null },
             { handRaised: raised }
           );
 
           this.io.to(`room-${roomId}`).emit('hand-raised', {
-            userId,
+            userId: currentUserId,
             raised,
             timestamp: new Date()
           });
+
+          const rState = this.rotatingRooms.get(roomId);
+          if (rState) {
+            if (raised) {
+              const position = rState.joinQueue(currentUserId, userName || currentUserId);
+              if (position !== null) {
+                if (!rState.currentSpeaker) {
+                  rState.advanceTurn();
+                  this._startRotationTimer(roomId);
+                  this.io.to(`room-${roomId}`).emit('turn-changed', {
+                    prevSpeaker: null,
+                    nextSpeaker: rState.currentSpeaker,
+                    ...rState.snapshot(),
+                    timestamp: new Date()
+                  });
+                } else {
+                  this.io.to(`room-${roomId}`).emit('queue-updated', {
+                    ...rState.snapshot(),
+                    action: 'joined',
+                    userId: currentUserId,
+                    position,
+                    timestamp: new Date()
+                  });
+                }
+              }
+            } else {
+              const wasCurrentSpeaker = rState.isCurrentSpeaker(currentUserId);
+              rState.leaveQueue(currentUserId);
+              if (wasCurrentSpeaker) {
+                this._advanceToNextSpeaker(roomId);
+              } else {
+                this.io.to(`room-${roomId}`).emit('queue-updated', {
+                  ...rState.snapshot(),
+                  action: 'left',
+                  userId: currentUserId,
+                  timestamp: new Date()
+                });
+              }
+            }
+          }
         } catch (error) {
           console.error('Error raising hand:', error);
         }
@@ -567,16 +738,16 @@ class SocketServer {
 
       // Speaking status
       socket.on('speaking', async (data) => {
-        const { roomId, userId, isSpeaking } = data;
-        
+        const { roomId, isSpeaking } = data;
+        if (!currentUserId) return;
         try {
           await RoomParticipant.findOneAndUpdate(
-            { roomId, userId, leftAt: null },
+            { roomId, userId: currentUserId, leftAt: null },
             { isSpeaking }
           );
-          
+
           socket.to(`room-${roomId}`).emit('user-speaking', {
-            userId,
+            userId: currentUserId,
             isSpeaking,
             timestamp: new Date()
           });
@@ -585,22 +756,214 @@ class SocketServer {
         }
       });
 
-      // Chat message in room
-      socket.on('room-message', (data) => {
-        const { roomId, message, userName, userId } = data;
+      // ─────────────────────────────────────────
+      // ROOM CHAT MESSAGE (WITH FILTER)
+      // ─────────────────────────────────────────
+      socket.on('room-message', async (data) => {
+        const { roomId, message, userName } = data;
+        if (!currentUserId) return;
+        
+        // Apply content filtering to voice room chat
+        const filterResult = await FilterService.checkAndProcess(message, currentUserId, 'voice_chat', roomId);
+        
+        if (!filterResult.allowed) {
+          socket.emit('message-blocked', {
+            originalMessage: message,
+            warning: filterResult.message,
+            warningIssued: filterResult.warningIssued,
+            warningCount: filterResult.warningCount,
+            suspended: filterResult.suspended
+          });
+          return;
+        }
+        
+        const finalMessage = filterResult.hasViolation ? filterResult.censoredText : message;
         
         this.io.to(`room-${roomId}`).emit('new-message', {
-          userId,
+          userId: currentUserId,
           userName,
-          message,
+          message: finalMessage,
+          wasFiltered: filterResult.hasViolation,
           timestamp: new Date().toISOString()
         });
+        
+        if (filterResult.warningIssued) {
+          socket.emit('content-warning', {
+            message: filterResult.message,
+            warningNumber: filterResult.warningCount
+          });
+        }
       });
 
-      // Get unread notification count for admin
+      // ─────────────────────────────────────────
+      // ROTATING SPEAKER HANDLERS
+      // ─────────────────────────────────────────
+
+      socket.on('switch-room-mode', async (data) => {
+        try {
+          const { roomId, mode, timeLimit = 90 } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room) return;
+          if (room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can change the room mode.' });
+            return;
+          }
+
+          if (mode === 'rotating') {
+            const state = new RotatingRoomState(roomId, Number(timeLimit) || 90);
+            this.rotatingRooms.set(roomId, state);
+          } else {
+            this._stopRotationTimer(roomId);
+          }
+
+          this.io.to(`room-${roomId}`).emit('room-mode-changed', {
+            mode,
+            snapshot: this.rotatingRooms.has(roomId) ? this.rotatingRooms.get(roomId).snapshot() : null,
+            timestamp: new Date()
+          });
+
+          console.log(`🔄 Room ${roomId} switched to ${mode} mode`);
+        } catch (error) {
+          console.error('switch-room-mode error:', error);
+        }
+      });
+
+      socket.on('join-speaker-queue', (data) => {
+        try {
+          const { roomId, userName } = data;
+          if (!currentUserId) return;
+          const state = this.rotatingRooms.get(roomId);
+          if (!state) { socket.emit('error', { message: 'Room is not in rotating mode.' }); return; }
+          const position = state.joinQueue(currentUserId, userName);
+          if (position === null) { socket.emit('already-in-queue', {}); return; }
+
+          if (!state.currentSpeaker) {
+            state.advanceTurn();
+            this._startRotationTimer(roomId);
+            this.io.to(`room-${roomId}`).emit('turn-changed', {
+              prevSpeaker: null,
+              nextSpeaker: state.currentSpeaker,
+              ...state.snapshot(),
+              timestamp: new Date()
+            });
+          } else {
+            this.io.to(`room-${roomId}`).emit('queue-updated', {
+              ...state.snapshot(),
+              action: 'joined',
+              userId: currentUserId,
+              userName,
+              position,
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.error('join-speaker-queue error:', error);
+        }
+      });
+
+      socket.on('leave-speaker-queue', (data) => {
+        try {
+          const { roomId } = data;
+          if (!currentUserId) return;
+          const state = this.rotatingRooms.get(roomId);
+          if (!state) return;
+          state.leaveQueue(currentUserId);
+          this.io.to(`room-${roomId}`).emit('queue-updated', {
+            ...state.snapshot(),
+            action: 'left',
+            userId: currentUserId,
+            timestamp: new Date()
+          });
+        } catch (error) {
+          console.error('leave-speaker-queue error:', error);
+        }
+      });
+
+      socket.on('skip-my-turn', (data) => {
+        try {
+          const { roomId } = data;
+          if (!currentUserId) return;
+          const state = this.rotatingRooms.get(roomId);
+          if (!state || !state.isCurrentSpeaker(currentUserId)) {
+            socket.emit('error', { message: 'You are not the current speaker.' });
+            return;
+          }
+          this._advanceToNextSpeaker(roomId);
+        } catch (error) {
+          console.error('skip-my-turn error:', error);
+        }
+      });
+
+      socket.on('vote-skip-speaker', (data) => {
+        try {
+          const { roomId } = data;
+          if (!currentUserId) return;
+          const state = this.rotatingRooms.get(roomId);
+          if (!state || !state.currentSpeaker) return;
+          if (state.isCurrentSpeaker(currentUserId)) return;
+
+          state.voteSkipVoters.add(currentUserId);
+          const needed = Math.max(1, Math.ceil((state.queue.length + 2) / 2));
+
+          this.io.to(`room-${roomId}`).emit('vote-skip-updated', {
+            voteSkipCount: state.voteSkipVoters.size,
+            voteSkipNeeded: needed,
+            timestamp: new Date()
+          });
+
+          if (state.voteSkipVoters.size >= needed) {
+            this.io.to(`room-${roomId}`).emit('speaker-skipped-by-vote', {
+              skippedUserId: state.currentSpeaker.userId,
+              timestamp: new Date()
+            });
+            this._advanceToNextSpeaker(roomId);
+          }
+        } catch (error) {
+          console.error('vote-skip-speaker error:', error);
+        }
+      });
+
+      socket.on('room-emoji-reaction', (data) => {
+        try {
+          const { roomId, userName, emoji } = data;
+          if (!currentUserId) return;
+          const ALLOWED = ['👍', '❤️', '🤯', '👏', '🔥', '😂', '💡'];
+          if (!ALLOWED.includes(emoji)) return;
+          this.io.to(`room-${roomId}`).emit('emoji-reaction', {
+            userId: currentUserId,
+            userName,
+            emoji,
+            timestamp: new Date()
+          });
+        } catch (error) {
+          console.error('room-emoji-reaction error:', error);
+        }
+      });
+
+      socket.on('set-topic-prompt', async (data) => {
+        try {
+          const { roomId, prompt } = data;
+          if (!currentUserId) return;
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) return;
+          this.io.to(`room-${roomId}`).emit('topic-prompt-set', {
+            prompt,
+            setBy: currentUserId,
+            timestamp: new Date()
+          });
+        } catch (error) {
+          console.error('set-topic-prompt error:', error);
+        }
+      });
+
+      // ─────────────────────────────────────────
+      // NOTIFICATION HANDLERS
+      // ─────────────────────────────────────────
+
       socket.on('get-unread-count', async () => {
         if (!isAdmin || !currentUserId) return;
-        
         try {
           const Notification = require('./models/Notification');
           const unreadCount = await Notification.countDocuments({
@@ -609,81 +972,75 @@ class SocketServer {
             archived: false,
             type: { $regex: '^admin_', $options: 'i' }
           });
-          
           socket.emit('notification-count', { unreadCount });
         } catch (error) {
           console.error('Error getting unread count:', error);
         }
       });
 
-      // Leave voice room
-      socket.on('leave-voice-room', async (data) => {
-        await this.handleLeaveRoom(socket, data);
+      socket.on('get-user-unread-count', async () => {
+        if (!currentUserId) return;
+        try {
+          const Notification = require('./models/Notification');
+          const unreadCount = await Notification.countDocuments({
+            userId: currentUserId,
+            read: false,
+            archived: false
+          });
+          socket.emit('user-notification-count', { unreadCount });
+        } catch (error) {
+          console.error('Error getting user unread count:', error);
+        }
       });
 
-      // Disconnect
-      socket.on('disconnect', async () => {
-        console.log('❌ Client disconnected:', socket.id);
-        
-        // Update user status
-        if (currentUserId) {
-          this.userStatus.set(currentUserId, { online: false, lastSeen: new Date() });
-          this.userSockets.delete(currentUserId);
-        }
-        
-        // Remove from admin tracking
+      socket.on('join-thread', (threadId) => {
+        socket.join(`thread-${threadId}`);
+        socket.emit('joined-thread', { threadId, message: 'Joined thread' });
+      });
+
+      socket.on('leave-thread', (threadId) => {
+        socket.leave(`thread-${threadId}`);
+      });
+
+      // ─────────────────────────────────────────
+      // LEAVE ROOM & DISCONNECT
+      // ─────────────────────────────────────────
+
+      socket.on('leave-voice-room', async (data) => {
+        await this.handleLeaveRoom(socket, currentUserId);
+      });
+
+      socket.on('disconnect', async (reason) => {
+        const disconnectLabel = reason === 'transport close' ? 'ℹ️ Client disconnected:' : '❌ Client disconnected:';
+        console.log(
+          disconnectLabel,
+          socket.id,
+          `(user: ${currentUserId || 'unauthenticated'})`,
+          `reason=${reason}`,
+          `transport=${socket.conn.transport.name}`
+        );
+
+        this._removeUserSocket(socket.id);
+
         if (this.adminSockets.has(socket.id)) {
           this.adminSockets.delete(socket.id);
           console.log(`👑 Admin disconnected, ${this.adminSockets.size} admins remain`);
         }
-        
-        // Find and remove from all rooms
-        for (const [roomId, sockets] of this.activeRooms.entries()) {
-          if (sockets.has(socket.id)) {
-            sockets.delete(socket.id);
-            
-            // Find user for this socket
-            const participant = await RoomParticipant.findOneAndUpdate(
-              { socketId: socket.id, leftAt: null },
-              { leftAt: new Date() }
-            );
 
-            if (participant) {
-              // Remove from room participants map
-              const roomParticipantsMap = this.roomParticipants.get(roomId);
-              if (roomParticipantsMap) {
-                roomParticipantsMap.delete(participant.userId.toString());
-              }
-              
-              // Update room count
-              const count = await RoomParticipant.countDocuments({ 
-                roomId, 
-                leftAt: null 
-              });
-              await VoiceRoom.findByIdAndUpdate(roomId, { 
-                participantCount: count 
-              });
+        if (!currentUserId) return;
 
-              // Notify others
-              this.io.to(`room-${roomId}`).emit('user-left', {
-                userId: participant.userId.toString(),
-                timestamp: new Date()
-              });
+        for (const [roomId, socketSet] of this.activeRooms.entries()) {
+          if (!socketSet.has(socket.id)) continue;
+          socketSet.delete(socket.id);
 
-              // If room empty, end it
-              if (count === 0) {
-                await VoiceRoom.findByIdAndUpdate(roomId, { 
-                  status: 'ended',
-                  endedAt: new Date()
-                });
-                this.io.to(`room-${roomId}`).emit('room-ended', {
-                  message: 'Room ended (no participants)',
-                  endedAt: new Date()
-                });
-                
-                // Clean up
-                this.activeRooms.delete(roomId);
-                this.roomParticipants.delete(roomId);
+          const pMap = this.roomParticipants.get(roomId);
+          if (pMap) {
+            const userSids = pMap.get(currentUserId);
+            if (userSids) {
+              userSids.delete(socket.id);
+              if (userSids.size === 0) {
+                pMap.delete(currentUserId);
+                await this._markParticipantLeft(roomId, currentUserId, socketSet);
               }
             }
           }
@@ -692,54 +1049,149 @@ class SocketServer {
     });
   }
 
-  async handleLeaveRoom(socket, data) {
+  // ── Internal: mark participant left, clean up room if empty ───────────────
+  async _markParticipantLeft(roomId, userId, socketSet) {
     try {
-      const { roomId, userId } = data;
-      
-      socket.leave(`room-${roomId}`);
-      
-      if (this.activeRooms.has(roomId)) {
-        this.activeRooms.get(roomId).delete(socket.id);
-      }
-      
-      const roomParticipantsMap = this.roomParticipants.get(roomId);
-      if (roomParticipantsMap) {
-        roomParticipantsMap.delete(userId);
-      }
-
       const participant = await RoomParticipant.findOneAndUpdate(
         { roomId, userId, leftAt: null },
-        { leftAt: new Date() }
+        { leftAt: new Date() },
+        { new: true }
       );
 
-      if (participant) {
-        const count = await RoomParticipant.countDocuments({ 
-          roomId, 
-          leftAt: null 
-        });
-        await VoiceRoom.findByIdAndUpdate(roomId, { 
-          participantCount: count 
-        });
+      if (!participant) return;
 
-        this.io.to(`room-${roomId}`).emit('user-left', {
-          userId,
-          timestamp: new Date()
-        });
+      const count = await RoomParticipant.countDocuments({ roomId, leftAt: null });
+      await VoiceRoom.findByIdAndUpdate(roomId, { participantCount: count });
+
+      this.io.to(`room-${roomId}`).emit('user-left', {
+        userId: userId.toString(),
+        timestamp: new Date()
+      });
+
+      const rState = this.rotatingRooms.get(roomId);
+      if (rState) {
+        const wasCurrentSpeaker = rState.isCurrentSpeaker(userId.toString());
+        rState.leaveQueue(userId.toString());
+        if (wasCurrentSpeaker) {
+          this._advanceToNextSpeaker(roomId);
+        } else {
+          this.io.to(`room-${roomId}`).emit('queue-updated', {
+            ...rState.snapshot(),
+            action: 'left',
+            userId: userId.toString(),
+            timestamp: new Date()
+          });
+        }
       }
 
-      console.log(`👋 User left room ${roomId}`);
+      if (count === 0) {
+        await VoiceRoom.findByIdAndUpdate(roomId, { status: 'ended', endedAt: new Date() });
+        this.io.to(`room-${roomId}`).emit('room-ended', {
+          message: 'Room ended (no participants)',
+          endedAt: new Date()
+        });
+        this.activeRooms.delete(roomId);
+        this.roomParticipants.delete(roomId);
+        this._stopRotationTimer(roomId);
+      }
     } catch (error) {
-      console.error('Error leaving room:', error);
+      console.error('_markParticipantLeft error:', error);
     }
   }
 
-  // Helper methods for admin
-  getConnectedAdminCount() {
-    return this.adminSockets.size;
+  async handleLeaveRoom(socket, userId) {
+    try {
+      if (!userId) return;
+      const roomId = this._getRoomForSocket(socket.id);
+      if (!roomId) return;
+
+      socket.leave(`room-${roomId}`);
+
+      const socketSet = this.activeRooms.get(roomId);
+      if (socketSet) socketSet.delete(socket.id);
+
+      const pMap = this.roomParticipants.get(roomId);
+      if (pMap) {
+        const userSids = pMap.get(userId);
+        if (userSids) {
+          userSids.delete(socket.id);
+          if (userSids.size === 0) {
+            pMap.delete(userId);
+            await this._markParticipantLeft(roomId, userId, socketSet || new Set());
+          }
+        }
+      }
+
+      console.log(`👋 User ${userId} left room ${roomId}`);
+    } catch (error) {
+      console.error('handleLeaveRoom error:', error);
+    }
   }
 
-  getConnectedAdminIds() {
-    return Array.from(this.adminSockets.values());
+  // ── Rotating speaker timer helpers ────────────────────────────────────────
+
+  _startRotationTimer(roomId) {
+    const state = this.rotatingRooms.get(roomId);
+    if (!state) return;
+    if (state.timerInterval) clearInterval(state.timerInterval);
+
+    state.timerInterval = setInterval(() => {
+      const s = this.rotatingRooms.get(roomId);
+      if (!s) { clearInterval(state.timerInterval); return; }
+
+      s.secondsLeft--;
+      this.io.to(`room-${roomId}`).emit('timer-tick', {
+        secondsLeft: s.secondsLeft,
+        timeLimit: s.timeLimit,
+        speakerId: s.currentSpeaker?.userId
+      });
+
+      if (s.secondsLeft <= 0) this._advanceToNextSpeaker(roomId);
+    }, 1000);
+  }
+
+  _stopRotationTimer(roomId) {
+    const state = this.rotatingRooms.get(roomId);
+    if (state) { state.destroy(); this.rotatingRooms.delete(roomId); }
+  }
+
+  _advanceToNextSpeaker(roomId) {
+    const state = this.rotatingRooms.get(roomId);
+    if (!state) return;
+    const prevSpeaker = state.currentSpeaker;
+    const nextSpeaker = state.advanceTurn();
+
+    if (nextSpeaker) {
+      this._startRotationTimer(roomId);
+    } else {
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+      state.secondsLeft = 0;
+    }
+
+    this.io.to(`room-${roomId}`).emit('turn-changed', {
+      prevSpeaker,
+      nextSpeaker,
+      ...state.snapshot(),
+      timestamp: new Date()
+    });
+    console.log(`🔄 Room ${roomId}: ${prevSpeaker?.userName || '-'} → ${nextSpeaker?.userName || 'nobody (queue empty)'}`);
+  }
+
+  // ─────────────────────────────────────────
+  // HELPER METHODS (called via global.io.*)
+  // ─────────────────────────────────────────
+
+  sendToUser(userId, data) {
+    const sent = this._emitToUser(userId, 'notification', data);
+    if (sent) {
+      console.log(`🔔 Notification sent to user ${userId}`);
+    } else {
+      console.log(`⚠️  sendToUser: user ${userId} not connected`);
+    }
+    return sent;
   }
 
   broadcastToAdmins(data) {
@@ -748,7 +1200,16 @@ class SocketServer {
       this.io.to(socketId).emit('admin-notification', data);
       sentCount++;
     }
+    console.log(`📢 Admin notification broadcast to ${sentCount} admin(s)`);
     return sentCount;
+  }
+
+  getConnectedAdminCount() {
+    return this.adminSockets.size;
+  }
+
+  getConnectedAdminIds() {
+    return Array.from(this.adminSockets.values());
   }
 }
 

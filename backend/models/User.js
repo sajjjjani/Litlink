@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  suspensionReason: {
+    type: String,
+    default: ''
+  },
   banReason: {
     type: String,
     default: ''
@@ -61,6 +65,11 @@ const userSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  // ===== BLOCKED USERS =====
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   // ===== EXISTING FIELDS =====
   isVerified: {
     type: Boolean,
@@ -114,7 +123,6 @@ const userSchema = new mongoose.Schema({
     title: String,
     author: String,
     readAt: Date,
-    // Store a stable cover URL so profile/book lists can render real covers
     cover: String
   }],
   currentlyReading: [{
@@ -149,14 +157,11 @@ const AdminNotificationService = require('../services/adminNotificationService')
 // Post-save hook for new user signups
 userSchema.post('save', async function(doc, next) {
   try {
-    // Only create notification for new user signups
     if (doc.wasNew && !doc.isAdmin) {
       console.log(`👤 New user signup: ${doc.name} (${doc.email})`);
       
-      // Create database notification
       await AdminNotificationService.notifyNewUserSignup(doc);
       
-      // Emit WebSocket event to all connected admins
       try {
         const io = global.io;
         if (io) {
@@ -175,8 +180,6 @@ userSchema.post('save', async function(doc, next) {
             }
           });
           console.log(`📢 WebSocket notification sent for new user: ${doc.name}`);
-        } else {
-          console.log('⚠️ WebSocket server not available for new user notification');
         }
       } catch (socketError) {
         console.error('WebSocket error in user post-save:', socketError);
@@ -188,19 +191,15 @@ userSchema.post('save', async function(doc, next) {
   next();
 });
 
-// Post-update hook for user actions (ban/suspend)
 userSchema.post('findOneAndUpdate', async function(doc, next) {
   try {
     if (doc) {
-      // Check if user was just banned
       const update = this.getUpdate();
       
       if (update.$set) {
-        // User banned
         if (update.$set.isBanned === true && !doc.isBanned) {
           console.log(`🚫 User banned: ${doc.name} (${doc.email})`);
           
-          // Emit WebSocket event
           try {
             const io = global.io;
             if (io) {
@@ -218,18 +217,15 @@ userSchema.post('findOneAndUpdate', async function(doc, next) {
                   banReason: update.$set.banReason || 'Not specified'
                 }
               });
-              console.log(`📢 WebSocket notification sent for banned user: ${doc.name}`);
             }
           } catch (socketError) {
             console.error('WebSocket error in user ban update:', socketError);
           }
         }
         
-        // User suspended
         if (update.$set.isSuspended === true && !doc.isSuspended) {
           console.log(`⏸️ User suspended: ${doc.name} (${doc.email})`);
           
-          // Emit WebSocket event
           try {
             const io = global.io;
             if (io) {
@@ -246,7 +242,6 @@ userSchema.post('findOneAndUpdate', async function(doc, next) {
                   userEmail: doc.email
                 }
               });
-              console.log(`📢 WebSocket notification sent for suspended user: ${doc.name}`);
             }
           } catch (socketError) {
             console.error('WebSocket error in user suspension update:', socketError);
@@ -273,14 +268,13 @@ userSchema.index({ favoriteAuthors: 1 });
 userSchema.index({ favoriteBooks: 1 });
 userSchema.index({ readingHabit: 1 });
 userSchema.index({ preferredFormats: 1 });
+userSchema.index({ blockedUsers: 1 });
 
-// Compound index for matching queries
 userSchema.index({ 
   favoriteGenres: 1, 
   favoriteAuthors: 1, 
   favoriteBooks: 1 
 });
-
 
 const User = mongoose.model('User', userSchema);
 

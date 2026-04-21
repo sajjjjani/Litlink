@@ -53,6 +53,11 @@
             50% { opacity: 0.7; }
         }
 
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
         .fade-in { animation: fadeIn 0.6s ease forwards; }
         .fade-in-up { animation: fadeInUp 0.8s ease forwards; }
         .scale-in { animation: scaleIn 0.6s ease forwards; }
@@ -352,6 +357,424 @@
             background: rgba(245, 230, 211, 0.1);
             border-color: #f5e6d3;
             transform: translateY(-2px);
+        }
+
+        .action-btn.read-now {
+            background: linear-gradient(135deg, #2d6a4f, #1b4332);
+            border-color: #2d6a4f;
+            color: #d8f3dc;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn.read-now:hover {
+            background: linear-gradient(135deg, #40916c, #2d6a4f);
+            border-color: #40916c;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 106, 79, 0.4);
+        }
+
+        .action-btn.read-now .read-badge {
+            font-size: 0.65rem;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== INLINE READER ===== */
+        .reader-overlay {
+            position: fixed;
+            inset: 0;
+            background: #1a0f0a;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .reader-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #2c1810;
+            border-bottom: 1px solid rgba(245,230,211,0.1);
+            flex-shrink: 0;
+            gap: 12px;
+        }
+
+        .reader-topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .reader-book-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f5e6d3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+
+        .reader-topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .reader-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1.5px solid;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .reader-btn.close-reader {
+            background: transparent;
+            border-color: rgba(245,230,211,0.25);
+            color: #f5e6d3;
+        }
+
+        .reader-btn.close-reader:hover { background: rgba(245,230,211,0.08); }
+
+        .reader-btn.open-tab {
+            background: rgba(200,155,60,0.15);
+            border-color: rgba(200,155,60,0.4);
+            color: #c89b3c;
+        }
+
+        .reader-btn.open-tab:hover { background: rgba(200,155,60,0.25); }
+
+        .reader-frame-wrap {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reader-frame-wrap iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        .reader-loading-screen {
+            position: absolute;
+            inset: 0;
+            background: #1a0f0a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            color: #d4b5a0;
+            font-size: 0.95rem;
+        }
+
+        .reader-spinner {
+            width: 44px;
+            height: 44px;
+            border: 4px solid rgba(200,155,60,0.2);
+            border-top-color: #c89b3c;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== NOT AVAILABLE / CHECKING MODALS ===== */
+        .noread-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .noread-modal {
+            background: #3d2617;
+            border: 2px solid rgba(245,230,211,0.12);
+            border-radius: 20px;
+            padding: 36px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            animation: scaleIn 0.3s ease;
+        }
+
+        .noread-modal-close {
+            position: absolute;
+            top: 14px; right: 16px;
+            background: none; border: none;
+            color: #d4b5a0; font-size: 1.4rem;
+            cursor: pointer; line-height: 1;
+        }
+
+        .noread-modal-close:hover { color: #f5e6d3; }
+
+        .noread-icon {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            background: rgba(245,230,211,0.07);
+            color: #d4b5a0; font-size: 1.6rem;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 18px;
+        }
+
+        .noread-modal h3 { font-size: 1.3rem; color: #f5e6d3; margin-bottom: 10px; }
+        .noread-modal p { color: #d4b5a0; font-size: 0.93rem; line-height: 1.6; margin-bottom: 22px; }
+
+        .noread-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+        .noread-btn {
+            padding: 11px 22px; border-radius: 10px;
+            font-weight: 600; font-size: 0.9rem; cursor: pointer;
+            border: 2px solid; display: inline-flex;
+            align-items: center; gap: 7px;
+            text-decoration: none; transition: all 0.2s;
+        }
+
+        .noread-btn.primary {
+            background: rgba(200,155,60,0.15);
+            border-color: rgba(200,155,60,0.4); color: #c89b3c;
+        }
+        .noread-btn.primary:hover { background: rgba(200,155,60,0.25); }
+
+        .noread-btn.ghost {
+            background: transparent;
+            border-color: rgba(245,230,211,0.2); color: #d4b5a0;
+        }
+        .noread-btn.ghost:hover { background: rgba(245,230,211,0.06); }
+
+        .noread-note {
+            margin-top: 18px; padding-top: 14px;
+            border-top: 1px solid rgba(245,230,211,0.08);
+            font-size: 0.78rem; color: #d4b5a0;
+        }
+
+        .checking-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            display: flex; align-items: center; justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .checking-box {
+            background: #3d2617;
+            border: 2px solid rgba(245,230,211,0.12);
+            border-radius: 16px; padding: 32px 40px;
+            text-align: center;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 14px;
+        }
+
+        .checking-box p { color: #d4b5a0; font-size: 0.95rem; }
+
+        /* ===== OLD READ MODAL (kept for reference, unused) ===== */
+        .read-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+            padding: 20px;
+        }
+
+        .read-modal {
+            background: #3d2617;
+            border: 2px solid rgba(245,230,211,0.15);
+            border-radius: 20px;
+            padding: 36px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            animation: scaleIn 0.35s ease;
+        }
+
+        .read-modal-close {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            background: none;
+            border: none;
+            color: #d4b5a0;
+            font-size: 1.4rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .read-modal-close:hover { color: #f5e6d3; }
+
+        .read-modal-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+
+        .read-modal-icon.available {
+            background: linear-gradient(135deg, #2d6a4f, #1b4332);
+            color: #d8f3dc;
+        }
+
+        .read-modal-icon.unavailable {
+            background: rgba(245,230,211,0.08);
+            color: #d4b5a0;
+        }
+
+        .read-modal-icon.loading-icon {
+            background: rgba(200,155,60,0.15);
+            color: #c89b3c;
+        }
+
+        .read-modal h3 {
+            font-size: 1.4rem;
+            color: #f5e6d3;
+            margin-bottom: 10px;
+        }
+
+        .read-modal p {
+            color: #d4b5a0;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+        }
+
+        .read-modal .editions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .edition-option {
+            background: rgba(245,230,211,0.05);
+            border: 1.5px solid rgba(245,230,211,0.15);
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-decoration: none;
+        }
+
+        .edition-option:hover {
+            background: rgba(45,106,79,0.2);
+            border-color: #2d6a4f;
+        }
+
+        .edition-info { flex: 1; }
+
+        .edition-title {
+            color: #f5e6d3;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 3px;
+        }
+
+        .edition-meta {
+            color: #d4b5a0;
+            font-size: 0.8rem;
+        }
+
+        .edition-arrow {
+            color: #40916c;
+            font-size: 1rem;
+        }
+
+        .read-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .read-modal-btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: 2px solid;
+            transition: all 0.25s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .read-modal-btn.green {
+            background: linear-gradient(135deg, #2d6a4f, #1b4332);
+            border-color: #2d6a4f;
+            color: #d8f3dc;
+        }
+
+        .read-modal-btn.green:hover {
+            background: linear-gradient(135deg, #40916c, #2d6a4f);
+        }
+
+        .read-modal-btn.outline {
+            background: transparent;
+            border-color: rgba(245,230,211,0.25);
+            color: #f5e6d3;
+        }
+
+        .read-modal-btn.outline:hover {
+            background: rgba(245,230,211,0.08);
+        }
+
+        .read-modal-spinner {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(200,155,60,0.3);
+            border-top-color: #c89b3c;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .availability-note {
+            font-size: 0.78rem;
+            color: #d4b5a0;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(245,230,211,0.1);
         }
 
         .book-description {
@@ -907,6 +1330,10 @@
                                 <button class="action-btn primary" onclick="addToLibrary()">
                                     <i class="fas fa-plus"></i> Add to Library
                                 </button>
+                                <button class="action-btn read-now" id="readNowBtn" onclick="openReadModal()">
+                                    <i class="fas fa-book-reader"></i> Read Now
+                                    <span class="read-badge">FREE</span>
+                                </button>
                                 <button class="action-btn secondary" onclick="addToReadingList()">
                                     <i class="fas fa-bookmark"></i> Want to Read
                                 </button>
@@ -1415,6 +1842,215 @@ function displayBookDetails(data) {
             setupLogout();
         });
 
+        let currentInlinePdfBlobUrl = null;
+
+        // ===== READ NOW — INLINE READER =====
+        // Finds the book's Internet Archive identifier from its Open Library editions,
+        // then embeds archive.org's built-in flipbook/reader directly on the page
+        // via an iframe. No redirect, no new tab — reads right here.
+
+        async function openReadModal() {
+            if (!bookId) return;
+
+            const btn = document.getElementById('readNowBtn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finding…';
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('litlink_token') || localStorage.getItem('token');
+
+                // 0. First try local backend PDF retrieval for this book.
+                if (token) {
+                    try {
+                        const pdfRes = await fetch(`http://localhost:5002/api/books/${bookId}/pdf`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (pdfRes.ok) {
+                            const pdfBlob = await pdfRes.blob();
+                            const blobUrl = URL.createObjectURL(pdfBlob);
+                            currentInlinePdfBlobUrl = blobUrl;
+                            openInlineReader(null, blobUrl, null, true);
+                            return;
+                        }
+                    } catch (pdfError) {
+                        console.warn('Local PDF fetch failed, falling back to archive source:', pdfError);
+                    }
+                }
+
+                // 1. Fetch editions
+                const edRes = await fetch(
+                    `https://openlibrary.org/works/${bookId}/editions.json?limit=30`
+                );
+                const edData = edRes.ok ? await edRes.json() : null;
+                const editions = edData?.entries || [];
+
+                // 2. Collect IA identifiers from all editions
+                const iaIds = [];
+                for (const ed of editions) {
+                    const ids = ed.ocaid
+                        ? [ed.ocaid]
+                        : (Array.isArray(ed.ia) ? ed.ia : ed.ia ? [ed.ia] : []);
+                    iaIds.push(...ids.filter(Boolean));
+                    if (iaIds.length >= 10) break;
+                }
+
+                // 3. Find first IA item that has a PDF or ePub (public-domain items do)
+                let foundIaId = null;
+                let pdfUrl = null;
+                let epubUrl = null;
+
+                for (const iaId of iaIds) {
+                    try {
+                        const metaRes = await fetch(`https://archive.org/metadata/${iaId}/files`);
+                        if (!metaRes.ok) continue;
+                        const files = (await metaRes.json())?.result || [];
+
+                        const pdf  = files.find(f => f.name?.endsWith('.pdf')  && f.source === 'original')
+                                  || files.find(f => f.name?.endsWith('.pdf'));
+                        const epub = files.find(f => f.name?.endsWith('.epub') && f.source === 'original')
+                                  || files.find(f => f.name?.endsWith('.epub'));
+
+                        if (pdf || epub) {
+                            foundIaId = iaId;
+                            if (pdf)  pdfUrl  = `https://archive.org/download/${iaId}/${encodeURIComponent(pdf.name)}`;
+                            if (epub) epubUrl = `https://archive.org/download/${iaId}/${encodeURIComponent(epub.name)}`;
+                            break;
+                        }
+                        // Even if no downloadable file, IA may still have the flipbook reader
+                        if (!foundIaId) foundIaId = iaId;
+                    } catch (_) { continue; }
+                }
+
+                if (foundIaId) {
+                    openInlineReader(foundIaId, pdfUrl, epubUrl, false);
+                } else {
+                    showNotAvailableModal();
+                }
+
+            } catch (err) {
+                console.error('Read check failed:', err);
+                showNotAvailableModal();
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+
+        // Opens the book right on the page in a full-screen iframe
+        function openInlineReader(iaId, pdfUrl, epubUrl, isLocalPdf = false) {
+            document.getElementById('readerOverlay')?.remove();
+
+            const title = bookData?.title || 'Book Reader';
+
+            // archive.org/embed gives the full BookReader UI inside an iframe
+            const embedUrl = isLocalPdf
+                ? pdfUrl
+                : `https://archive.org/embed/${iaId}?ui=embed&view=theater`;
+            const detailUrl = iaId ? `https://archive.org/details/${iaId}` : null;
+
+            const overlay = document.createElement('div');
+            overlay.id = 'readerOverlay';
+            overlay.className = 'reader-overlay';
+
+            // Build download links if files are available
+            const downloadLinks = [
+                pdfUrl  ? `<a class="reader-btn open-tab" href="${pdfUrl}"  download><i class="fas fa-file-pdf"></i> Download PDF</a>`  : '',
+                epubUrl ? `<a class="reader-btn open-tab" href="${epubUrl}" download><i class="fas fa-file-alt"></i> Download ePub</a>` : ''
+            ].filter(Boolean).join('');
+
+            overlay.innerHTML = `
+                <div class="reader-topbar">
+                    <div class="reader-topbar-left">
+                        <i class="fas fa-book-open" style="color:#c89b3c;font-size:1.1rem;flex-shrink:0"></i>
+                        <span class="reader-book-title">${title}</span>
+                    </div>
+                    <div class="reader-topbar-right">
+                        ${downloadLinks}
+                        ${detailUrl ? `<a class="reader-btn open-tab" href="${detailUrl}" target="_blank" rel="noopener">
+                            <i class="fas fa-external-link-alt"></i> Open on Archive.org
+                        </a>` : ''}
+                        <button class="reader-btn close-reader" onclick="closeInlineReader()">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+                <div class="reader-frame-wrap">
+                    <div class="reader-loading-screen" id="readerLoadingScreen">
+                        <div class="reader-spinner"></div>
+                        <p>Loading reader — this may take a moment…</p>
+                    </div>
+                    <iframe
+                        id="readerIframe"
+                        src="${embedUrl}"
+                        allowfullscreen
+                        allow="fullscreen"
+                        onload="document.getElementById('readerLoadingScreen').style.display='none'">
+                    </iframe>
+                </div>`;
+
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+
+            const esc = e => {
+                if (e.key === 'Escape') { closeInlineReader(); document.removeEventListener('keydown', esc); }
+            };
+            document.addEventListener('keydown', esc);
+        }
+
+        function closeInlineReader() {
+            const overlay = document.getElementById('readerOverlay');
+            if (overlay) {
+                overlay.style.animation = 'fadeOut 0.25s ease forwards';
+                setTimeout(() => {
+                    overlay.remove();
+                    document.body.style.overflow = '';
+                    if (currentInlinePdfBlobUrl) {
+                        URL.revokeObjectURL(currentInlinePdfBlobUrl);
+                        currentInlinePdfBlobUrl = null;
+                    }
+                }, 250);
+            }
+        }
+
+        function showNotAvailableModal() {
+            document.getElementById('noreadOverlay')?.remove();
+
+            const title = bookData?.title || 'this book';
+            const olUrl = `https://openlibrary.org/works/${bookId}`;
+
+            const overlay = document.createElement('div');
+            overlay.id = 'noreadOverlay';
+            overlay.className = 'noread-overlay';
+            overlay.addEventListener('click', e => { if (e.target === overlay) closeNotAvailableModal(); });
+
+            overlay.innerHTML = `
+                <div class="noread-modal">
+                    <button class="noread-modal-close" onclick="closeNotAvailableModal()">&times;</button>
+                    <div class="noread-icon"><i class="fas fa-lock"></i></div>
+                    <h3>Not available to read</h3>
+                    <p>No readable digital edition was found for <strong style="color:#f5e6d3">${title}</strong>. This is common for modern, in-print books that are still under copyright.</p>
+                    <div class="noread-actions">
+                        <a class="noread-btn primary" href="${olUrl}" target="_blank" rel="noopener">
+                            <i class="fas fa-search"></i> Check Open Library
+                        </a>
+                        <button class="noread-btn ghost" onclick="closeNotAvailableModal()">Close</button>
+                    </div>
+                    <div class="noread-note">
+                        <i class="fas fa-lightbulb"></i>
+                        Tip: The <strong>Libby</strong> app lets you borrow ebooks free with a library card.
+                    </div>
+                </div>`;
+
+            document.body.appendChild(overlay);
+            const esc = e => { if (e.key === 'Escape') { closeNotAvailableModal(); document.removeEventListener('keydown', esc); } };
+            document.addEventListener('keydown', esc);
+        }
+
+        function closeNotAvailableModal() {
+            document.getElementById('noreadOverlay')?.remove();
+        }
+
         // Make functions global
         window.switchTab = switchTab;
         window.toggleDescription = toggleDescription;
@@ -1424,6 +2060,9 @@ function displayBookDetails(data) {
         window.viewAuthor = viewAuthor;
         window.loadBookDetails = loadBookDetails;
         window.closeCustomModal = closeCustomModal;
+        window.openReadModal = openReadModal;
+        window.closeInlineReader = closeInlineReader;
+        window.closeNotAvailableModal = closeNotAvailableModal;
     </script>
 </body>
 </html>

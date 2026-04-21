@@ -7,6 +7,423 @@
     <link rel="stylesheet" href="../Homepage/style.css">
     <link rel="stylesheet" href="profile.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Additional spacious styles */
+        .settings-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .settings-header {
+            margin-bottom: 2.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(224, 185, 115, 0.2);
+        }
+
+        .settings-header h1 {
+            font-size: 2rem;
+            color: #2c1810;
+            margin-bottom: 0.5rem;
+        }
+
+        .settings-header p {
+            color: #5c3a28;
+            font-size: 1rem;
+        }
+
+        .settings-section {
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .settings-section-header {
+            padding: 1.5rem 2rem;
+            background: linear-gradient(135deg, #f5f0e8 0%, #faf6ef 100%);
+            border-bottom: 1px solid rgba(224, 185, 115, 0.2);
+        }
+
+        .settings-section-header h2 {
+            font-size: 1.25rem;
+            color: #2c1810;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .settings-section-header h2 i {
+            color: #e0b973;
+            font-size: 1.35rem;
+        }
+
+        .settings-content {
+            padding: 1.5rem 2rem;
+        }
+
+        .settings-item-large {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 0;
+            border-bottom: 1px solid rgba(139, 111, 71, 0.1);
+        }
+
+        .settings-item-large:last-child {
+            border-bottom: none;
+        }
+
+        .settings-item-info {
+            flex: 1;
+        }
+
+        .settings-item-info label {
+            font-weight: 600;
+            color: #2c1810;
+            font-size: 1rem;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .settings-value {
+            color: #5c3a28;
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .settings-description {
+            color: #8b6f47;
+            font-size: 0.85rem;
+            margin: 0.25rem 0 0 0;
+        }
+
+        .action-btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .action-btn.edit {
+            background: #e0b973;
+            color: #2c1810;
+        }
+
+        .action-btn.edit:hover {
+            background: #d4a657;
+            transform: translateY(-1px);
+        }
+
+        .action-btn.deactivate {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .action-btn.deactivate:hover {
+            background: #d97706;
+        }
+
+        .action-btn.delete {
+            background: #dc2626;
+            color: white;
+        }
+
+        .action-btn.delete:hover {
+            background: #b91c1c;
+        }
+
+        .settings-select {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(139, 111, 71, 0.3);
+            background: white;
+            color: #2c1810;
+            font-size: 0.9rem;
+            cursor: pointer;
+            min-width: 160px;
+        }
+
+        .settings-select:focus {
+            outline: none;
+            border-color: #e0b973;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #e0b973;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Blocked Users List */
+        .blocked-users-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .blocked-user-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: rgba(224, 185, 115, 0.05);
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+
+        .blocked-user-item:hover {
+            background: rgba(224, 185, 115, 0.1);
+        }
+
+        .blocked-user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .blocked-user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #e0b973;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .blocked-user-details h4 {
+            margin: 0 0 0.25rem 0;
+            color: #2c1810;
+            font-size: 1rem;
+        }
+
+        .blocked-user-details p {
+            margin: 0;
+            color: #8b6f47;
+            font-size: 0.85rem;
+        }
+
+        .unblock-btn {
+            padding: 0.5rem 1rem;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .unblock-btn:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+        }
+
+        .empty-blocked {
+            text-align: center;
+            padding: 2rem;
+            color: #8b6f47;
+        }
+
+        .empty-blocked i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .signup-modal {
+            background: white;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(139, 111, 71, 0.2);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #2c1810;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #8b6f47;
+        }
+
+        .warning-message {
+            background: #fef3c7;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 1.5rem;
+        }
+
+        .warning-message ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .form-group {
+            padding: 0 1.5rem 1rem 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #2c1810;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(139, 111, 71, 0.3);
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #e0b973;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 1.5rem 1.5rem;
+        }
+
+        .cancel-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: #e5e7eb;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .save-btn, .delete-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .save-btn {
+            background: #e0b973;
+            color: #2c1810;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: 1rem;
+            }
+            
+            .settings-section-header,
+            .settings-content {
+                padding: 1rem;
+            }
+            
+            .settings-item-large {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .action-btn, .settings-select {
+                width: 100%;
+            }
+            
+            .blocked-user-item {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .blocked-user-info {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -21,7 +438,7 @@
                     <i class="fas fa-home"></i> 
                     <span class="nav-text">Home</span>
                 </a>
-                <a href="#" class="nav-link" title="Messages" onclick="showComingSoon('Messages')">
+                <a href="../Chat/chat.html" class="nav-link" title="Messages">
                     <i class="fas fa-envelope"></i> 
                     <span class="nav-text">Messages</span>
                 </a>
@@ -33,7 +450,7 @@
                     <i class="fas fa-microphone"></i> 
                     <span class="nav-text">Voice Rooms</span>
                 </a>
-                <a href="profile.html" class="nav-link" title="Profile">
+                <a href="../Profile/profile.html" class="nav-link" title="Profile">
                     <i class="fas fa-user"></i> 
                     <span class="nav-text">Profile</span>
                 </a>
@@ -82,10 +499,10 @@
     </nav>
 
     <!-- Settings Content -->
-    <div class="profile-container">
+    <div class="settings-container">
         <div class="settings-header">
             <h1><i class="fas fa-cog"></i> Settings</h1>
-            <p>Manage your account and preferences</p>
+            <p>Manage your account, privacy, and blocked users</p>
         </div>
 
         <div class="settings-sections">
@@ -139,6 +556,22 @@
                             <option value="followers">Followers only</option>
                             <option value="private">Private</option>
                         </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blocked Users Section -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-ban"></i> Blocked Users</h2>
+                </div>
+                <div class="settings-content">
+                    <div id="blockedUsersList" class="blocked-users-list">
+                        <div class="empty-blocked">
+                            <i class="fas fa-user-slash"></i>
+                            <p>No blocked users</p>
+                            <small>Users you block will appear here</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -219,10 +652,10 @@
 
     <!-- Delete Account Modal -->
     <div class="modal-overlay" id="deleteAccountModal">
-        <div class="signup-modal" style="max-width: 500px;">
+        <div class="signup-modal">
             <div class="modal-header">
                 <h2><i class="fas fa-exclamation-triangle"></i> Delete Account</h2>
-                <button class="close-btn">&times;</button>
+                <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
             </div>
             <div class="warning-message">
                 <p><strong>⚠️ Warning: This action cannot be undone!</strong></p>
@@ -248,7 +681,7 @@
 
     <!-- Change Password Modal -->
     <div class="modal-overlay" id="changePasswordModal">
-        <div class="signup-modal" style="max-width: 500px;">
+        <div class="signup-modal">
             <div class="modal-header">
                 <h2><i class="fas fa-key"></i> Change Password</h2>
                 <button class="close-btn" onclick="closePasswordModal()">&times;</button>
@@ -276,7 +709,7 @@
 
     <!-- Change Email Modal -->
     <div class="modal-overlay" id="changeEmailModal">
-        <div class="signup-modal" style="max-width: 500px;">
+        <div class="signup-modal">
             <div class="modal-header">
                 <h2><i class="fas fa-envelope"></i> Change Email</h2>
                 <button class="close-btn" onclick="closeEmailModal()">&times;</button>
@@ -304,4 +737,3 @@
     <script src="settings.js"></script>
 </body>
 </html>
-

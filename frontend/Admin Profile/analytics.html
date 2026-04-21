@@ -232,6 +232,21 @@
     z-index: 9999; font-size: 18px; color: var(--gold);
   }
 
+  .error-container {
+    text-align: center; padding: 60px; color: var(--text-sec);
+  }
+  .error-container svg {
+    width: 48px; height: 48px; stroke: currentColor; stroke-width: 1.5;
+  }
+  .error-container p {
+    margin-top: 16px; margin-bottom: 20px;
+  }
+  .retry-btn {
+    padding: 10px 20px; background: var(--gold); border: none;
+    border-radius: 8px; color: var(--bg); cursor: pointer;
+    font-family: 'Inter', sans-serif; font-weight: 600;
+  }
+
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
@@ -271,6 +286,7 @@ let authToken = null;
 let currentUser = null;
 let activityChart = null;
 let currentFilter = '30d';
+let refreshInterval = null;
 
 function goBack() {
   window.location.href = 'adprofile.html';
@@ -297,65 +313,168 @@ async function checkAuth() {
   return true;
 }
 
+async function fetchWithAuth(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+  
+  if (response.status === 401) {
+    showToast('Session expired. Please login again.', 'error');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setTimeout(() => {
+      window.location.href = '../login.html';
+    }, 1500);
+    throw new Error('Unauthorized');
+  }
+  
+  return response;
+}
+
 async function loadAnalytics() {
   const content = document.getElementById('analyticsContent');
   content.innerHTML = '<div class="loading-overlay">Loading analytics data...</div>';
   
   try {
-    // Fetch all analytics data in parallel
-    const [dashboardStats, userActivity, genreStats, topUsers, trendingDiscussions, voiceRoomStats] = await Promise.all([
-      fetch(`${API_BASE}/admin/dashboard/stats`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json()),
-      fetch(`${API_BASE}/admin/analytics/activity?days=${currentFilter === '7d' ? 7 : 30}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json()),
-      fetch(`${API_BASE}/discussions/stats/genres`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json()),
-      fetch(`${API_BASE}/admin/users?limit=5&sortBy=activity`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json()),
-      fetch(`${API_BASE}/discussions/threads?limit=5&sortBy=replies`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json()),
-      fetch(`${API_BASE}/voice-rooms/rooms/stats`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      }).then(r => r.json())
+    const days = currentFilter === '7d' ? 7 : 30;
+    
+    // Fetch ALL real data from backend
+    const [
+      dashboardStatsRes,
+      activityDataRes,
+      topUsersRes,
+      discussionsRes,
+      voiceRoomsRes,
+      reportsRes,
+      filterWordsRes,
+      usersListRes
+    ] = await Promise.all([
+      fetchWithAuth(`${API_BASE}/admin/dashboard/stats`),
+      fetchWithAuth(`${API_BASE}/analytics/activity?days=${days}`),
+      fetchWithAuth(`${API_BASE}/analytics/activity/top-users?days=${days}`),
+      fetchWithAuth(`${API_BASE}/discussions/threads?limit=10&sortBy=replies`),
+      fetchWithAuth(`${API_BASE}/voice-rooms/rooms/live`),
+      fetchWithAuth(`${API_BASE}/admin/reports?limit=50`),
+      fetchWithAuth(`${API_BASE}/admin/filter-words?limit=100`),
+      fetchWithAuth(`${API_BASE}/admin/users?limit=500&page=1`)
     ]);
     
+    const dashboardStats = await dashboardStatsRes.json();
+    const activityData = await activityDataRes.json();
+    const topUsersData = await topUsersRes.json();
+    const discussionsData = await discussionsRes.json();
+    const voiceRoomsData = await voiceRoomsRes.json();
+    const reportsData = await reportsRes.json();
+    const filterWordsData = await filterWordsRes.json();
+    const usersData = await usersListRes.json();
+    
+    // Calculate genre stats from real user data
+    const genreStats = calculateGenreStats(usersData.users || []);
+    
+    // Get voice room stats
+    const voiceStats = {
+      liveRooms: (voiceRoomsData.rooms || []).length,
+      activeParticipants: (voiceRoomsData.rooms || []).reduce((sum, room) => sum + (room.participantCount || 0), 0),
+      totalRooms: voiceRoomsData.total || 0
+    };
+    
+    // Get report stats
+    const reportStats = {
+      pending: (reportsData.reports || []).filter(r => r.status === 'pending').length,
+      resolved: (reportsData.reports || []).filter(r => r.status === 'resolved').length,
+      total: reportsData.stats?.total || 0
+    };
+    
     renderAnalytics({
-      dashboardStats: dashboardStats.success ? dashboardStats : null,
-      userActivity: userActivity.success ? userActivity : null,
-      genreStats: genreStats.success ? genreStats : null,
-      topUsers: topUsers.success ? topUsers : null,
-      trendingDiscussions: trendingDiscussions.success ? trendingDiscussions : null,
-      voiceRoomStats: voiceRoomStats.success ? voiceRoomStats : null
+      dashboardStats: dashboardStats.success ? dashboardStats.stats : null,
+      activityData: activityData.success ? activityData.data : null,
+      topUsers: topUsersData.success ? topUsersData.users : [],
+      genreStats,
+      trendingDiscussions: (discussionsData.threads || []).slice(0, 5),
+      voiceStats,
+      reportStats,
+      filterWordsCount: filterWordsData.stats?.total || 0,
+      totalUsers: usersData.pagination?.totalUsers || 0
     });
     
   } catch (error) {
     console.error('Error loading analytics:', error);
-    content.innerHTML = `
-      <div style="text-align: center; padding: 60px; color: var(--text-sec);">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    document.getElementById('analyticsContent').innerHTML = `
+      <div class="error-container">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
-        <p style="margin-top: 16px;">Failed to load analytics data. Please refresh the page.</p>
-        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: var(--gold); border: none; border-radius: 8px; color: var(--bg); cursor: pointer;">Retry</button>
+        <p>Failed to load analytics data. ${error.message}</p>
+        <button class="retry-btn" onclick="location.reload()">Retry</button>
       </div>
     `;
   }
 }
 
+function calculateGenreStats(users) {
+  const genreCount = new Map();
+  let total = 0;
+  
+  users.forEach(user => {
+    if (user.favoriteGenres && Array.isArray(user.favoriteGenres)) {
+      user.favoriteGenres.forEach(genre => {
+        if (genre && genre.trim()) {
+          genreCount.set(genre, (genreCount.get(genre) || 0) + 1);
+          total++;
+        }
+      });
+    }
+  });
+  
+  const genres = Array.from(genreCount.entries())
+    .map(([name, count]) => ({
+      name,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  
+  return genres;
+}
+
 function renderAnalytics(data) {
-  const stats = data.dashboardStats?.stats || {};
-  const activity = data.userActivity?.activity || [];
-  const genres = data.genreStats?.genres || [];
-  const users = data.topUsers?.users || [];
-  const discussions = data.trendingDiscussions?.threads || [];
-  const voiceStats = data.voiceRoomStats?.stats || {};
+  const stats = data.dashboardStats || {};
+  const activityData = data.activityData;
+  const genres = data.genreStats || [];
+  const topUsers = data.topUsers || [];
+  const discussions = data.trendingDiscussions || [];
+  const voiceStats = data.voiceStats || { liveRooms: 0, activeParticipants: 0, totalRooms: 0 };
+  const reportStats = data.reportStats || { pending: 0, resolved: 0, total: 0 };
+  const totalUsers = data.totalUsers || 0;
+  
+  // Get real activity summary
+  const activitySummary = activityData?.summary || {
+    totalUsers: totalUsers,
+    avgDailyActiveUsers: 0,
+    totalNewUsers: 0,
+    userGrowthPercent: 0,
+    engagementRate: 0
+  };
+  
+  const metrics = activityData?.metrics || {
+    totalMessages: 0,
+    totalDiscussions: 0,
+    totalReplies: 0,
+    totalVoiceJoins: 0,
+    totalMatches: 0,
+    totalBooksAdded: 0
+  };
+  
+  // Calculate active percentage
+  const activePercentage = totalUsers > 0 ? ((stats.activeToday || 0) / totalUsers * 100).toFixed(1) : 0;
   
   const html = `
     <!-- Metrics Grid -->
@@ -366,11 +485,14 @@ function renderAnalytics(data) {
             <div class="metric-icon">
               <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <span class="badge up"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>+${Math.floor(Math.random() * 20) + 5}%</span>
+            <span class="badge ${activitySummary.userGrowthPercent >= 0 ? 'up' : 'down'}">
+              <svg viewBox="0 0 24 24"><polyline points="${activitySummary.userGrowthPercent >= 0 ? '23 6 13.5 15.5 8.5 10.5 1 18' : '23 18 13.5 8.5 8.5 13.5 1 6'}"/><polyline points="${activitySummary.userGrowthPercent >= 0 ? '17 6 23 6 23 12' : '17 18 23 18 23 12'}"/></svg>
+              ${Math.abs(activitySummary.userGrowthPercent).toFixed(1)}%
+            </span>
           </div>
           <div>
-            <div class="metric-label">Active Users</div>
-            <div class="metric-value">${(stats.activeToday || 0).toLocaleString()}</div>
+            <div class="metric-label">Total Users</div>
+            <div class="metric-value">${totalUsers.toLocaleString()}</div>
           </div>
         </div>
         
@@ -379,11 +501,14 @@ function renderAnalytics(data) {
             <div class="metric-icon">
               <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             </div>
-            <span class="badge up"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>+${Math.floor(Math.random() * 15) + 5}%</span>
+            <span class="badge up">
+              <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              ${activePercentage}%
+            </span>
           </div>
           <div>
-            <div class="metric-label">New Signups</div>
-            <div class="metric-value">${(stats.joinedToday || 0).toLocaleString()}</div>
+            <div class="metric-label">Active Today</div>
+            <div class="metric-value">${(stats.activeToday || 0).toLocaleString()}</div>
           </div>
         </div>
         
@@ -392,11 +517,14 @@ function renderAnalytics(data) {
             <div class="metric-icon">
               <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </div>
-            <span class="badge up"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>+${Math.floor(Math.random() * 25) + 10}%</span>
+            <span class="badge up">
+              <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              ${activitySummary.engagementRate}%
+            </span>
           </div>
           <div>
-            <div class="metric-label">Active Matches</div>
-            <div class="metric-value">${(stats.activeMatches || 0).toLocaleString()}</div>
+            <div class="metric-label">Engagement Rate</div>
+            <div class="metric-value">${activitySummary.engagementRate}%</div>
           </div>
         </div>
         
@@ -405,11 +533,14 @@ function renderAnalytics(data) {
             <div class="metric-icon">
               <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <span class="badge up"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>+${Math.floor(Math.random() * 30) + 15}%</span>
+            <span class="badge ${reportStats.pending > 0 ? 'up' : 'down'}">
+              <svg viewBox="0 0 24 24"><polyline points="${reportStats.pending > 0 ? '23 6 13.5 15.5 8.5 10.5 1 18' : '23 18 13.5 8.5 8.5 13.5 1 6'}"/><polyline points="${reportStats.pending > 0 ? '17 6 23 6 23 12' : '17 18 23 18 23 12'}"/></svg>
+              ${reportStats.pending}
+            </span>
           </div>
           <div>
-            <div class="metric-label">Messages Sent</div>
-            <div class="metric-value">${(stats.messagesToday || 0).toLocaleString() || '0'}</div>
+            <div class="metric-label">Pending Reports</div>
+            <div class="metric-value">${reportStats.pending.toLocaleString()}</div>
           </div>
         </div>
         
@@ -418,66 +549,66 @@ function renderAnalytics(data) {
             <div class="metric-icon">
               <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </div>
-            <span class="badge ${Math.random() > 0.5 ? 'up' : 'down'}">
-              <svg viewBox="0 0 24 24"><polyline points="${Math.random() > 0.5 ? '23 6 13.5 15.5 8.5 10.5 1 18' : '23 18 13.5 8.5 8.5 13.5 1 6'}"/><polyline points="${Math.random() > 0.5 ? '17 6 23 6 23 12' : '17 18 23 18 23 12'}"/></svg>
-              ${Math.floor(Math.random() * 15) + 5}%
+            <span class="badge ${voiceStats.liveRooms > 0 ? 'up' : 'down'}">
+              <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              ${voiceStats.liveRooms} live
             </span>
           </div>
           <div>
-            <div class="metric-label">Voice Room Joins</div>
-            <div class="metric-value">${(voiceStats.activeParticipants || 0).toLocaleString()}</div>
+            <div class="metric-label">Voice Participants</div>
+            <div class="metric-value">${voiceStats.activeParticipants.toLocaleString()}</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Chart -->
+    <!-- Chart - REAL DATA -->
     <section>
       <div class="chart-card">
-        <h2>User Activity</h2>
-        <p>Active users over the last ${currentFilter === '7d' ? '7 days' : '30 days'}</p>
+        <h2>User Growth & Activity</h2>
+        <p>Real user data over the last ${currentFilter === '7d' ? '7 days' : '30 days'} (${activitySummary.totalNewUsers.toLocaleString()} new users, ${activitySummary.avgDailyActiveUsers.toLocaleString()} avg daily active)</p>
         <div class="chart-wrap">
           <canvas id="activityChart"></canvas>
         </div>
       </div>
     </section>
 
-    <!-- Feature Usage -->
+    <!-- Feature Usage - REAL METRICS -->
     <section>
-      <h2 class="section-title">Feature Usage</h2>
+      <h2 class="section-title">Platform Activity Metrics</h2>
       <div class="feature-grid">
         <div class="feature-card">
           <div class="feature-header">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <span class="feature-title">Chat Messages</span>
+            <span class="feature-title">Messages & Discussions</span>
           </div>
-          <div><span class="feature-stat">${(stats.messagesToday || 0).toLocaleString()}</span><span class="feature-unit">today</span></div>
-          <div class="feature-secondary up">+${Math.floor(Math.random() * 20) + 10}% vs last week</div>
-          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(85, 50 + Math.random() * 40)}"></div></div>
+          <div><span class="feature-stat">${metrics.totalMessages.toLocaleString()}</span><span class="feature-unit">messages</span></div>
+          <div class="feature-secondary up">${metrics.totalDiscussions + metrics.totalReplies} posts & replies</div>
+          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(100, (metrics.totalMessages / Math.max(1, metrics.totalMessages + metrics.totalDiscussions)) * 100)}"></div></div>
         </div>
         <div class="feature-card">
           <div class="feature-header">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             </div>
-            <span class="feature-title">Discussion Posts</span>
+            <span class="feature-title">Community Engagement</span>
           </div>
-          <div><span class="feature-stat">${(stats.discussionPosts || 0).toLocaleString() || '0'}</span><span class="feature-unit">total</span></div>
-          <div class="feature-secondary up">${Math.floor(Math.random() * 30) + 20} new posts</div>
-          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(75, 40 + Math.random() * 35)}"></div></div>
+          <div><span class="feature-stat">${metrics.totalDiscussions}</span><span class="feature-unit">discussions</span></div>
+          <div class="feature-secondary up">${metrics.totalReplies} replies given</div>
+          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(100, (metrics.totalReplies / Math.max(1, metrics.totalDiscussions)) * 20)}"></div></div>
         </div>
         <div class="feature-card">
           <div class="feature-header">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </div>
-            <span class="feature-title">Voice Rooms</span>
+            <span class="feature-title">Voice & Matching</span>
           </div>
-          <div><span class="feature-stat">${voiceStats.liveRooms || 0}</span><span class="feature-unit">live rooms</span></div>
-          <div class="feature-secondary ${voiceStats.activeParticipants > 0 ? 'up' : 'down'}">${voiceStats.activeParticipants || 0} participants</div>
-          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(70, (voiceStats.activeParticipants / 100) * 100 || 0)}"></div></div>
+          <div><span class="feature-stat">${metrics.totalVoiceJoins}</span><span class="feature-unit">voice joins</span></div>
+          <div class="feature-secondary up">${metrics.totalMatches} matches made</div>
+          <div class="mini-bar"><div class="mini-bar-fill" data-width="${Math.min(100, (metrics.totalVoiceJoins / Math.max(1, metrics.totalMatches)) * 50)}"></div></div>
         </div>
       </div>
     </section>
@@ -489,15 +620,15 @@ function renderAnalytics(data) {
         <div class="insight-card">
           <div class="insight-card-header">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <h3>Top Active Users</h3>
+            <h3>Most Active Users</h3>
           </div>
-          ${users.length > 0 ? users.slice(0, 4).map((user, i) => `
+          ${topUsers.length > 0 ? topUsers.slice(0, 4).map((userData, i) => `
             <div class="user-row">
               <div class="user-info">
-                <div class="avatar" style="background: ${['#7A4432', '#6B3828', '#8B5A44', '#5A2E1F'][i]}">${(user.name || 'U').charAt(0).toUpperCase()}</div>
-                <span class="user-name">${user.name || 'Unknown'}</span>
+                <div class="avatar" style="background: ${['#7A4432', '#6B3828', '#8B5A44', '#5A2E1F'][i]}">${(userData.user?.name || 'U').charAt(0).toUpperCase()}</div>
+                <span class="user-name">${userData.user?.name || 'Unknown'}</span>
               </div>
-              <span class="user-count">${user.activityScore || 0} points</span>
+              <span class="user-count">${userData.stats?.activityScore || 0} pts</span>
             </div>
           `).join('') : '<div class="user-row">No user data available</div>'}
         </div>
@@ -505,7 +636,7 @@ function renderAnalytics(data) {
         <div class="insight-card">
           <div class="insight-card-header">
             <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            <h3>Most Active Genres</h3>
+            <h3>Popular Genres</h3>
           </div>
           ${genres.length > 0 ? genres.slice(0, 4).map(genre => `
             <div class="genre-row">
@@ -522,8 +653,8 @@ function renderAnalytics(data) {
           </div>
           ${discussions.length > 0 ? discussions.slice(0, 3).map(disc => `
             <div class="disc-row">
-              <div class="disc-title">${disc.title || 'Untitled'}</div>
-              <div class="disc-replies">${disc.replyCount || 0} replies</div>
+              <div class="disc-title" title="${disc.title || 'Untitled'}">${disc.title || 'Untitled'}</div>
+              <div class="disc-replies">${disc.replyCount || 0} replies • ${disc.viewCount || 0} views</div>
             </div>
           `).join('') : '<div class="disc-row">No discussions available</div>'}
         </div>
@@ -531,19 +662,19 @@ function renderAnalytics(data) {
         <div class="insight-card">
           <div class="insight-card-header">
             <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <h3>Voice Room Stats</h3>
+            <h3>Quick Stats</h3>
           </div>
           <div class="match-row">
-            <div class="match-names"><span>Live Rooms</span></div>
-            <span class="match-pct">${voiceStats.liveRooms || 0}</span>
+            <div class="match-names"><span>Books Added</span></div>
+            <span class="match-pct">${metrics.totalBooksAdded.toLocaleString()}</span>
           </div>
           <div class="match-row">
-            <div class="match-names"><span>Active Participants</span></div>
-            <span class="match-pct">${voiceStats.activeParticipants || 0}</span>
+            <div class="match-names"><span>Active Voice Rooms</span></div>
+            <span class="match-pct">${voiceStats.liveRooms}</span>
           </div>
           <div class="match-row">
-            <div class="match-names"><span>Total Rooms Created</span></div>
-            <span class="match-pct">${voiceStats.totalRooms || 0}</span>
+            <div class="match-names"><span>Reports Resolved</span></div>
+            <span class="match-pct">${reportStats.total > 0 ? Math.round((reportStats.resolved / reportStats.total) * 100) : 0}%</span>
           </div>
         </div>
       </div>
@@ -556,18 +687,20 @@ function renderAnalytics(data) {
         <h2>Smart Insights</h2>
       </div>
       <div class="insights-grid">
-        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><p class="smart-text">User engagement increased by ${Math.floor(Math.random() * 30) + 10}% this week.</p></div></div>
-        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p class="smart-text">Voice rooms are growing! ${voiceStats.liveRooms || 0} active rooms with ${voiceStats.activeParticipants || 0} participants.</p></div></div>
-        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p class="smart-text">Peak activity detected at 8 PM daily. Optimal time for announcements.</p></div></div>
-        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><p class="smart-text">New user retention up ${Math.floor(Math.random() * 20) + 10}% after community features launch.</p></div></div>
+        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><p class="smart-text">Total community: ${totalUsers.toLocaleString()} readers! ${activitySummary.totalNewUsers.toLocaleString()} new in last ${currentFilter}.</p></div></div>
+        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p class="smart-text">Voice rooms: ${voiceStats.liveRooms} active with ${voiceStats.activeParticipants} participants. ${metrics.totalVoiceJoins} total joins.</p></div></div>
+        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p class="smart-text">Engagement rate: ${activitySummary.engagementRate}% active users. ${metrics.totalMessages.toLocaleString()} messages sent!</p></div></div>
+        <div class="smart-card"><div class="smart-inner"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><p class="smart-text">Moderation: ${reportStats.pending} reports need review. ${reportStats.total} total reports processed.</p></div></div>
       </div>
     </section>
   `;
   
   document.getElementById('analyticsContent').innerHTML = html;
   
-  // Initialize chart
-  initChart(activity);
+  // Initialize chart with REAL activity data
+  if (activityData?.dailyData) {
+    initChartWithRealData(activityData.dailyData);
+  }
   
   // Animate bars
   setTimeout(() => {
@@ -577,14 +710,21 @@ function renderAnalytics(data) {
   }, 500);
 }
 
-function initChart(activityData) {
+function initChartWithRealData(dailyData) {
   const ctx = document.getElementById('activityChart');
   if (!ctx) return;
   
-  const labels = activityData.map(d => d.date) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const values = activityData.map(d => d.count) || [1200, 1350, 1250, 1580, 1900, 2400, 2847];
+  const labels = dailyData.map(d => {
+    const date = new Date(d.date);
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  });
   
-  const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 300);
+  const newUsers = dailyData.map(d => d.newUsers);
+  const cumulativeUsers = dailyData.map(d => d.cumulativeUsers);
+  const activeUsers = dailyData.map(d => d.activeUsers);
+  
+  const canvas = ctx.getContext('2d');
+  const gradient = canvas.createLinearGradient(0, 0, 0, 300);
   gradient.addColorStop(0, 'rgba(224,185,115,0.3)');
   gradient.addColorStop(1, 'rgba(224,185,115,0)');
   
@@ -596,43 +736,119 @@ function initChart(activityData) {
     type: 'line',
     data: {
       labels: labels,
-      datasets: [{
-        data: values,
-        borderColor: '#E0B973',
-        borderWidth: 3,
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: '#E0B973',
-        pointHoverBorderColor: '#3B1D14',
-        pointHoverBorderWidth: 2,
-      }]
+      datasets: [
+        {
+          label: 'New Users',
+          data: newUsers,
+          borderColor: '#E0B973',
+          borderWidth: 3,
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: '#E0B973',
+          pointBorderColor: '#3B1D14',
+          pointBorderWidth: 1,
+          pointHoverRadius: 6,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Active Users',
+          data: activeUsers,
+          borderColor: '#B89355',
+          borderWidth: 2,
+          backgroundColor: 'transparent',
+          borderDash: [5, 5],
+          tension: 0.4,
+          pointRadius: 2,
+          pointBackgroundColor: '#B89355',
+          pointBorderColor: '#3B1D14',
+          pointBorderWidth: 1,
+          pointHoverRadius: 5,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Cumulative Users',
+          data: cumulativeUsers,
+          borderColor: '#FDE6B1',
+          borderWidth: 2,
+          backgroundColor: 'transparent',
+          tension: 0.4,
+          pointRadius: 0,
+          fill: false,
+          yAxisID: 'y1',
+        }
+      ]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#C9A27B',
+            font: { size: 11, family: 'Inter' },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
         tooltip: {
           backgroundColor: '#5A2E1F',
-          borderColor: '#7A4432', borderWidth: 1,
-          titleColor: '#F5E6CC', bodyColor: '#E0B973',
-          padding: 12, cornerRadius: 8,
-          callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString()} users` }
+          borderColor: '#7A4432',
+          borderWidth: 1,
+          titleColor: '#F5E6CC',
+          bodyColor: '#E0B973',
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: (ctx) => {
+              let label = ctx.dataset.label || '';
+              let value = ctx.parsed.y;
+              if (ctx.dataset.label === 'Cumulative Users') {
+                return `${label}: ${value.toLocaleString()} total`;
+              }
+              return `${label}: ${value.toLocaleString()}`;
+            }
+          }
         }
       },
       scales: {
         x: {
-          grid: { display: false },
-          ticks: { color: '#9B7B5E', font: { size: 12 } },
+          grid: { display: false, drawBorder: false },
+          ticks: { color: '#9B7B5E', font: { size: 10 } },
           border: { display: false }
         },
         y: {
-          grid: { color: 'rgba(122,68,50,0.4)', drawBorder: false },
-          ticks: { color: '#9B7B5E', font: { size: 12 } },
-          border: { display: false }
+          position: 'left',
+          grid: { color: 'rgba(122,68,50,0.3)', drawBorder: false },
+          ticks: { color: '#9B7B5E', font: { size: 10 } },
+          border: { display: false },
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Daily Activity',
+            color: '#C9A27B',
+            font: { size: 10 }
+          }
+        },
+        y1: {
+          position: 'right',
+          grid: { display: false },
+          ticks: { color: '#FDE6B1', font: { size: 10 } },
+          border: { display: false },
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Cumulative Users',
+            color: '#FDE6B1',
+            font: { size: 10 }
+          }
         }
       }
     }
@@ -646,23 +862,38 @@ function setFilter(btn, filter) {
   loadAnalytics();
 }
 
-function showToast(message, type) {
+function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.textContent = message;
   toast.style.cssText = `
     position: fixed; bottom: 20px; right: 20px;
-    background: ${type === 'error' ? '#dc2626' : '#16a34a'};
+    background: ${type === 'error' ? '#dc2626' : type === 'warning' ? '#eab308' : '#16a34a'};
     color: white; padding: 12px 20px; border-radius: 8px;
     z-index: 10000; animation: fadeInUp 0.3s ease-out;
+    font-family: 'Inter', sans-serif; font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   `;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    console.log('🔄 Auto-refreshing analytics data...');
+    loadAnalytics();
+  }, 60000);
 }
 
 // Initialize
 (async function init() {
   if (await checkAuth()) {
     await loadAnalytics();
+    startAutoRefresh();
   }
 })();
 </script>

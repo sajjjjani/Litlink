@@ -635,7 +635,7 @@
                 My Profile
             </a>
             
-            <a href="../User%20Management/usermanagement.html" class="nav-item" id="userManagementLink">
+            <a href="usermanagement.html" class="nav-item" id="userManagementLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -667,7 +667,7 @@
             
             <div class="nav-divider"></div>
             
-            <a href="../Admin%20Settings/adsettings.html" class="nav-item" id="settingsLink">
+            <a href="adsettings.html" class="nav-item" id="settingsLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 20h9"></path>
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
@@ -1137,6 +1137,7 @@
                         currentAdmin.email = formData.email;
                         currentAdmin.location = formData.location;
                         updateAdminUI(currentAdmin);
+                        localStorage.setItem('user', JSON.stringify(currentAdmin));
                     }
                     
                     showToast('Profile updated successfully!', 'success');
@@ -1193,7 +1194,7 @@
             if (settingsBtn) {
                 settingsBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    window.location.href = '../Admin%20Settings/adsettings.html';
+                    window.location.href = 'adsettings.html';
                 });
             }
             

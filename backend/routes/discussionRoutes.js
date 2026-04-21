@@ -3,8 +3,28 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const DiscussionThread = require('../models/DiscussionThread');
 const Circle = require('../models/Circle');
+const CircleRequest = require('../models/CircleRequest');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const FilterService = require('../services/filterService');
+const UNS = require('../services/UserNotificationService');
+
+// Helper to check if user is suspended
+async function isUserSuspended(userId) {
+  const user = await User.findById(userId);
+  if (!user) return false;
+  if (user.isSuspended && user.suspensionEnds && new Date() < user.suspensionEnds) {
+    return true;
+  }
+  if (user.isSuspended && user.suspensionEnds && new Date() >= user.suspensionEnds) {
+    user.isSuspended = false;
+    user.suspensionEnds = null;
+    user.suspensionReason = null;
+    await user.save();
+    return false;
+  }
+  return false;
+}
 
 // ===== HELPER FUNCTIONS =====
 
@@ -108,17 +128,21 @@ async function getCommunityHighlights() {
 
 // ===== CIRCLE DISCOVERY ROUTES =====
 
-// Get all available circles for discovery
 router.get('/circles/all', authMiddleware, async (req, res) => {
   try {
     const circles = await Circle.find({})
       .populate('createdBy', 'name username')
       .lean();
     
-    // Get circles user is already a member of
     const userCircles = await Circle.find({ 'members.user': req.userId }).select('circleId');
     const userCircleIds = userCircles.map(c => c.circleId);
     
+    const pendingRequests = await CircleRequest.find({
+      senderId: req.userId,
+      status: 'pending'
+    }).select('circleId');
+    const pendingCircleIds = new Set(pendingRequests.map(r => r.circleId.toString()));
+
     const circlesWithStatus = circles.map(circle => ({
       id: circle._id,
       circleId: circle.circleId,
@@ -129,7 +153,7 @@ router.get('/circles/all', authMiddleware, async (req, res) => {
       memberCount: circle.stats.memberCount,
       threadCount: circle.stats.threadCount,
       isMember: userCircleIds.includes(circle.circleId),
-      hasPendingRequest: circle.pendingRequests.some(req => req.user.toString() === req.userId),
+      hasPendingRequest: pendingCircleIds.has(circle._id.toString()),
       createdBy: circle.createdBy,
       createdAt: circle.createdAt
     }));
@@ -148,7 +172,6 @@ router.get('/circles/all', authMiddleware, async (req, res) => {
   }
 });
 
-// Get recommended circles based on user's reading preferences
 router.get('/circles/recommended', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('favoriteGenres');
@@ -201,16 +224,16 @@ router.get('/circles/recommended', authMiddleware, async (req, res) => {
 
 // ===== CIRCLE MEMBERSHIP ROUTES =====
 
-// Get user's circles
 router.get('/user/circles', authMiddleware, async (req, res) => {
   try {
     const circles = await Circle.find({
       'members.user': req.userId
     }).populate('members.user', 'name username profilePicture');
     
-    const pendingRequests = await Circle.find({
-      'pendingRequests.user': req.userId
-    }).select('name circleId description icon');
+    const pendingRequests = await CircleRequest.find({
+      senderId: req.userId,
+      status: 'pending'
+    }).populate('circleId', 'name circleId description icon');
     
     res.json({
       success: true,
@@ -226,12 +249,14 @@ router.get('/user/circles', authMiddleware, async (req, res) => {
         role: circle.members.find(m => m.user._id.toString() === req.userId)?.role || 'member',
         joinedAt: circle.members.find(m => m.user._id.toString() === req.userId)?.joinedAt
       })),
-      pendingRequests: pendingRequests.map(req => ({
-        circleId: req.circleId,
-        name: req.name,
-        description: req.description,
-        icon: req.icon,
-        requestedAt: req.pendingRequests.find(r => r.user.toString() === req.userId)?.requestedAt
+      pendingRequests: pendingRequests
+        .filter(req => req.circleId)
+        .map(req => ({
+        circleId: req.circleId.circleId,
+        name: req.circleId.name,
+        description: req.circleId.description,
+        icon: req.circleId.icon,
+        requestedAt: req.createdAt
       }))
     });
   } catch (error) {
@@ -244,7 +269,6 @@ router.get('/user/circles', authMiddleware, async (req, res) => {
   }
 });
 
-// Get circle details
 router.get('/circles/:circleId/details', authMiddleware, async (req, res) => {
   try {
     const { circleId } = req.params;
@@ -308,70 +332,116 @@ router.get('/circles/:circleId/details', authMiddleware, async (req, res) => {
   }
 });
 
-// Request to join circle
+
+// ── Submit a join request to a circle ─────────────────────────────────────
+// Called by the frontend: POST /api/discussions/circles/:circleId/request
 router.post('/circles/:circleId/request', authMiddleware, async (req, res) => {
   try {
     const { circleId } = req.params;
-    const { message } = req.body;
-    
+    const { message = '' } = req.body;
+
     let circle;
     if (mongoose.Types.ObjectId.isValid(circleId)) {
       circle = await Circle.findById(circleId);
     } else {
-      circle = await Circle.findOne({ circleId: circleId });
+      circle = await Circle.findOne({ circleId });
     }
-    
+
     if (!circle) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Circle not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Circle not found' });
     }
-    
+
     if (circle.isMember(req.userId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You are already a member of this circle' 
+      return res.status(400).json({ success: false, message: 'You are already a member of this circle' });
+    }
+
+    const existingPendingRequest = await CircleRequest.findOne({
+      senderId: req.userId,
+      circleId: circle._id,
+      status: 'pending'
+    });
+    if (existingPendingRequest) {
+      return res.status(400).json({ success: false, message: 'Join request already pending' });
+    }
+
+    // If no approval needed, add directly
+    if (!circle.settings.requireApproval) {
+      circle.members.push({ user: req.userId, joinedAt: new Date(), role: 'member' });
+      circle.stats.memberCount += 1;
+      await circle.save();
+      return res.json({ success: true, message: `You have joined "${circle.name}"!`, joined: true });
+    }
+
+    // Persist canonical request record
+    const requester = await User.findById(req.userId).select('name profilePicture');
+    const creatorId = (circle.creatorId || circle.createdBy).toString();
+    const moderatorIds = [creatorId].filter(id => id !== req.userId.toString());
+
+    if (moderatorIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No moderator available to review this request'
       });
     }
-    
-    const request = await circle.requestMembership(req.userId, message);
-    
+
+    const requestDocs = await Promise.all(
+      moderatorIds.map(modId => CircleRequest.create({
+        senderId: req.userId,
+        receiverId: modId,
+        circleId: circle._id,
+        status: 'pending',
+        message: String(message || '').substring(0, 500)
+      }))
+    );
+
+    // Keep legacy pendingRequests array in sync for existing UI consumers.
+    await circle.requestMembership(req.userId, message);
+
+    // Notify moderators — DB record + real-time socket
+    const freshCircle = await Circle.findById(circle._id).populate('moderators', '_id');
+
+    try {
+      await UNS.onCircleJoinRequest(requester, freshCircle);
+    } catch (unsErr) {
+      console.error('[UNS] onCircleJoinRequest error:', unsErr.message);
+    }
+
     try {
       const io = global.io;
       if (io) {
-        const user = await User.findById(req.userId).select('name profilePicture');
-        const moderatorIds = circle.members
-          .filter(m => m.role === 'moderator' || m.user.toString() === circle.createdBy.toString())
-          .map(m => m.user.toString());
-        
-        moderatorIds.forEach(modId => {
+        const modIds = [
+          ...freshCircle.moderators.map(m => m._id.toString()),
+          freshCircle.createdBy.toString()
+        ];
+        [...new Set(modIds)].forEach(modId => {
           io.to(`user-${modId}`).emit('circle-join-request', {
+            type: 'notification',
+            notificationType: 'circle_join_request',
+            title: 'New Join Request',
+            message: `${requester.name} wants to join "${circle.name}"`,
             circleId: circle.circleId,
             circleName: circle.name,
-            userId: req.userId,
-            userName: user.name,
-            userAvatar: user.profilePicture,
-            message: message,
-            requestId: request._id
+            requesterId: req.userId,
+            requesterName: requester.name,
+            timestamp: new Date(),
+            requestId: requestDocs[0]._id
           });
         });
       }
     } catch (socketError) {
-      console.error('WebSocket error:', socketError);
+      console.error('WebSocket error in circle join request:', socketError);
     }
-    
+
     res.json({
       success: true,
-      message: 'Join request sent successfully',
-      request
+      message: `Join request sent to "${circle.name}"!`,
+      joined: false,
+      pending: true
     });
+
   } catch (error) {
-    console.error('Error requesting circle membership:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Error requesting membership'
-    });
+    console.error('Error submitting circle join request:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error sending join request' });
   }
 });
 
@@ -394,14 +464,22 @@ router.post('/circles/:circleId/requests/:requestId/approve', authMiddleware, as
       });
     }
     
-    if (!circle.isModerator(req.userId) && circle.createdBy.toString() !== req.userId) {
+    const creatorId = (circle.creatorId || circle.createdBy).toString();
+    if (creatorId !== req.userId.toString()) {
       return res.status(403).json({ 
         success: false, 
-        message: 'Not authorized to approve requests' 
+        message: 'Only the circle creator can approve requests' 
       });
     }
     
-    const request = circle.pendingRequests.id(requestId);
+    let request = circle.pendingRequests.id(requestId);
+    let canonicalRequest = null;
+    if (!request) {
+      canonicalRequest = await CircleRequest.findById(requestId);
+      if (canonicalRequest && canonicalRequest.circleId.toString() === circle._id.toString()) {
+        request = { user: canonicalRequest.senderId };
+      }
+    }
     if (!request) {
       return res.status(404).json({ 
         success: false, 
@@ -409,8 +487,47 @@ router.post('/circles/:circleId/requests/:requestId/approve', authMiddleware, as
       });
     }
     
+    if (canonicalRequest) {
+      await CircleRequest.updateMany(
+        {
+          senderId: canonicalRequest.senderId,
+          circleId: circle._id,
+          status: 'pending'
+        },
+        {
+          $set: {
+            status: 'accepted',
+            actedBy: req.userId,
+            actedAt: new Date()
+          }
+        }
+      );
+    } else {
+      await CircleRequest.updateMany(
+        {
+          senderId: request.user,
+          circleId: circle._id,
+          status: 'pending'
+        },
+        {
+          $set: {
+            status: 'accepted',
+            actedBy: req.userId,
+            actedAt: new Date()
+          }
+        }
+      );
+    }
+
     await circle.approveRequest(request.user, req.userId);
     
+    // ── Notify the approved user (DB record + real-time) ──────────────────
+    try {
+      await UNS.onCircleAccepted(request.user, circle);
+    } catch (unsErr) {
+      console.error('[UNS] onCircleAccepted error:', unsErr.message);
+    }
+
     try {
       const io = global.io;
       if (io) {
@@ -456,14 +573,22 @@ router.post('/circles/:circleId/requests/:requestId/decline', authMiddleware, as
       });
     }
     
-    if (!circle.isModerator(req.userId) && circle.createdBy.toString() !== req.userId) {
+    const creatorId = (circle.creatorId || circle.createdBy).toString();
+    if (creatorId !== req.userId.toString()) {
       return res.status(403).json({ 
         success: false, 
-        message: 'Not authorized to decline requests' 
+        message: 'Only the circle creator can decline requests' 
       });
     }
     
-    const request = circle.pendingRequests.id(requestId);
+    let request = circle.pendingRequests.id(requestId);
+    let canonicalRequest = null;
+    if (!request) {
+      canonicalRequest = await CircleRequest.findById(requestId);
+      if (canonicalRequest && canonicalRequest.circleId.toString() === circle._id.toString()) {
+        request = { user: canonicalRequest.senderId };
+      }
+    }
     if (!request) {
       return res.status(404).json({ 
         success: false, 
@@ -471,6 +596,38 @@ router.post('/circles/:circleId/requests/:requestId/decline', authMiddleware, as
       });
     }
     
+    if (canonicalRequest) {
+      await CircleRequest.updateMany(
+        {
+          senderId: canonicalRequest.senderId,
+          circleId: circle._id,
+          status: 'pending'
+        },
+        {
+          $set: {
+            status: 'rejected',
+            actedBy: req.userId,
+            actedAt: new Date()
+          }
+        }
+      );
+    } else {
+      await CircleRequest.updateMany(
+        {
+          senderId: request.user,
+          circleId: circle._id,
+          status: 'pending'
+        },
+        {
+          $set: {
+            status: 'rejected',
+            actedBy: req.userId,
+            actedAt: new Date()
+          }
+        }
+      );
+    }
+
     await circle.declineRequest(request.user, req.userId);
     
     try {
@@ -499,9 +656,512 @@ router.post('/circles/:circleId/requests/:requestId/decline', authMiddleware, as
   }
 });
 
+// ===== CIRCLE CREATION AND MANAGEMENT ROUTES =====
+
+router.post('/circles/create', authMiddleware, async (req, res) => {
+  try {
+    const { name, description, icon, genre, settings } = req.body;
+    
+    if (!name || !description || !genre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, description, and genre are required'
+      });
+    }
+    
+    const circleId = name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    const existingCircle = await Circle.findOne({ circleId });
+    if (existingCircle) {
+      return res.status(400).json({
+        success: false,
+        message: 'A circle with a similar name already exists'
+      });
+    }
+    
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const circle = new Circle({
+      name,
+      circleId,
+      description,
+      icon: icon || '📚',
+      genre,
+      createdBy: req.userId,
+      creatorId: req.userId,
+      moderators: [req.userId],
+      members: [{
+        user: req.userId,
+        joinedAt: new Date(),
+        role: 'admin'
+      }],
+      settings: {
+        isPrivate: settings?.isPrivate !== undefined ? settings.isPrivate : true,
+        requireApproval: settings?.requireApproval !== undefined ? settings.requireApproval : true,
+        allowMemberPosts: settings?.allowMemberPosts !== undefined ? settings.allowMemberPosts : true
+      },
+      stats: {
+        memberCount: 1,
+        threadCount: 0,
+        activeToday: 1
+      }
+    });
+    
+    await circle.save();
+    
+    try {
+      const io = global.io;
+      if (io) {
+        io.to(`user-${req.userId}`).emit('circle-created', {
+          circleId: circle.circleId,
+          circleName: circle.name,
+          message: `You successfully created "${circle.name}" circle!`
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.status(201).json({
+      success: true,
+      message: 'Circle created successfully',
+      circle: {
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        memberCount: circle.stats.memberCount,
+        isMember: true,
+        userRole: 'admin',
+        createdAt: circle.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error creating circle:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error creating circle'
+    });
+  }
+});
+
+router.get('/circles/my-circles', authMiddleware, async (req, res) => {
+  try {
+    const circles = await Circle.find({ createdBy: req.userId })
+      .populate('members.user', 'name username profilePicture')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      circles: circles.map(circle => ({
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        memberCount: circle.stats.memberCount,
+        threadCount: circle.stats.threadCount,
+        pendingRequestsCount: circle.pendingRequests.length,
+        userRole: 'admin',
+        createdAt: circle.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching user\'s circles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching circles',
+      error: error.message
+    });
+  }
+});
+
+router.get('/circles/pending-requests', authMiddleware, async (req, res) => {
+  try {
+    const creatorCircles = await Circle.find({
+      $or: [{ creatorId: req.userId }, { createdBy: req.userId }]
+    }).select('_id');
+    const pendingRequests = await CircleRequest.find({
+      circleId: { $in: creatorCircles.map(c => c._id) },
+      status: 'pending'
+    })
+      .populate('senderId', 'name username profilePicture')
+      .populate('circleId', 'circleId name icon')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      pendingRequests: pendingRequests
+        .filter(request => request.circleId && request.senderId)
+        .map(request => ({
+          requestId: request._id,
+          circleId: request.circleId.circleId,
+          circleName: request.circleId.name,
+          circleIcon: request.circleId.icon,
+          user: request.senderId,
+          message: request.message || '',
+          requestedAt: request.createdAt
+        }))
+    });
+  } catch (error) {
+    console.error('Error fetching pending requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching requests',
+      error: error.message
+    });
+  }
+});
+
+router.get('/circles/:circleId/manage', authMiddleware, async (req, res) => {
+  try {
+    const { circleId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId)
+        .populate('members.user', 'name username profilePicture')
+        .populate('createdBy', 'name username profilePicture')
+        .populate('moderators', 'name username profilePicture')
+        .populate('pendingRequests.user', 'name username profilePicture');
+    } else {
+      circle = await Circle.findOne({ circleId: circleId })
+        .populate('members.user', 'name username profilePicture')
+        .populate('createdBy', 'name username profilePicture')
+        .populate('moderators', 'name username profilePicture')
+        .populate('pendingRequests.user', 'name username profilePicture');
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the circle creator can manage this circle'
+      });
+    }
+    
+    res.json({
+      success: true,
+      circle: {
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        createdBy: circle.createdBy,
+        moderators: circle.moderators,
+        settings: circle.settings,
+        stats: circle.stats,
+        createdAt: circle.createdAt,
+        members: circle.members.map(m => ({
+          user: m.user,
+          role: m.role,
+          joinedAt: m.joinedAt
+        })),
+        pendingRequests: circle.pendingRequests.map(r => ({
+          id: r._id,
+          user: r.user,
+          message: r.message,
+          requestedAt: r.requestedAt
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching circle management details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching circle details',
+      error: error.message
+    });
+  }
+});
+
+router.put('/circles/:circleId/settings', authMiddleware, async (req, res) => {
+  try {
+    const { circleId } = req.params;
+    const { name, description, icon, genre, settings } = req.body;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isModerator(req.userId) && !circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update circle settings'
+      });
+    }
+    
+    if (name) circle.name = name;
+    if (description) circle.description = description;
+    if (icon) circle.icon = icon;
+    if (genre) circle.genre = genre;
+    if (settings) {
+      circle.settings = {
+        ...circle.settings,
+        ...settings
+      };
+    }
+    
+    await circle.save();
+    
+    res.json({
+      success: true,
+      message: 'Circle settings updated successfully',
+      circle: {
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        description: circle.description,
+        icon: circle.icon,
+        genre: circle.genre,
+        settings: circle.settings
+      }
+    });
+  } catch (error) {
+    console.error('Error updating circle settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating circle settings',
+      error: error.message
+    });
+  }
+});
+
+router.post('/circles/:circleId/members/:userId/promote', authMiddleware, async (req, res) => {
+  try {
+    const { circleId, userId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the circle creator can promote members'
+      });
+    }
+    
+    await circle.promoteToModerator(userId, req.userId);
+    
+    try {
+      const io = global.io;
+      if (io) {
+        const promotedUser = await User.findById(userId);
+        io.to(`user-${userId}`).emit('promoted-to-moderator', {
+          circleId: circle.circleId,
+          circleName: circle.name,
+          message: `You have been promoted to moderator in "${circle.name}"`
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Member promoted to moderator successfully'
+    });
+  } catch (error) {
+    console.error('Error promoting member:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error promoting member'
+    });
+  }
+});
+
+router.post('/circles/:circleId/members/:userId/demote', authMiddleware, async (req, res) => {
+  try {
+    const { circleId, userId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the circle creator can demote moderators'
+      });
+    }
+    
+    await circle.demoteToMember(userId, req.userId);
+    
+    res.json({
+      success: true,
+      message: 'Moderator demoted to member successfully'
+    });
+  } catch (error) {
+    console.error('Error demoting moderator:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error demoting member'
+    });
+  }
+});
+
+router.delete('/circles/:circleId/members/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { circleId, userId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isModerator(req.userId) && !circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to remove members'
+      });
+    }
+    
+    await circle.removeMember(userId, req.userId);
+    
+    try {
+      const io = global.io;
+      if (io) {
+        io.to(`user-${userId}`).emit('removed-from-circle', {
+          circleId: circle.circleId,
+          circleName: circle.name,
+          message: `You have been removed from "${circle.name}"`
+        });
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Member removed successfully'
+    });
+  } catch (error) {
+    console.error('Error removing member:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error removing member'
+    });
+  }
+});
+
+router.delete('/circles/:circleId', authMiddleware, async (req, res) => {
+  try {
+    const { circleId } = req.params;
+    
+    let circle;
+    if (mongoose.Types.ObjectId.isValid(circleId)) {
+      circle = await Circle.findById(circleId);
+    } else {
+      circle = await Circle.findOne({ circleId: circleId });
+    }
+    
+    if (!circle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Circle not found'
+      });
+    }
+    
+    if (!circle.isCreator(req.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the circle creator can delete the circle'
+      });
+    }
+    
+    await DiscussionThread.deleteMany({ circleId: circle._id });
+    await Circle.deleteOne({ _id: circle._id });
+    
+    try {
+      const io = global.io;
+      if (io) {
+        for (const member of circle.members) {
+          io.to(`user-${member.user}`).emit('circle-deleted', {
+            circleId: circle.circleId,
+            circleName: circle.name,
+            message: `The circle "${circle.name}" has been deleted`
+          });
+        }
+      }
+    } catch (socketError) {
+      console.error('WebSocket error:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Circle deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting circle:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting circle',
+      error: error.message
+    });
+  }
+});
+
 // ===== CIRCLE THREAD ROUTES =====
 
-// Get threads for a specific circle
 router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
   try {
     const { circleId } = req.params;
@@ -602,7 +1262,7 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
   }
 });
 
-// Create a new circle thread
+// Create a new circle thread (with filter)
 router.post('/circles/threads', authMiddleware, async (req, res) => {
   try {
     const { 
@@ -623,6 +1283,43 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(req.userId);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(req.userId);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended. You cannot create discussions.',
+        suspended: true
+      });
+    }
+
+    // Filter thread title
+    const titleFilterResult = await FilterService.checkAndProcess(title, req.userId, 'discussion', circleId || circleName);
+    if (!titleFilterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: titleFilterResult.message,
+        warningIssued: titleFilterResult.warningIssued,
+        warningCount: titleFilterResult.warningCount,
+        suspended: titleFilterResult.suspended
+      });
+    }
+    const filteredTitle = titleFilterResult.hasViolation ? titleFilterResult.censoredText : title;
+
+    // Filter thread content
+    const contentFilterResult = await FilterService.checkAndProcess(content, req.userId, 'discussion', circleId || circleName);
+    if (!contentFilterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: contentFilterResult.message,
+        warningIssued: contentFilterResult.warningIssued,
+        warningCount: contentFilterResult.warningCount,
+        suspended: contentFilterResult.suspended
+      });
+    }
+    const filteredContent = contentFilterResult.hasViolation ? contentFilterResult.censoredText : content;
+
     let circle;
     if (circleId && mongoose.Types.ObjectId.isValid(circleId)) {
       circle = await Circle.findById(circleId);
@@ -637,7 +1334,9 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!circle.isMember(req.userId)) {
+    const creatorId = (circle.creatorId || circle.createdBy).toString();
+    const canPostAsCreator = creatorId === req.userId.toString();
+    if (!circle.isMember(req.userId) && !canPostAsCreator) {
       return res.status(403).json({ 
         success: false, 
         message: 'You must be a member of this circle to post' 
@@ -645,8 +1344,8 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
     }
 
     const thread = new DiscussionThread({
-      title,
-      content,
+      title: filteredTitle,
+      content: filteredContent,
       author: req.userId,
       circle: circle.name,
       circleId: circle._id,
@@ -658,6 +1357,13 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
     });
 
     if (type === 'poll' && poll) {
+      // Filter poll question if present
+      if (poll.question) {
+        const pollFilterResult = await FilterService.checkOnly(poll.question);
+        if (pollFilterResult.hasViolation) {
+          poll.question = pollFilterResult.censoredText;
+        }
+      }
       thread.poll = {
         question: poll.question,
         options: poll.options.map(opt => ({ 
@@ -683,11 +1389,21 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
 
     await thread.populate('author', 'name username profilePicture');
 
+    // ── Notify circle members (DB record + real-time) ─────────────────────
+    const author = await User.findById(req.userId).select('name profilePicture');
+    try {
+      await UNS.onCircleNewThread(author, circle, thread);
+    } catch (unsErr) {
+      console.error('[UNS] onCircleNewThread error:', unsErr.message);
+    }
+
     try {
       const io = global.io;
       if (io) {
-        const memberUserIds = circle.members.map(m => m.user.toString());
-        
+        const memberUserIds = circle.members
+          .map(m => m.user.toString())
+          .filter(id => id !== req.userId.toString());
+
         memberUserIds.forEach(userId => {
           io.to(`user-${userId}`).emit('new-circle-thread', {
             thread: {
@@ -697,7 +1413,7 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
             },
             circleId: circle.circleId,
             circleName: circle.name,
-            message: `New ${type} in ${circle.name}: "${title}"`
+            message: `New ${type} in ${circle.name}: "${filteredTitle}"`
           });
         });
       }
@@ -705,7 +1421,7 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       console.error('WebSocket error:', socketError);
     }
 
-    res.status(201).json({
+    const responseData = {
       success: true,
       message: 'Circle thread created successfully',
       thread: {
@@ -715,7 +1431,15 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
         likeCount: 0,
         isCircleThread: true
       }
-    });
+    };
+    
+    if (titleFilterResult.warningIssued || contentFilterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
+      responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
+    }
+    
+    res.status(201).json(responseData);
   } catch (error) {
     console.error('Error creating circle thread:', error);
     res.status(500).json({ 
@@ -738,6 +1462,30 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(req.userId);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(req.userId);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended.',
+        suspended: true
+      });
+    }
+
+    // Filter poll question
+    const questionFilterResult = await FilterService.checkAndProcess(question, req.userId, 'discussion', circleId || circleName);
+    if (!questionFilterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: questionFilterResult.message,
+        warningIssued: questionFilterResult.warningIssued,
+        warningCount: questionFilterResult.warningCount,
+        suspended: questionFilterResult.suspended
+      });
+    }
+    const filteredQuestion = questionFilterResult.hasViolation ? questionFilterResult.censoredText : question;
+
     let circle;
     if (circleId && mongoose.Types.ObjectId.isValid(circleId)) {
       circle = await Circle.findById(circleId);
@@ -752,7 +1500,9 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!circle.isMember(req.userId)) {
+    const creatorId = (circle.creatorId || circle.createdBy).toString();
+    const canCreateAsCreator = creatorId === req.userId.toString();
+    if (!circle.isMember(req.userId) && !canCreateAsCreator) {
       return res.status(403).json({ 
         success: false, 
         message: 'You must be a member of this circle to create a poll' 
@@ -760,7 +1510,7 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
     }
 
     const thread = new DiscussionThread({
-      title: `📊 POLL: ${question}`,
+      title: `📊 POLL: ${filteredQuestion}`,
       content: `Cast your vote in this ${circle.name} poll!`,
       author: req.userId,
       circle: circle.name,
@@ -771,7 +1521,7 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
       isPublic: false,
       genre: circle.genre,
       poll: {
-        question,
+        question: filteredQuestion,
         options: options.map(opt => ({ 
           text: opt, 
           votes: [] 
@@ -786,7 +1536,7 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
 
     await thread.populate('author', 'name username profilePicture');
 
-    res.status(201).json({
+    const responseData = {
       success: true,
       message: 'Poll created successfully',
       thread: {
@@ -796,7 +1546,15 @@ router.post('/circles/polls', authMiddleware, async (req, res) => {
         likeCount: 0,
         isCircleThread: true
       }
-    });
+    };
+    
+    if (questionFilterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = questionFilterResult.message;
+      responseData.warningCount = questionFilterResult.warningCount;
+    }
+    
+    res.status(201).json(responseData);
   } catch (error) {
     console.error('Error creating poll:', error);
     res.status(500).json({ 
@@ -895,7 +1653,6 @@ router.post('/threads/:threadId/event/rsvp', authMiddleware, async (req, res) =>
 
 // ===== PUBLIC DISCUSSION ROUTES =====
 
-// Get public discussions
 router.get('/public', authMiddleware, async (req, res) => {
   try {
     const {
@@ -981,7 +1738,6 @@ router.get('/public', authMiddleware, async (req, res) => {
   }
 });
 
-// Get all activity (mix of circle and public)
 router.get('/all', authMiddleware, async (req, res) => {
   try {
     const {
@@ -1043,7 +1799,6 @@ router.get('/all', authMiddleware, async (req, res) => {
   }
 });
 
-// Get highlights only
 router.get('/highlights', authMiddleware, async (req, res) => {
   try {
     const highlights = await getCommunityHighlights();
@@ -1063,7 +1818,6 @@ router.get('/highlights', authMiddleware, async (req, res) => {
 
 // ===== THREAD ROUTES =====
 
-// Get all threads with filtering, sorting, and pagination
 router.get('/threads', authMiddleware, async (req, res) => {
   try {
     const {
@@ -1171,7 +1925,6 @@ router.get('/threads', authMiddleware, async (req, res) => {
   }
 });
 
-// Get single thread by ID
 router.get('/threads/:threadId', authMiddleware, async (req, res) => {
   try {
     const { threadId } = req.params;
@@ -1251,7 +2004,7 @@ router.get('/threads/:threadId', authMiddleware, async (req, res) => {
   }
 });
 
-// Create new thread (public discussion)
+// Create new thread (public discussion) with filter
 router.post('/threads', authMiddleware, async (req, res) => {
   try {
     const { title, content, genre, tags, bookReferences, category } = req.body;
@@ -1263,9 +2016,46 @@ router.post('/threads', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(req.userId);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(req.userId);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended. You cannot create discussions.',
+        suspended: true
+      });
+    }
+
+    // Filter thread title
+    const titleFilterResult = await FilterService.checkAndProcess(title, req.userId, 'discussion');
+    if (!titleFilterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: titleFilterResult.message,
+        warningIssued: titleFilterResult.warningIssued,
+        warningCount: titleFilterResult.warningCount,
+        suspended: titleFilterResult.suspended
+      });
+    }
+    const filteredTitle = titleFilterResult.hasViolation ? titleFilterResult.censoredText : title;
+
+    // Filter thread content
+    const contentFilterResult = await FilterService.checkAndProcess(content, req.userId, 'discussion');
+    if (!contentFilterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: contentFilterResult.message,
+        warningIssued: contentFilterResult.warningIssued,
+        warningCount: contentFilterResult.warningCount,
+        suspended: contentFilterResult.suspended
+      });
+    }
+    const filteredContent = contentFilterResult.hasViolation ? contentFilterResult.censoredText : content;
+
     const thread = new DiscussionThread({
-      title,
-      content,
+      title: filteredTitle,
+      content: filteredContent,
       author: req.userId,
       genre: genre || 'General',
       tags: tags || [],
@@ -1283,14 +2073,14 @@ router.post('/threads', authMiddleware, async (req, res) => {
       if (io) {
         io.emit('new-thread', {
           thread,
-          message: `New public discussion: "${title}"`
+          message: `New public discussion: "${filteredTitle}"`
         });
       }
     } catch (socketError) {
       console.error('WebSocket error:', socketError);
     }
 
-    res.status(201).json({
+    const responseData = {
       success: true,
       message: 'Discussion created successfully',
       thread: {
@@ -1299,7 +2089,15 @@ router.post('/threads', authMiddleware, async (req, res) => {
         commentCount: 0,
         likeCount: 0
       }
-    });
+    };
+    
+    if (titleFilterResult.warningIssued || contentFilterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
+      responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
+    }
+    
+    res.status(201).json(responseData);
   } catch (error) {
     console.error('Error creating thread:', error);
     res.status(500).json({ 
@@ -1332,8 +2130,34 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
       });
     }
 
-    if (title) thread.title = title;
-    if (content) thread.content = content;
+    // Filter updated title if provided
+    if (title) {
+      const titleFilterResult = await FilterService.checkAndProcess(title, req.userId, 'discussion', threadId);
+      if (!titleFilterResult.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: titleFilterResult.message,
+          warningIssued: titleFilterResult.warningIssued,
+          warningCount: titleFilterResult.warningCount
+        });
+      }
+      thread.title = titleFilterResult.hasViolation ? titleFilterResult.censoredText : title;
+    }
+    
+    // Filter updated content if provided
+    if (content) {
+      const contentFilterResult = await FilterService.checkAndProcess(content, req.userId, 'discussion', threadId);
+      if (!contentFilterResult.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: contentFilterResult.message,
+          warningIssued: contentFilterResult.warningIssued,
+          warningCount: contentFilterResult.warningCount
+        });
+      }
+      thread.content = contentFilterResult.hasViolation ? contentFilterResult.censoredText : content;
+    }
+    
     if (genre) thread.genre = genre;
     if (tags) thread.tags = tags;
 
@@ -1420,6 +2244,16 @@ router.post('/threads/:threadId/like', authMiddleware, async (req, res) => {
 
     await thread.save();
 
+    // ── Notify thread author when someone likes (not unlikes) ─────────────
+    if (likeIndex === -1) {
+      try {
+        const liker = await User.findById(req.userId).select('name profilePicture');
+        await UNS.onThreadLiked(liker, thread);
+      } catch (unsErr) {
+        console.error('[UNS] onThreadLiked error:', unsErr.message);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Thread like toggled',
@@ -1438,7 +2272,7 @@ router.post('/threads/:threadId/like', authMiddleware, async (req, res) => {
 
 // ===== COMMENT ROUTES =====
 
-// Add comment to thread
+// Add comment to thread (with filter)
 router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
   try {
     const { threadId } = req.params;
@@ -1451,6 +2285,30 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if user is suspended
+    const isSuspended = await isUserSuspended(req.userId);
+    if (isSuspended) {
+      const suspensionMsg = await FilterService.getSuspensionMessage(req.userId);
+      return res.status(403).json({ 
+        success: false, 
+        message: suspensionMsg?.message || 'Your account is suspended. You cannot post comments.',
+        suspended: true
+      });
+    }
+
+    // Filter comment content
+    const filterResult = await FilterService.checkAndProcess(content, req.userId, 'discussion', threadId);
+    if (!filterResult.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: filterResult.message,
+        warningIssued: filterResult.warningIssued,
+        warningCount: filterResult.warningCount,
+        suspended: filterResult.suspended
+      });
+    }
+    const filteredContent = filterResult.hasViolation ? filterResult.censoredText : content;
+
     const thread = await DiscussionThread.findById(threadId);
     
     if (!thread) {
@@ -1462,7 +2320,7 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
 
     const comment = {
       user: req.userId,
-      content,
+      content: filteredContent,
       likes: [],
       likeCount: 0,
       replies: [],
@@ -1488,6 +2346,14 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
     
     await thread.save();
 
+    // ── Notify thread author about new comment ────────────────────────────
+    try {
+      const commenter = await User.findById(req.userId).select('name profilePicture');
+      await UNS.onThreadCommented(commenter, thread, filteredContent);
+    } catch (unsErr) {
+      console.error('[UNS] onThreadCommented error:', unsErr.message);
+    }
+
     let newComment;
     if (parentCommentId) {
       const parentComment = thread.comments.id(parentCommentId);
@@ -1499,12 +2365,20 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
     const user = await User.findById(req.userId).select('name username profilePicture');
     newComment.user = user;
 
-    res.status(201).json({
+    const responseData = {
       success: true,
       message: 'Comment added successfully',
       comment: newComment,
       commentCount: thread.commentCount
-    });
+    };
+    
+    if (filterResult.warningIssued) {
+      responseData.warningIssued = true;
+      responseData.warningMessage = filterResult.message;
+      responseData.warningCount = filterResult.warningCount;
+    }
+    
+    res.status(201).json(responseData);
   } catch (error) {
     console.error('Error adding comment:', error);
     res.status(500).json({ 
@@ -1617,7 +2491,6 @@ router.delete('/threads/:threadId/comments/:commentId', authMiddleware, async (r
 
 // ===== STATS ROUTES =====
 
-// Get genre stats
 router.get('/stats/genres', authMiddleware, async (req, res) => {
   try {
     const genreStats = await DiscussionThread.aggregate([
@@ -1660,7 +2533,6 @@ router.get('/stats/genres', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's threads
 router.get('/user/:userId/threads', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1703,6 +2575,53 @@ router.get('/user/:userId/threads', authMiddleware, async (req, res) => {
       message: 'Error fetching user threads',
       error: error.message 
     });
+  }
+});
+
+// ===== FILTER CHECK ENDPOINT =====
+router.post('/check-content', authMiddleware, async (req, res) => {
+  try {
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.json({ success: true, hasViolation: false, censoredText: content });
+    }
+    
+    const result = await FilterService.checkOnly(content);
+    
+    res.json({
+      success: true,
+      hasViolation: result.hasViolation,
+      censoredText: result.censoredText,
+      matches: result.matches.map(m => ({ word: m.word, severity: m.severity, category: m.category }))
+    });
+  } catch (error) {
+    console.error('Check content error:', error);
+    res.status(500).json({ success: false, message: 'Error checking content' });
+  }
+});
+
+// ===== GET USER WARNINGS =====
+router.get('/my-warnings', authMiddleware, async (req, res) => {
+  try {
+    const warnings = await FilterService.getUserWarnings(req.userId);
+    const warningCount = await FilterService.getWarningCount(req.userId);
+    const suspension = await FilterService.getSuspensionMessage(req.userId);
+    
+    res.json({
+      success: true,
+      warnings,
+      warningCount,
+      suspension: suspension ? {
+        isSuspended: true,
+        message: suspension.message,
+        suspensionEnds: suspension.suspensionEnds,
+        daysLeft: suspension.daysLeft
+      } : { isSuspended: false }
+    });
+  } catch (error) {
+    console.error('Error fetching warnings:', error);
+    res.status(500).json({ success: false, message: 'Error fetching warnings' });
   }
 });
 

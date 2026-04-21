@@ -134,6 +134,10 @@ function initChatWebSocket() {
     }
     
     const wsUrl = 'http://localhost:5002';
+
+    if (chatSocket && chatSocket.connected) {
+        return;
+    }
     
     try {
         if (typeof io !== 'undefined') {
@@ -205,6 +209,28 @@ function initChatWebSocket() {
                 handleChatSocketMessage({ type: 'chat:message:deleted', ...data });
             });
 
+            // ── Content filter events ──────────────────────────────────────
+            chatSocket.on('message-blocked', (data) => {
+                console.warn('🚫 Message blocked by filter:', data);
+                // Roll back the optimistic pending message
+                const currentMatch = matches.find(m => m.active);
+                if (currentMatch && currentMatch.messages) {
+                    currentMatch.messages = currentMatch.messages.filter(
+                        m => !String(m.id).startsWith('pending-')
+                    );
+                    renderMessages(currentMatch.messages, currentMatch);
+                }
+                showContentWarningBanner(
+                    data.warning || 'Message blocked: community guidelines violation.',
+                    data.suspended ? 'suspended' : 'blocked'
+                );
+            });
+
+            chatSocket.on('content-warning', (data) => {
+                console.warn('⚠️ Content warning received:', data);
+                showContentWarningBanner(data.message, 'warning');
+            });
+
             chatSocket.on('connect_error', (error) => {
                 console.error('Socket.IO connection error:', error);
                 showNotification('Connection error: ' + error.message, 'error');
@@ -218,6 +244,15 @@ function initChatWebSocket() {
                 } else {
                     showNotification('Unable to connect to chat server', 'error');
                 }
+            });
+
+            chatSocket.on('reconnect_attempt', (attempt) => {
+                console.log('Chat reconnect attempt:', attempt);
+            });
+
+            chatSocket.on('reconnect', (attempt) => {
+                console.log('Chat reconnected after attempts:', attempt);
+                chatSocket.emit('authenticate', token);
             });
         } else {
             console.warn('Socket.IO client not loaded, using fallback');
@@ -324,6 +359,10 @@ function onChatMessageSent(data) {
     if (data.conversationId) {
         currentConversationId = data.conversationId;
     }
+    // Message was sent but content was censored — show warning to sender
+    if (data.warningIssued && data.warningMessage) {
+        showContentWarningBanner(data.warningMessage, 'warning');
+    }
 }
 
 function onChatTyping(data) {
@@ -364,7 +403,7 @@ function onChatHistory(data) {
     // Filter out messages that are unsent or deleted for current user
     const visibleMessages = list.filter(function (m) {
         if (m.unsent) return false;
-        if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+        if (m.deletedFor && m.deletedFor.some(function(id) { return id.toString() === currentUserId; })) return false;
         return true;
     });
     
@@ -648,7 +687,7 @@ async function loadMessages(currentMatch) {
                         // Filter out unsent and deleted messages
                         const visibleMessages = data.messages.filter(m => {
                             if (m.unsent) return false;
-                            if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+                            if (m.deletedFor && m.deletedFor.some(id => id.toString() === currentUserId)) return false;
                             return true;
                         });
                         
@@ -724,7 +763,7 @@ async function refreshCurrentConversation() {
                     
                     const visibleMessages = data.messages.filter(m => {
                         if (m.unsent) return false;
-                        if (m.deletedFor && m.deletedFor.includes(currentUserId)) return false;
+                        if (m.deletedFor && m.deletedFor.some(id => id.toString() === currentUserId)) return false;
                         return true;
                     });
                     
@@ -1240,7 +1279,14 @@ async function sendAttachment(file, category, caption) {
             body: JSON.stringify({ recipientId: currentMatch._id || currentMatch.id, data: base64, mimeType: file.type, filename: file.name, size: file.size, category, caption })
         });
         const result = await res.json();
-        if (!res.ok || !result.success) throw new Error(result.message || 'Send failed');
+        if (result.suspended) {
+            showContentWarningBanner(result.message, 'suspended');
+            throw new Error('suspended');
+        }
+        if (!res.ok || !result.success) {
+            if (result.warningIssued) showContentWarningBanner(result.message, 'warning');
+            throw new Error(result.message || 'Send failed');
+        }
         const now = new Date();
         const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         if (!currentMatch.messages) currentMatch.messages = [];
@@ -1258,6 +1304,9 @@ async function sendAttachment(file, category, caption) {
         renderMessages(currentMatch.messages, currentMatch);
         document.getElementById('statMessages').textContent = matches.reduce((t, m) => t + (m.messages ? m.messages.length : 0), 0);
         showNotification(category === 'image' ? 'Photo sent!' : 'File sent!', 'success');
+        if (result.warningIssued && result.warningMessage) {
+            showContentWarningBanner(result.warningMessage, 'warning');
+        }
     } catch (err) {
         console.error('Attachment error:', err);
         showNotification('Failed to send: ' + err.message, 'error');
@@ -1321,6 +1370,52 @@ function hideMessageLoading() {
 }
 
 // ===== NOTIFICATION SYSTEM =====
+// ── Content warning banner ─────────────────────────────────────────────────
+(function() {
+    const s = document.createElement('style');
+    s.textContent = `
+        @keyframes cwSlideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+        @keyframes cwFadeOut   { to   { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+    `;
+    document.head.appendChild(s);
+})();
+
+function showContentWarningBanner(message, type) {
+    type = type || 'warning';
+    document.querySelectorAll('.content-warning-banner').forEach(function(b) { b.remove(); });
+
+    var palette = {
+        warning:  { bg: '#5c3200', border: '#E0B973', icon: '⚠️' },
+        blocked:  { bg: '#5c0a0a', border: '#e06060', icon: '🚫' },
+        suspended:{ bg: '#2d1a5c', border: '#a06de0', icon: '⛔' }
+    };
+    var p = palette[type] || palette.warning;
+
+    var banner = document.createElement('div');
+    banner.className = 'content-warning-banner';
+    banner.style.cssText = [
+        'position:fixed', 'top:70px', 'left:50%', 'transform:translateX(-50%)',
+        'background:' + p.bg, 'border:1px solid ' + p.border, 'border-radius:12px',
+        'padding:14px 20px', 'z-index:9999', 'max-width:500px', 'width:90%',
+        'box-shadow:0 8px 32px rgba(0,0,0,.55)', 'display:flex', 'align-items:flex-start',
+        'gap:12px', 'animation:cwSlideDown .25s ease'
+    ].join(';');
+
+    banner.innerHTML =
+        '<span style="font-size:1.4rem;flex-shrink:0;line-height:1">' + p.icon + '</span>' +
+        '<div style="flex:1;color:#f0dcc8;font-size:.9rem;line-height:1.55">' + message + '</div>' +
+        '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:#a89070;' +
+        'cursor:pointer;font-size:1.1rem;padding:0 0 0 8px;flex-shrink:0;line-height:1">✕</button>';
+
+    document.body.appendChild(banner);
+
+    var dur = type === 'suspended' ? 9000 : 5500;
+    setTimeout(function() {
+        banner.style.animation = 'cwFadeOut .3s ease forwards';
+        setTimeout(function() { banner.remove(); }, 300);
+    }, dur);
+}
+
 function showNotification(message, type = 'info') {
     const existingNotifications = document.querySelectorAll('.notification');
     existingNotifications.forEach(n => n.remove());
@@ -1415,6 +1510,12 @@ async function unsendMessage(messageId) {
     
     if (!confirm('Unsend this message for everyone? This cannot be undone.')) return;
     
+    // Optimistic UI: remove immediately from local state
+    if (currentMatch.messages) {
+        currentMatch.messages = currentMatch.messages.filter(m => String(m.id || m._id) !== String(messageId));
+        renderMessages(currentMatch.messages, currentMatch);
+    }
+    
     try {
         const token = getAuthToken();
         const res = await fetch(API_BASE_URL + '/api/chat/messages/' + messageId + '/unsend', { 
@@ -1424,12 +1525,14 @@ async function unsendMessage(messageId) {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
         
-        await refreshCurrentConversation();
-        
         showNotification('Message unsent for everyone', 'success');
+        // Refresh from server to confirm final state
+        await refreshCurrentConversation();
     } catch (err) { 
         console.error('Unsend error:', err);
-        showNotification('Could not unsend: ' + err.message, 'error'); 
+        showNotification('Could not unsend: ' + err.message, 'error');
+        // Revert optimistic update on failure
+        await refreshCurrentConversation();
     }
 }
 
@@ -1438,6 +1541,12 @@ async function deleteForMe(messageId) {
     if (!currentMatch) return;
     
     if (!confirm('Delete this message only for yourself? The other person will still see it.')) return;
+    
+    // Optimistic UI: remove immediately from local state
+    if (currentMatch.messages) {
+        currentMatch.messages = currentMatch.messages.filter(m => String(m.id || m._id) !== String(messageId));
+        renderMessages(currentMatch.messages, currentMatch);
+    }
     
     try {
         const token = getAuthToken();
@@ -1448,12 +1557,187 @@ async function deleteForMe(messageId) {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
         
-        await refreshCurrentConversation();
-        
         showNotification('Message deleted for you', 'info');
+        // Refresh from server to confirm final state
+        await refreshCurrentConversation();
     } catch (err) { 
         console.error('Delete error:', err);
-        showNotification('Could not delete: ' + err.message, 'error'); 
+        showNotification('Could not delete: ' + err.message, 'error');
+        // Revert optimistic update on failure
+        await refreshCurrentConversation();
+    }
+}
+
+// ===== BLOCK & REPORT =====
+
+/** Show the block/report modal for the currently active match */
+function showBlockReportModal() {
+    const currentMatch = matches.find(m => m.active);
+    if (!currentMatch) {
+        showNotification('Select a conversation first', 'warning');
+        return;
+    }
+
+    // Remove any existing modal
+    const old = document.getElementById('blockReportModal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'blockReportModal';
+    modal.className = 'br-modal-overlay';
+    modal.innerHTML = `
+        <div class="br-modal">
+            <div class="br-modal-header">
+                <h3><i class="fas fa-shield-alt"></i> Block or Report</h3>
+                <button class="br-close-btn" id="brCloseBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="br-modal-body">
+                <div class="br-user-info">
+                    <img src="${getProfilePicture(currentMatch, 48)}" alt="${escapeHtml(currentMatch.name)}" class="br-avatar">
+                    <span class="br-username">${escapeHtml(currentMatch.name)}</span>
+                </div>
+
+                <!-- TABS -->
+                <div class="br-tabs">
+                    <button class="br-tab active" data-tab="report">📋 Report</button>
+                    <button class="br-tab" data-tab="block">🚫 Block</button>
+                </div>
+
+                <!-- REPORT PANEL -->
+                <div class="br-panel" id="brReportPanel">
+                    <p class="br-panel-desc">Reports are reviewed by our moderation team and kept confidential.</p>
+                    <label class="br-label">Category</label>
+                    <select class="br-select" id="brCategory">
+                        <option value="harassment">Harassment</option>
+                        <option value="inappropriate_content">Inappropriate Content</option>
+                        <option value="hate_speech">Hate Speech</option>
+                        <option value="spam">Spam</option>
+                        <option value="fake_account">Fake Account</option>
+                        <option value="impersonation">Impersonation</option>
+                        <option value="privacy_violation">Privacy Violation</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <label class="br-label">Reason <span class="br-required">*</span></label>
+                    <input type="text" class="br-input" id="brReason" placeholder="Briefly describe the issue..." maxlength="200">
+                    <label class="br-label">Additional details (optional)</label>
+                    <textarea class="br-textarea" id="brDescription" placeholder="Include any extra context that may help our team..." maxlength="1000" rows="3"></textarea>
+                    <button class="br-submit-btn br-report-btn" id="brSubmitReport">
+                        <i class="fas fa-flag"></i> Submit Report
+                    </button>
+                </div>
+
+                <!-- BLOCK PANEL -->
+                <div class="br-panel" id="brBlockPanel" style="display:none;">
+                    <div class="br-block-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Blocking <strong>${escapeHtml(currentMatch.name)}</strong> will:</p>
+                        <ul>
+                            <li>Hide their messages from your chat</li>
+                            <li>Notify our moderation team</li>
+                        </ul>
+                        <p class="br-note">You can unblock users from your profile settings.</p>
+                    </div>
+                    <button class="br-submit-btn br-block-btn" id="brSubmitBlock">
+                        <i class="fas fa-ban"></i> Block ${escapeHtml(currentMatch.name)}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Tab switching
+    modal.querySelectorAll('.br-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            modal.querySelectorAll('.br-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('brReportPanel').style.display = tab.dataset.tab === 'report' ? '' : 'none';
+            document.getElementById('brBlockPanel').style.display  = tab.dataset.tab === 'block'  ? '' : 'none';
+        });
+    });
+
+    // Close
+    document.getElementById('brCloseBtn').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    // Submit report
+    document.getElementById('brSubmitReport').addEventListener('click', () => {
+        const reason   = document.getElementById('brReason').value.trim();
+        const category = document.getElementById('brCategory').value;
+        const desc     = document.getElementById('brDescription').value.trim();
+        if (!reason) { showNotification('Please enter a reason', 'warning'); return; }
+        reportUser(currentMatch._id || currentMatch.id, reason, category, desc, modal);
+    });
+
+    // Submit block
+    document.getElementById('brSubmitBlock').addEventListener('click', () => {
+        blockUser(currentMatch._id || currentMatch.id, currentMatch.name, modal);
+    });
+}
+
+async function reportUser(userId, reason, category, description, modal) {
+    const btn = document.getElementById('brSubmitReport');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...'; }
+
+    try {
+        const token = getAuthToken();
+        const res = await fetch(`${API_BASE_URL}/api/chat/report/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason, category, description })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            if (modal) modal.remove();
+            showNotification('Report submitted. Thank you for keeping Litlink safe! 🛡️', 'success');
+        } else {
+            throw new Error(data.message || 'Failed to submit report');
+        }
+    } catch (err) {
+        console.error('Report error:', err);
+        showNotification(err.message || 'Could not submit report', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-flag"></i> Submit Report'; }
+    }
+}
+
+async function blockUser(userId, userName, modal) {
+    const btn = document.getElementById('brSubmitBlock');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Blocking...'; }
+
+    try {
+        const token = getAuthToken();
+        const res = await fetch(`${API_BASE_URL}/api/chat/block/${userId}`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            if (modal) modal.remove();
+            showNotification(`${userName} has been blocked.`, 'success');
+
+            // Remove the blocked user from matches list
+            matches = matches.filter(m => (m._id || m.id) !== userId);
+            renderMatches();
+
+            // Reset chat area to welcome state
+            if (welcomeState) welcomeState.style.display = '';
+            if (messagesContainer) messagesContainer.style.display = 'none';
+            if (messageInputWrapper) messageInputWrapper.style.display = 'none';
+            if (currentUserName) currentUserName.textContent = 'Select a match to chat';
+            if (currentUserGenre) currentUserGenre.textContent = 'Click on a match from the sidebar';
+        } else {
+            throw new Error(data.message || 'Failed to block user');
+        }
+    } catch (err) {
+        console.error('Block error:', err);
+        showNotification(err.message || 'Could not block user', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-ban"></i> Block ' + escapeHtml(userName); }
     }
 }
 
@@ -1492,6 +1776,9 @@ window.LitlinkChat = {
     toggleSidebar,
     refreshMatches: loadMatches,
     showSettings: () => showNotification('Settings coming soon!', 'info'),
+    showBlockReportModal,
+    blockUser,
+    reportUser,
     unsendMessage,
     deleteForMe,
     useSuggestedMessage: (message) => {

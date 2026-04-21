@@ -9,7 +9,42 @@ const voiceRoomSchema = new mongoose.Schema({
   genre: {
     type: String,
     required: true,
-    enum: ['Fantasy', 'Mystery', 'Sci-Fi', 'Romance', 'Horror', 'Poetry', 'Classic Literature', 'Non-Fiction', 'Other']
+    enum: [
+      // Fiction
+      'Fantasy', 'High Fantasy', 'Dark Fantasy', 'Urban Fantasy',
+      'Science Fiction', 'Dystopian', 'Cyberpunk', 'Space Opera',
+      'Mystery', 'Thriller', 'Psychological Thriller', 'Crime Fiction', 'Cozy Mystery',
+      'Horror', 'Gothic Fiction', 'Supernatural Fiction',
+      'Romance', 'Historical Romance', 'Contemporary Romance', 'Paranormal Romance',
+      'Literary Fiction', 'Magical Realism', 'Historical Fiction',
+      'Adventure', 'Action & Adventure', 'Humor & Satire',
+      'Short Stories', 'Anthologies',
+      // Classic Literature
+      'Classic Literature', 'Ancient Literature', 'Victorian Literature',
+      'Modernist Literature', 'World Literature', 'Mythology & Folklore',
+      // Poetry & Drama
+      'Poetry', 'Spoken Word', 'Drama & Plays', 'Screenwriting',
+      // Non-Fiction
+      'Non-Fiction', 'Memoir & Autobiography', 'Biography', 'True Crime',
+      'History', 'Philosophy', 'Psychology', 'Self-Help & Personal Growth',
+      'Business & Leadership', 'Economics', 'Science & Nature', 'Technology',
+      'Politics & Society', 'Travel Writing', 'Food & Cooking', 'Art & Design',
+      'Music & Culture', 'Sports & Recreation', 'Spirituality & Religion',
+      'Health & Wellness', 'Environment & Nature', 'Education',
+      'Journalism & Essays',
+      // Young Adult & Children
+      'Young Adult (YA)', 'YA Fantasy', 'YA Romance', 'YA Thriller',
+      'Middle Grade', "Children's Books", 'Picture Books',
+      // Manga & Comics
+      'Manga', 'Graphic Novels', 'Comics', 'Webtoons',
+      // Other / catch-all
+      'Book Club Picks', 'Award Winners', 'Debut Authors', 'Indie & Self-Published',
+      'Translated Literature', 'LGBTQ+ Literature', 'South Asian Literature',
+      'African Literature', 'Latin American Literature', 'East Asian Literature',
+      'General Discussion',
+      'Sci-Fi', // legacy alias kept for backward compatibility
+      'Other'
+    ]
   },
   description: {
     type: String,
@@ -63,5 +98,13 @@ const voiceRoomSchema = new mongoose.Schema({
 voiceRoomSchema.index({ status: 1, createdAt: -1 });
 voiceRoomSchema.index({ hostId: 1 });
 voiceRoomSchema.index({ genre: 1 });
+
+voiceRoomSchema.pre('save', function (next) {
+  const allowed = voiceRoomSchema.path('genre').enumValues;
+  if (this.genre && !allowed.includes(this.genre)) {
+    this.genre = 'Other';
+  }
+  next();
+});
 
 module.exports = mongoose.model('VoiceRoom', voiceRoomSchema);

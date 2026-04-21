@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 // Use safe fetch wrapper (Node 18+ global fetch, with node-fetch fallback)
 const fetch = require('../utils/fetch');
 const router = express.Router();
@@ -6,6 +8,8 @@ const authenticate = require('../middleware/auth');
 
 // Cache for API responses
 const cache = new Map();
+
+const PDF_MIME = 'application/pdf';
 
 // Helper: Get book cover URL with fallbacks
 function getBookCoverUrl(bookId, coverId, isbn) {
@@ -59,6 +63,33 @@ function mapGenreToSubject(genre) {
     'graphic-novels': 'graphic_novels'
   };
   return genreMap[genre.toLowerCase()] || genre.toLowerCase().replace(/\s+/g, '_');
+}
+
+function resolvePdfPathByBookId(bookId) {
+  const uploadsRoot = path.join(__dirname, '..', 'uploads');
+  const configuredDir = process.env.BOOK_PDF_DIR
+    ? path.resolve(process.env.BOOK_PDF_DIR)
+    : path.join(uploadsRoot, 'books');
+
+  const candidates = [
+    path.join(configuredDir, `${bookId}.pdf`),
+    path.join(configuredDir, `${bookId.toLowerCase()}.pdf`),
+    path.join(uploadsRoot, `${bookId}.pdf`)
+  ];
+
+  for (const abs of candidates) {
+    if (fs.existsSync(abs)) return abs;
+  }
+
+  if (!fs.existsSync(configuredDir)) return null;
+
+  const normalized = String(bookId).toLowerCase();
+  const match = fs.readdirSync(configuredDir).find((name) =>
+    name.toLowerCase().endsWith('.pdf') &&
+    name.toLowerCase().startsWith(normalized)
+  );
+
+  return match ? path.join(configuredDir, match) : null;
 }
 
 // Helper: Fetch genre books from Open Library
@@ -211,6 +242,42 @@ router.get('/details/:bookId', authenticate, async (req, res) => {
       success: false,
       message: 'Error fetching book details: ' + error.message
     });
+  }
+});
+
+// GET /api/books/:id/pdf - stream locally stored PDF for a book
+router.get('/:id/pdf', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const absPath = resolvePdfPathByBookId(id);
+
+    if (!absPath) {
+      return res.status(404).json({
+        success: false,
+        message: 'PDF not found for this book'
+      });
+    }
+
+    const stat = fs.statSync(absPath);
+    const filename = path.basename(absPath);
+
+    res.setHeader('Content-Type', PDF_MIME);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Content-Length, Content-Disposition');
+
+    const stream = fs.createReadStream(absPath);
+    stream.on('error', (error) => {
+      console.error('PDF stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Failed to stream PDF' });
+      }
+    });
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Error serving PDF:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve PDF' });
   }
 });
 
@@ -464,4 +531,3 @@ router.get('/genre/:genre', authenticate, async (req, res) => {
 });
 
 module.exports = router;
-

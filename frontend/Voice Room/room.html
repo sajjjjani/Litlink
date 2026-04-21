@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Litlink — Voice Room</title>
+  <!-- All styles including rotating-speaker are now in voice.css — no separate file needed -->
   <link rel="stylesheet" href="voice.css"/>
 </head>
 <body>
@@ -16,6 +17,9 @@
       <a href="voice-rooms.html" class="back-btn" aria-label="Back to lobby">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       </a>
+      <a href="../Dashboard/dashboard.html" class="back-btn" id="dashboard-nav-btn" aria-label="Back to dashboard" title="Back to dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </a>
       <div>
         <div class="room-hdr-name" id="hdr-name">Loading...</div>
         <div class="room-hdr-tags">
@@ -23,6 +27,11 @@
           <span class="room-hdr-live">
             <span class="room-hdr-live-dot pulse-live"></span>
             Live
+          </span>
+          <!-- Mode badge — updated dynamically -->
+          <span class="room-mode-badge free" id="hdr-mode-badge">
+            <span class="mode-dot"></span>
+            Free Mode
           </span>
         </div>
       </div>
@@ -39,8 +48,8 @@
     <!-- STAGE -->
     <div class="room-stage">
       <div class="stage-content" id="stage-content">
-        <div style="text-align: center; padding: 60px 20px;">
-          <div class="loading-spinner" style="width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <div style="text-align:center;padding:60px 20px">
+          <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px"></div>
           <p>Loading room...</p>
         </div>
       </div>
@@ -67,7 +76,7 @@
         </button>
       </div>
 
-      <!-- Chat Panel (overlay) -->
+      <!-- Chat Panel -->
       <div class="chat-panel hidden" id="chat-panel">
         <div class="chat-panel-hdr">
           <button class="chat-back" id="chat-back-btn" aria-label="Back to room info">
@@ -92,8 +101,7 @@
 
 <!-- BOTTOM CONTROLS -->
 <div class="room-controls" id="room-controls">
-  <!-- Raise Hand -->
-  <button class="ctrl-btn ctrl-hand-off" id="ctrl-hand" aria-label="Raise hand" aria-pressed="false">
+  <button class="ctrl-btn ctrl-hand-off" id="ctrl-hand" aria-label="Raise hand / Join queue" aria-pressed="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
       <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
@@ -101,8 +109,7 @@
       <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
     </svg>
   </button>
-  
-  <!-- Mic -->
+
   <button class="ctrl-btn ctrl-mic-neutral" id="ctrl-mic" aria-label="Toggle microphone" aria-pressed="false">
     <svg id="mic-off-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <line x1="1" y1="1" x2="23" y2="23"/>
@@ -118,10 +125,9 @@
       <line x1="8" y1="23" x2="16" y2="23"/>
     </svg>
   </button>
-  
-  <!-- End Room button will be inserted here for hosts -->
-  
-  <!-- Leave -->
+
+  <!-- Host controls injected here by room.js -->
+
   <button class="ctrl-btn ctrl-leave" id="ctrl-leave" aria-label="Leave room">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <line x1="18.36" y1="5.64" x2="5.64" y2="18.36"/>
@@ -133,10 +139,18 @@
 </div>
 
 <style>
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
+<script>
+  function updateModeBadge(mode) {
+    const badge = document.getElementById('hdr-mode-badge');
+    if (!badge) return;
+    badge.className = `room-mode-badge ${mode}`;
+    badge.innerHTML = `<span class="mode-dot"></span> ${mode === 'rotating' ? '🔄 Rotating Mode' : 'Free Mode'}`;
+  }
+  window.updateModeBadge = updateModeBadge;
+</script>
 
 <script src="room.js"></script>
 </body>

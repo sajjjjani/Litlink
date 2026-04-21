@@ -18,6 +18,10 @@
     <span class="nav-section-title">Voice Rooms</span>
   </div>
   <div class="nav-right">
+    <button class="nav-dashboard" aria-label="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </button>
     <button class="nav-explore">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
       Explore Community
@@ -39,7 +43,7 @@
     <div class="sidebar-section">
       <div class="sidebar-section-hdr">
         <span class="sidebar-section-title">Live Rooms</span>
-        <span class="live-badge" id="live-count-badge">4 live</span>
+        <span class="live-badge" id="live-count-badge">0 live</span>
       </div>
       <div class="rooms-list" id="rooms-list"></div>
     </div>
@@ -100,9 +104,110 @@
       <label for="m-genre">Book / Genre</label>
       <select id="m-genre" class="form-select">
         <option value="">Select a genre</option>
-        <option>Fantasy</option><option>Mystery</option><option>Sci-Fi</option>
-        <option>Romance</option><option>Horror</option><option>Poetry</option>
-        <option>Classic Literature</option><option>Non-Fiction</option>
+        <!-- Fiction -->
+        <optgroup label="Fiction">
+          <option>Fantasy</option>
+          <option>High Fantasy</option>
+          <option>Dark Fantasy</option>
+          <option>Urban Fantasy</option>
+          <option>Science Fiction</option>
+          <option>Dystopian</option>
+          <option>Cyberpunk</option>
+          <option>Space Opera</option>
+          <option>Mystery</option>
+          <option>Thriller</option>
+          <option>Psychological Thriller</option>
+          <option>Crime Fiction</option>
+          <option>Cozy Mystery</option>
+          <option>Horror</option>
+          <option>Gothic Fiction</option>
+          <option>Supernatural Fiction</option>
+          <option>Romance</option>
+          <option>Historical Romance</option>
+          <option>Contemporary Romance</option>
+          <option>Paranormal Romance</option>
+          <option>Literary Fiction</option>
+          <option>Magical Realism</option>
+          <option>Historical Fiction</option>
+          <option>Adventure</option>
+          <option>Action & Adventure</option>
+          <option>Humor & Satire</option>
+          <option>Short Stories</option>
+          <option>Anthologies</option>
+        </optgroup>
+        <!-- Classic Literature -->
+        <optgroup label="Classic Literature">
+          <option>Classic Literature</option>
+          <option>Ancient Literature</option>
+          <option>Victorian Literature</option>
+          <option>Modernist Literature</option>
+          <option>World Literature</option>
+          <option>Mythology &amp; Folklore</option>
+        </optgroup>
+        <!-- Poetry & Drama -->
+        <optgroup label="Poetry & Drama">
+          <option>Poetry</option>
+          <option>Spoken Word</option>
+          <option>Drama &amp; Plays</option>
+          <option>Screenwriting</option>
+        </optgroup>
+        <!-- Non-Fiction -->
+        <optgroup label="Non-Fiction">
+          <option>Non-Fiction</option>
+          <option>Memoir &amp; Autobiography</option>
+          <option>Biography</option>
+          <option>True Crime</option>
+          <option>History</option>
+          <option>Philosophy</option>
+          <option>Psychology</option>
+          <option>Self-Help &amp; Personal Growth</option>
+          <option>Business &amp; Leadership</option>
+          <option>Economics</option>
+          <option>Science &amp; Nature</option>
+          <option>Technology</option>
+          <option>Politics &amp; Society</option>
+          <option>Travel Writing</option>
+          <option>Food &amp; Cooking</option>
+          <option>Art &amp; Design</option>
+          <option>Music &amp; Culture</option>
+          <option>Sports &amp; Recreation</option>
+          <option>Spirituality &amp; Religion</option>
+          <option>Health &amp; Wellness</option>
+          <option>Environment &amp; Nature</option>
+          <option>Education</option>
+          <option>Journalism &amp; Essays</option>
+        </optgroup>
+        <!-- Young Adult & Children -->
+        <optgroup label="Young Adult & Children">
+          <option>Young Adult (YA)</option>
+          <option>YA Fantasy</option>
+          <option>YA Romance</option>
+          <option>YA Thriller</option>
+          <option>Middle Grade</option>
+          <option>Children's Books</option>
+          <option>Picture Books</option>
+        </optgroup>
+        <!-- Manga & Comics -->
+        <optgroup label="Manga & Comics">
+          <option>Manga</option>
+          <option>Graphic Novels</option>
+          <option>Comics</option>
+          <option>Webtoons</option>
+        </optgroup>
+        <!-- Other -->
+        <optgroup label="Other">
+          <option>Book Club Picks</option>
+          <option>Award Winners</option>
+          <option>Debut Authors</option>
+          <option>Indie &amp; Self-Published</option>
+          <option>Translated Literature</option>
+          <option>LGBTQ+ Literature</option>
+          <option>South Asian Literature</option>
+          <option>African Literature</option>
+          <option>Latin American Literature</option>
+          <option>East Asian Literature</option>
+          <option>General Discussion</option>
+        </optgroup>
       </select>
     </div>
     <div class="form-group">
@@ -112,6 +217,7 @@
     <div class="form-group">
       <label>When</label>
       <div class="sched-toggle">
+        <!-- FIX: Button says "Start Now" - clicking it IMMEDIATELY starts the room -->
         <button class="sched-btn active" id="sched-now">Start Now</button>
         <button class="sched-btn" id="sched-later">Schedule Later</button>
       </div>
@@ -129,7 +235,8 @@
   </div>
   <div class="modal-ftr">
     <button class="modal-cancel" id="modal-cancel">Cancel</button>
-    <button class="modal-submit" id="modal-submit" disabled>Create Room</button>
+    <!-- FIX: text updates based on mode. "Start Room" for now, "Schedule Room" for later -->
+    <button class="modal-submit" id="modal-submit" disabled>Start Room</button>
   </div>
 </div>
 

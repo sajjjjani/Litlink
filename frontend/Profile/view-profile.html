@@ -3,237 +3,1009 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Profile - Litlink</title>
-    <link rel="stylesheet" href="profile.css">
+    <title>Reader Profile - Litlink</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        .view-profile-container {
-            max-width: 800px;
-            margin: 80px auto 40px;
-            padding: 20px;
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-deep:     #0f0905;
+            --bg-dark:     #1a0f0a;
+            --bg-card:     #241409;
+            --bg-raised:   #2e1a0e;
+            --bg-hover:    #3a2212;
+            --border:      rgba(201,162,123,0.12);
+            --border-hi:   rgba(201,162,123,0.28);
+            --gold:        #C9A27B;
+            --gold-light:  #dbb58f;
+            --gold-dim:    #b88d6a;
+            --cream:       #f5e6d3;
+            --muted:       #C9A27B;
+            --text:        #e8d5be;
+            --online:      #4cda64;
+            --radius-lg:   24px;
+            --radius-md:   14px;
+            --radius-sm:   10px;
+            --shadow:      0 8px 32px rgba(0,0,0,0.5);
+            --trans:       all 0.22s ease;
         }
-        .profile-card {
-            background: #3d2617;
-            border-radius: 24px;
-            padding: 32px;
-            border: 1px solid rgba(245,230,211,0.1);
-        }
-        .profile-header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .profile-avatar {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid #e0b973;
-            margin-bottom: 16px;
-        }
-        .profile-name {
-            font-size: 1.8rem;
-            color: #f5e6d3;
-            margin-bottom: 8px;
-        }
-        .profile-username {
-            color: #d4b5a0;
-            margin-bottom: 16px;
-        }
-        .profile-bio {
-            color: #d4b5a0;
+
+        body {
+            background: linear-gradient(180deg, #2c1810 0%, #1a0f0a 100%);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
             line-height: 1.6;
-            margin-bottom: 24px;
-            padding: 16px;
-            background: rgba(245,230,211,0.05);
-            border-radius: 12px;
+            padding: 0;
         }
-        .info-section {
-            margin-bottom: 24px;
+
+        /* Navigation Bar - MATCHES DASHBOARD */
+        .navbar {
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(29, 21, 15, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+            z-index: 1000;
+            padding: 0 20px;
         }
-        .info-section h3 {
-            color: #e0b973;
-            margin-bottom: 12px;
-            font-size: 1.2rem;
-        }
-        .tags-list {
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
             display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            text-decoration: none;
+        }
+
+        .nav-brand i {
+            color: #d4b5a0;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
             gap: 8px;
+            color: #d4b5a0;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        .nav-link:hover {
+            color: #f5e6d3;
+            background: rgba(245, 230, 211, 0.1);
+        }
+
+        .nav-link.active {
+            color: #f5e6d3;
+            background: rgba(245, 230, 211, 0.15);
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(245, 230, 211, 0.1);
+            border: 1px solid rgba(245, 230, 211, 0.2);
+            border-radius: 8px;
+            color: #d4b5a0;
+            text-decoration: none;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            color: #f5e6d3;
+            background: rgba(245, 230, 211, 0.2);
+            border-color: rgba(245, 230, 211, 0.3);
+        }
+
+        .menu-toggle {
+            display: none;
+            color: #f5e6d3;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 44px 24px 60px;
+        }
+
+        .state-box {
+            text-align: center;
+            padding: 80px 24px;
+            color: var(--gold);
+        }
+        .state-box i { font-size: 2.6rem; margin-bottom: 16px; display: block; opacity: 0.7; }
+        .state-box p { font-size: 1rem; }
+
+        .hero {
+            background: #3d2617;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+            border-radius: var(--radius-lg);
+            padding: 44px 40px 36px;
+            margin-bottom: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #d4b5a0, transparent);
+        }
+
+        .hero-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 36px;
             flex-wrap: wrap;
         }
-        .tag {
-            background: rgba(245,230,211,0.1);
-            padding: 6px 12px;
-            border-radius: 20px;
+
+        .avatar-shell {
+            position: relative;
+            flex-shrink: 0;
+        }
+        .avatar-img {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #d4b5a0;
+            display: block;
+        }
+        .avatar-emoji {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5c3a28, #3d2417);
+            border: 3px solid #d4b5a0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 58px;
+        }
+        .avatar-initial {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5c3a28, #3d2417);
+            border: 3px solid #d4b5a0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 52px;
+            font-weight: 700;
+            color: #d4b5a0;
+        }
+        .online-ring {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #4cda64;
+            border: 3px solid #3d2617;
+        }
+
+        .identity { flex: 1; min-width: 0; }
+        .user-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            line-height: 1.15;
+            margin-bottom: 8px;
+        }
+        .user-handle { color: #d4b5a0; font-size: 1rem; margin-bottom: 14px; opacity: 0.8; }
+        .user-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: #d4b5a0;
+            margin-bottom: 20px;
+        }
+        .user-meta span { display: flex; align-items: center; gap: 8px; }
+        .user-meta i { color: #d4b5a0; opacity: 0.7; }
+
+        .follow-counts {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 22px;
+        }
+        .count-item { text-align: center; }
+        .count-num { font-size: 1.4rem; font-weight: 700; color: #f5e6d3; }
+        .count-label { font-size: 0.75rem; color: #d4b5a0; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+
+        .action-row {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        .btn-gold {
+            background: #f5e6d3;
+            color: #2c1810;
+        }
+        .btn-gold:hover {
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 230, 211, 0.3);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid rgba(245, 230, 211, 0.3);
+            color: #d4b5a0;
+        }
+        .btn-outline:hover {
+            background: rgba(245, 230, 211, 0.1);
+            border-color: #f5e6d3;
+            color: #f5e6d3;
+            transform: translateY(-2px);
+        }
+        .btn-following {
+            background: rgba(245, 230, 211, 0.1);
+            border: 2px solid #d4b5a0;
+            color: #d4b5a0;
+        }
+        .btn-following:hover {
+            background: rgba(220, 38, 38, 0.15);
+            border-color: #dc2626;
+            color: #dc2626;
+            transform: translateY(-2px);
+        }
+        .btn-ghost {
+            background: rgba(245, 230, 211, 0.05);
+            border: 1px solid rgba(245, 230, 211, 0.2);
+            color: #d4b5a0;
+        }
+        .btn-ghost:hover {
+            background: rgba(245, 230, 211, 0.1);
+            color: #f5e6d3;
+            border-color: rgba(245, 230, 211, 0.3);
+        }
+
+        .bio-block {
+            margin-top: 28px;
+            padding: 20px;
+            background: rgba(245, 230, 211, 0.03);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(245, 230, 211, 0.1);
+            color: #d4b5a0;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            font-style: italic;
+        }
+        .bio-block::before { content: '"'; font-size: 1.5rem; color: #d4b5a0; line-height: 0; vertical-align: -4px; margin-right: 5px; opacity: 0.6; }
+        .bio-block::after  { content: '"'; font-size: 1.5rem; color: #d4b5a0; line-height: 0; vertical-align: -4px; margin-left: 5px; opacity: 0.6; }
+
+        .section-card {
+            background: #3d2617;
+            border: 1px solid rgba(245, 230, 211, 0.1);
+            border-radius: var(--radius-lg);
+            padding: 32px 36px;
+            margin-bottom: 24px;
+        }
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #d4b5a0;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .section-title i { font-size: 1rem; }
+
+        .pill-list { display: flex; gap: 12px; flex-wrap: wrap; }
+        .pill {
+            background: rgba(245, 230, 211, 0.1);
+            border: 1px solid rgba(245, 230, 211, 0.18);
+            color: #d4b5a0;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 6px 16px;
+            border-radius: 30px;
+            transition: all 0.3s ease;
+        }
+        .pill:hover {
+            background: rgba(245, 230, 211, 0.2);
+            border-color: rgba(245, 230, 211, 0.4);
+        }
+        .pill-empty { color: #d4b5a0; font-size: 0.85rem; font-style: italic; opacity: 0.6; }
+
+        .habit-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .habit-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(245, 230, 211, 0.05);
+            border: 1px solid rgba(245, 230, 211, 0.1);
+            border-radius: var(--radius-sm);
+            padding: 10px 20px;
             font-size: 0.85rem;
             color: #d4b5a0;
         }
-        .action-buttons {
-            display: flex;
-            gap: 16px;
-            margin-top: 32px;
-        }
-        .btn-primary, .btn-secondary {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 1rem;
+        .habit-chip i { color: #d4b5a0; font-size: 0.85rem; }
+
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+        .thread-list { display: flex; flex-direction: column; gap: 16px; }
+        .thread-item {
+            background: rgba(245, 230, 211, 0.03);
+            border: 1px solid rgba(245, 230, 211, 0.1);
+            border-radius: var(--radius-md);
+            padding: 20px 24px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: block;
             cursor: pointer;
-            border: none;
-            transition: all 0.3s;
         }
-        .btn-primary {
-            background: #e0b973;
-            color: #2c1810;
+        .thread-item:hover {
+            border-color: rgba(245, 230, 211, 0.25);
+            background: rgba(245, 230, 211, 0.06);
+            transform: translateX(4px);
         }
-        .btn-primary:hover {
-            background: #f0c98a;
-            transform: translateY(-2px);
+        .thread-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+        .thread-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f5e6d3;
+            line-height: 1.4;
+            margin-bottom: 8px;
         }
-        .btn-secondary {
-            background: transparent;
-            border: 1px solid #e0b973;
-            color: #e0b973;
-        }
-        .btn-secondary:hover {
-            background: rgba(224,185,115,0.1);
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
+        .thread-excerpt { font-size: 0.85rem; color: #d4b5a0; line-height: 1.5; margin-bottom: 12px; opacity: 0.8; }
+        .thread-meta {
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+            font-size: 0.75rem;
             color: #d4b5a0;
         }
+        .thread-meta span { display: flex; align-items: center; gap: 6px; }
+        .thread-meta i { color: #d4b5a0; opacity: 0.6; }
+        .thread-category {
+            background: rgba(245, 230, 211, 0.12);
+            border: 1px solid rgba(245, 230, 211, 0.2);
+            color: #d4b5a0;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 25px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .threads-empty {
+            text-align: center;
+            padding: 44px 20px;
+            color: #d4b5a0;
+            font-style: italic;
+            font-size: 0.9rem;
+            opacity: 0.6;
+        }
+        .threads-empty i { font-size: 2.4rem; margin-bottom: 14px; display: block; opacity: 0.5; }
+
+        .compat-row { display: flex; align-items: center; gap: 18px; }
+        .compat-bar-bg {
+            flex: 1;
+            height: 8px;
+            border-radius: 99px;
+            background: rgba(245, 230, 211, 0.1);
+            overflow: hidden;
+        }
+        .compat-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #d4b5a0, #f5e6d3);
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .compat-pct { font-size: 1.2rem; font-weight: 700; color: #d4b5a0; min-width: 52px; text-align: right; }
+        .compat-label { font-size: 0.8rem; color: #d4b5a0; margin-top: 10px; opacity: 0.7; }
+
+        .shared-list { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+        .shared-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(76, 218, 100, 0.08);
+            border: 1px solid rgba(76, 218, 100, 0.2);
+            color: #7de89b;
+            font-size: 0.78rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 25px;
+        }
+        .shared-chip i { font-size: 0.7rem; }
+
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #3d2617;
+            border: 1px solid rgba(245, 230, 211, 0.3);
+            color: #f5e6d3;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            z-index: 9999;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { border-color: rgba(76, 218, 100, 0.5); color: #7de89b; }
+        .toast.error   { border-color: rgba(224, 80, 60, 0.5); color: #e07060; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                position: fixed;
+                top: 70px;
+                left: 0;
+                right: 0;
+                background: rgba(29, 21, 15, 0.98);
+                backdrop-filter: blur(10px);
+                flex-direction: column;
+                padding: 20px;
+                gap: 12px;
+                border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+                display: none;
+            }
+            
+            .nav-links.active {
+                display: flex;
+            }
+            
+            .nav-link {
+                width: 100%;
+                justify-content: center;
+                padding: 12px;
+            }
+            
+            .menu-toggle {
+                display: block;
+            }
+            
+            .navbar { padding: 0 16px; }
+            .hero { padding: 28px 22px 24px; }
+            .hero-top { flex-direction: column; align-items: center; text-align: center; }
+            .user-meta { justify-content: center; }
+            .follow-counts { justify-content: center; }
+            .action-row { justify-content: center; }
+            .page { padding: 28px 16px 48px; }
+            .section-card { padding: 22px 20px; }
+            .back-btn { padding: 8px 16px; font-size: 0.85rem; }
+        }
+
+        @keyframes shimmer { 0%{background-position:-600px 0} 100%{background-position:600px 0} }
+        .skeleton {
+            background: linear-gradient(90deg, #3d2617 25%, #5c3a28 50%, #3d2617 75%);
+            background-size: 1200px 100%;
+            animation: shimmer 1.4s infinite linear;
+            border-radius: var(--radius-sm);
+        }
+        .skel-circle { width: 130px; height: 130px; border-radius: 50%; flex-shrink: 0; }
+        .skel-line  { height: 14px; margin-bottom: 12px; background: linear-gradient(90deg, #3d2617 25%, #5c3a28 50%, #3d2617 75%); background-size: 1200px 100%; animation: shimmer 1.4s infinite linear; border-radius: 8px; }
+        .skel-short { width: 45%; }
+        .skel-med   { width: 65%; }
+        .skel-full  { width: 100%; }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-brand">
-                <i class="fas fa-book-open"></i>
-                <span>Litlink</span>
-            </div>
-            <div class="nav-links">
-                <a href="../Dashboard/dashboard.html"><i class="fas fa-home"></i> Home</a>
-                <a href="../Chat/chat.html"><i class="fas fa-comments"></i> Chat</a>
-                <a href="../Discussion Board/discussion.html"><i class="fas fa-users"></i> Discussions</a>
-                <a href="../Profile/profile.html"><i class="fas fa-user"></i> My Profile</a>
-            </div>
-            <a href="../Chat/chatexplore.html" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
-        </div>
-    </nav>
 
-    <div class="view-profile-container">
-        <div id="profileContent" class="profile-card">
-            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading profile...</div>
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="../Dashboard/dashboard.html" class="nav-brand">
+            <i class="fas fa-book-open"></i>
+            <span>Litlink</span>
+        </a>
+        <div class="nav-links" id="navLinks">
+            <a href="../Dashboard/dashboard.html" class="nav-link">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <a href="../Chat/chat.html" class="nav-link">
+                <i class="fas fa-comments"></i>
+                <span>Chat</span>
+            </a>
+            <a href="../Discussion Board/discussion.html" class="nav-link">
+                <i class="fas fa-users"></i>
+                <span>Discussions</span>
+            </a>
+            <a href="../Profile/profile.html" class="nav-link">
+                <i class="fas fa-user"></i>
+                <span>My Profile</span>
+            </a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <a class="back-btn" id="backBtn" href="../Chat/chatexplore.html">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <div class="menu-toggle" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </div>
         </div>
     </div>
+</nav>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('id');
-        
-        async function loadProfile() {
-            if (!userId) {
-                window.location.href = '../Chat/chatexplore.html';
-                return;
-            }
-            
-            try {
-                const token = localStorage.getItem('litlink_token');
-                const response = await fetch(`http://localhost:5002/api/users/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (!response.ok) throw new Error('User not found');
-                
-                const user = await response.json();
-                renderProfile(user);
-                
-            } catch (error) {
-                console.error('Error loading profile:', error);
-                document.getElementById('profileContent').innerHTML = `
-                    <div class="empty-state" style="text-align:center">
-                        <i class="fas fa-exclamation-triangle" style="font-size:3rem;margin-bottom:16px"></i>
-                        <p>User not found</p>
-                        <button onclick="window.location.href='../Chat/chatexplore.html'" class="btn-primary">Back to Explore</button>
-                    </div>
-                `;
-            }
+<div class="page" id="page">
+    <div id="loadingSkeleton">
+        <div class="hero" style="margin-bottom:28px">
+            <div class="hero-top">
+                <div class="skeleton skel-circle"></div>
+                <div style="flex:1;padding-top:8px">
+                    <div class="skeleton skel-line skel-med"></div>
+                    <div class="skeleton skel-line skel-short"></div>
+                    <div class="skeleton skel-line skel-full" style="height:60px;margin-top:12px"></div>
+                </div>
+            </div>
+        </div>
+        <div class="section-card"><div class="skeleton skel-line skel-full"></div><div class="skeleton skel-line skel-med"></div></div>
+        <div class="section-card"><div class="skeleton skel-line skel-full"></div><div class="skeleton skel-line skel-short"></div></div>
+    </div>
+
+    <div id="profileRoot" style="display:none"></div>
+
+    <div id="errorState" style="display:none">
+        <div class="state-box">
+            <i class="fas fa-exclamation-triangle" style="color:var(--gold-dim)"></i>
+            <p id="errorMsg">Profile not found.</p>
+            <a href="../Chat/chatexplore.html" class="btn btn-outline" style="margin-top:28px">
+                <i class="fas fa-arrow-left"></i> Back to Explore
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function toggleMobileMenu() {
+    const navLinks = document.getElementById('navLinks');
+    if (navLinks) {
+        navLinks.classList.toggle('active');
+    }
+}
+
+const API = 'http://localhost:5002';
+
+function esc(t) {
+    if (!t) return '';
+    const d = document.createElement('div');
+    d.textContent = t; return d.innerHTML;
+}
+
+function getToken() {
+    return localStorage.getItem('litlink_token');
+}
+
+function getCurrentUser() {
+    try { return JSON.parse(localStorage.getItem('litlink_user') || 'null'); } catch { return null; }
+}
+
+let toastTimer;
+function showToast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, 3200);
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr);
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (m < 1)  return 'just now';
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    if (d < 7)  return `${d}d ago`;
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function isOnline(lastLogin) {
+    if (!lastLogin) return false;
+    return Date.now() - new Date(lastLogin) < 5 * 60 * 1000;
+}
+
+function calcMatch(viewedUser, currentUser) {
+    if (!currentUser || !viewedUser) return 0;
+    let score = 0;
+    const sharedGenres   = (viewedUser.favoriteGenres  || []).filter(g => (currentUser.favoriteGenres  || []).includes(g));
+    const sharedAuthors  = (viewedUser.favoriteAuthors || []).filter(a => (currentUser.favoriteAuthors || []).includes(a));
+    const sharedBooks    = (viewedUser.favoriteBooks   || []).filter(b => (currentUser.favoriteBooks   || []).includes(b));
+    score += sharedGenres.length  * 12;
+    score += sharedAuthors.length * 10;
+    score += sharedBooks.length   * 8;
+    return Math.min(100, 50 + score);
+}
+
+function getSharedItems(viewedUser, currentUser) {
+    if (!currentUser) return [];
+    const genres  = (viewedUser.favoriteGenres  || []).filter(g => (currentUser.favoriteGenres  || []).includes(g)).map(x => ({ icon: 'fa-bookmark', label: x }));
+    const authors = (viewedUser.favoriteAuthors || []).filter(a => (currentUser.favoriteAuthors || []).includes(a)).map(x => ({ icon: 'fa-pen-nib',  label: x }));
+    const books   = (viewedUser.favoriteBooks   || []).filter(b => (currentUser.favoriteBooks   || []).includes(b)).map(x => ({ icon: 'fa-book',     label: x }));
+    return [...genres, ...authors, ...books].slice(0, 8);
+}
+
+function renderAvatar(user, online) {
+    const pic = user.profilePicture;
+    const onlineDot = online ? '<span class="online-ring"></span>' : '';
+
+    if (pic && (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/'))) {
+        return `<div class="avatar-shell">
+            <img src="${esc(pic)}" alt="${esc(user.name)}" class="avatar-img"
+                 onerror="this.outerHTML='<div class=\\'avatar-initial\\'>${esc(user.name.charAt(0).toUpperCase())}</div>'">
+            ${onlineDot}
+        </div>`;
+    }
+    if (pic && pic.length <= 4 && /\p{Emoji}/u.test(pic)) {
+        return `<div class="avatar-shell">
+            <div class="avatar-emoji">${pic}</div>${onlineDot}
+        </div>`;
+    }
+    return `<div class="avatar-shell">
+        <div class="avatar-initial">${esc(user.name.charAt(0).toUpperCase())}</div>${onlineDot}
+    </div>`;
+}
+
+function pillList(items) {
+    if (!items || items.length === 0) return '<span class="pill-empty">None listed</span>';
+    return `<div class="pill-list">${items.map(x => `<span class="pill">${esc(x)}</span>`).join('')}</div>`;
+}
+
+let isFollowing = false;
+let followLoading = false;
+
+async function toggleFollow(userId) {
+    if (followLoading) return;
+    followLoading = true;
+
+    const token = getToken();
+    if (!token) { showToast('Please log in first', 'error'); followLoading = false; return; }
+
+    const endpoint = isFollowing
+        ? `${API}/api/users/${userId}/unfollow`
+        : `${API}/api/users/${userId}/follow`;
+
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (res.ok && (data.success !== false)) {
+            isFollowing = !isFollowing;
+            updateFollowBtn();
+            updateFollowerCount(isFollowing ? 1 : -1);
+            showToast(isFollowing ? 'Now following!' : 'Unfollowed', isFollowing ? 'success' : '');
+        } else {
+            showToast(data.message || 'Could not update follow status', 'error');
         }
-        
-        function renderProfile(user) {
-            const profileHtml = `
-                <div class="profile-header">
-                    ${user.profilePicture && user.profilePicture !== 'null' ? 
-                        `<img src="${user.profilePicture}" alt="${user.name}" class="profile-avatar">` :
-                        `<div class="profile-avatar" style="background:linear-gradient(135deg,#5c3a28,#3d2417);display:flex;align-items:center;justify-content:center;font-size:48px;margin:0 auto 16px">
-                            ${user.name.charAt(0).toUpperCase()}
-                        </div>`
-                    }
-                    <h1 class="profile-name">${escapeHtml(user.name)}</h1>
-                    <div class="profile-username">@${user.username || user.name.toLowerCase().replace(' ', '')}</div>
-                    ${user.bio ? `<div class="profile-bio">${escapeHtml(user.bio)}</div>` : ''}
+    } catch (e) {
+        showToast('Network error — please try again', 'error');
+    }
+    followLoading = false;
+}
+
+function updateFollowBtn() {
+    const btn = document.getElementById('followBtn');
+    if (!btn) return;
+    if (isFollowing) {
+        btn.className = 'btn btn-following';
+        btn.innerHTML = '<i class="fas fa-user-check"></i> Following';
+    } else {
+        btn.className = 'btn btn-gold';
+        btn.innerHTML = '<i class="fas fa-user-plus"></i> Follow';
+    }
+}
+
+function updateFollowerCount(delta) {
+    const el = document.getElementById('followerCount');
+    if (!el) return;
+    el.textContent = Math.max(0, (parseInt(el.textContent) || 0) + delta);
+}
+
+function renderProfile(user, threads, currentUser) {
+    const online   = isOnline(user.lastLogin);
+    const match    = calcMatch(user, currentUser);
+    const shared   = getSharedItems(user, currentUser);
+    const isSelf   = currentUser && (currentUser._id === user._id || currentUser.id === user._id);
+    const following = (user.followers || []).some(f =>
+        (f._id || f).toString() === (currentUser?._id || currentUser?.id || '')
+    );
+    isFollowing = following;
+
+    const followerCount = (user.followers || []).length;
+    const followingCount = (user.following || []).length;
+
+    let heroHtml = `
+    <div class="hero">
+        <div class="hero-top">
+            ${renderAvatar(user, online)}
+            <div class="identity">
+                <div class="user-name">${esc(user.name)}</div>
+                <div class="user-handle">@${esc(user.username || user.name.toLowerCase().replace(/\s+/g, '_'))}</div>
+                <div class="user-meta">
+                    ${online ? `<span><i class="fas fa-circle" style="color:#4cda64;font-size:0.6rem"></i> Online now</span>` :
+                               (user.lastLogin ? `<span><i class="fas fa-clock"></i> Last seen ${timeAgo(user.lastLogin)}</span>` : '')}
+                    ${user.location ? `<span><i class="fas fa-map-marker-alt"></i> ${esc(user.location)}</span>` : ''}
+                    ${user.pronouns  ? `<span><i class="fas fa-tag"></i> ${esc(user.pronouns)}</span>`  : ''}
+                    ${user.readingGoal ? `<span><i class="fas fa-bullseye"></i> ${user.readingGoal} books / year</span>` : ''}
                 </div>
-                
-                <div class="info-section">
-                    <h3>📚 Favorite Genres</h3>
-                    <div class="tags-list">
-                        ${(user.favoriteGenres || []).map(genre => `<span class="tag">${escapeHtml(genre)}</span>`).join('')}
-                        ${(!user.favoriteGenres || user.favoriteGenres.length === 0) ? '<span class="tag">Not specified</span>' : ''}
+
+                <div class="follow-counts">
+                    <div class="count-item">
+                        <div class="count-num" id="followerCount">${followerCount}</div>
+                        <div class="count-label">Followers</div>
+                    </div>
+                    <div class="count-item">
+                        <div class="count-num">${followingCount}</div>
+                        <div class="count-label">Following</div>
+                    </div>
+                    <div class="count-item">
+                        <div class="count-num">${(user.booksRead || []).length}</div>
+                        <div class="count-label">Books Read</div>
                     </div>
                 </div>
-                
-                <div class="info-section">
-                    <h3>✍️ Favorite Authors</h3>
-                    <div class="tags-list">
-                        ${(user.favoriteAuthors || []).map(author => `<span class="tag">${escapeHtml(author)}</span>`).join('')}
-                        ${(!user.favoriteAuthors || user.favoriteAuthors.length === 0) ? '<span class="tag">Not specified</span>' : ''}
-                    </div>
-                </div>
-                
-                <div class="info-section">
-                    <h3>📖 Favorite Books</h3>
-                    <div class="tags-list">
-                        ${(user.favoriteBooks || []).map(book => `<span class="tag">${escapeHtml(book)}</span>`).join('')}
-                        ${(!user.favoriteBooks || user.favoriteBooks.length === 0) ? '<span class="tag">Not specified</span>' : ''}
-                    </div>
-                </div>
-                
-                <div class="info-section">
-                    <h3>⏰ Reading Habit</h3>
-                    <div class="tags-list">
-                        <span class="tag">${user.readingHabit || 'Not specified'}</span>
-                        ${user.readingGoal ? `<span class="tag">Goal: ${user.readingGoal} books/year</span>` : ''}
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button class="btn-secondary" onclick="window.location.href='../Chat/chatexplore.html'">
-                        <i class="fas fa-arrow-left"></i> Back
+
+                ${!isSelf ? `
+                <div class="action-row">
+                    <button class="btn ${isFollowing ? 'btn-following' : 'btn-gold'}" id="followBtn"
+                            onclick="toggleFollow('${user._id}')">
+                        <i class="fas ${isFollowing ? 'fa-user-check' : 'fa-user-plus'}"></i>
+                        ${isFollowing ? 'Following' : 'Follow'}
                     </button>
-                    <button class="btn-primary" onclick="messageUser()">
-                        <i class="fas fa-comment"></i> Send Message
+                    <button class="btn btn-outline" onclick="window.location.href='../Chat/chat.html?userId=${user._id}'">
+                        <i class="fas fa-comment"></i> Message
                     </button>
+                </div>` : `
+                <div class="action-row">
+                    <a class="btn btn-outline" href="../Profile/profile.html">
+                        <i class="fas fa-pen"></i> Edit My Profile
+                    </a>
+                </div>`}
+            </div>
+        </div>
+
+        ${user.bio ? `<div class="bio-block">${esc(user.bio)}</div>` : ''}
+    </div>`;
+
+    let matchHtml = '';
+    if (!isSelf && currentUser) {
+        const sharedChips = shared.length
+            ? shared.map(s => `<div class="shared-chip"><i class="fas ${s.icon}"></i>${esc(s.label)}</div>`).join('')
+            : '<span class="pill-empty">No overlapping interests found yet</span>';
+
+        matchHtml = `
+        <div class="section-card">
+            <div class="section-title"><i class="fas fa-heart"></i> Reading Compatibility</div>
+            <div class="compat-row">
+                <div class="compat-bar-bg"><div class="compat-bar-fill" id="compatBar" style="width:0%"></div></div>
+                <div class="compat-pct" id="compatPct">0%</div>
+            </div>
+            <div class="compat-label">Based on shared genres, authors, and books</div>
+            ${shared.length ? `<div class="shared-list">${sharedChips}</div>` : ''}
+        </div>`;
+    }
+
+    const readingHtml = `
+    <div class="two-col">
+        <div class="section-card">
+            <div class="section-title"><i class="fas fa-bookmark"></i> Favourite Genres</div>
+            ${pillList(user.favoriteGenres)}
+        </div>
+        <div class="section-card">
+            <div class="section-title"><i class="fas fa-pen-nib"></i> Favourite Authors</div>
+            ${pillList(user.favoriteAuthors)}
+        </div>
+    </div>
+    <div class="section-card">
+        <div class="section-title"><i class="fas fa-book"></i> Favourite Books</div>
+        ${pillList(user.favoriteBooks)}
+    </div>`;
+
+    const habits = [];
+    if (user.readingHabit) habits.push({ icon: 'fa-clock', text: user.readingHabit });
+    if (user.readingGoal)  habits.push({ icon: 'fa-bullseye', text: `${user.readingGoal} books / year goal` });
+    if (user.preferredFormats && user.preferredFormats.length) {
+        user.preferredFormats.forEach(f => habits.push({ icon: 'fa-layer-group', text: f }));
+    }
+    if (user.discussionPreferences && user.discussionPreferences.length) {
+        user.discussionPreferences.forEach(p => habits.push({ icon: 'fa-comments', text: p }));
+    }
+
+    const habitsHtml = habits.length ? `
+    <div class="section-card">
+        <div class="section-title"><i class="fas fa-sun"></i> Reading Habits</div>
+        <div class="habit-row">
+            ${habits.map(h => `<div class="habit-chip"><i class="fas ${h.icon}"></i> ${esc(h.text)}</div>`).join('')}
+        </div>
+    </div>` : '';
+
+    let threadsHtml;
+    if (!threads || threads.length === 0) {
+        threadsHtml = `
+        <div class="section-card">
+            <div class="section-title"><i class="fas fa-comments"></i> Discussion Threads</div>
+            <div class="threads-empty">
+                <i class="fas fa-comment-slash"></i>
+                ${esc(user.name.split(' ')[0])} hasn't started any discussions yet.
+            </div>
+        </div>`;
+    } else {
+        const threadItems = threads.map(t => {
+            const excerpt = t.content ? (t.content.length > 120 ? t.content.slice(0, 117) + '…' : t.content) : '';
+            return `
+            <div class="thread-item" onclick="window.location.href='../Discussion Board/discussion.html?thread=${t._id}'">
+                <div class="thread-header">
+                    <div>
+                        <div class="thread-title">${esc(t.title)}</div>
+                        ${excerpt ? `<div class="thread-excerpt">${esc(excerpt)}</div>` : ''}
+                    </div>
+                    ${t.category ? `<span class="thread-category">${esc(t.category)}</span>` : ''}
                 </div>
-            `;
-            
-            document.getElementById('profileContent').innerHTML = profileHtml;
-            window.currentUserProfile = user;
+                <div class="thread-meta">
+                    <span><i class="fas fa-clock"></i> ${timeAgo(t.createdAt)}</span>
+                    ${t.replyCount != null ? `<span><i class="fas fa-reply"></i> ${t.replyCount} repl${t.replyCount === 1 ? 'y' : 'ies'}</span>` : ''}
+                    ${t.likeCount  != null ? `<span><i class="fas fa-heart"></i> ${t.likeCount} like${t.likeCount === 1 ? '' : 's'}</span>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+
+        threadsHtml = `
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fas fa-comments"></i> Discussion Threads
+                <span style="font-family:'DM Sans',sans-serif;font-size:0.8rem;color:#d4b5a0;font-weight:400;margin-left:auto;opacity:0.7">${threads.length} thread${threads.length === 1 ? '' : 's'}</span>
+            </div>
+            <div class="thread-list">${threadItems}</div>
+        </div>`;
+    }
+
+    document.getElementById('profileRoot').innerHTML =
+        heroHtml + matchHtml + readingHtml + habitsHtml + threadsHtml;
+
+    if (!isSelf && currentUser) {
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                const bar = document.getElementById('compatBar');
+                const pct = document.getElementById('compatPct');
+                if (bar) bar.style.width = match + '%';
+                if (pct) pct.textContent = match + '%';
+            }, 120);
+        });
+    }
+}
+
+async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('id');
+    const from   = params.get('from');
+
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        if (from === 'chat') backBtn.href = '../Chat/chat.html';
+        else backBtn.href = '../Chat/chatexplore.html';
+    }
+
+    if (!userId) {
+        showError('No user specified.');
+        return;
+    }
+
+    const token = getToken();
+    const currentUser = getCurrentUser();
+
+    try {
+        const userRes = await fetch(`${API}/api/users/${userId}`, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+
+        if (!userRes.ok) {
+            showError('Could not load this profile. The user may not exist.');
+            return;
         }
-        
-        function messageUser() {
-            if (window.currentUserProfile) {
-                window.location.href = `../Chat/chat.html?userId=${window.currentUserProfile._id}`;
+        const userData = await userRes.json();
+        const user = userData.user || userData;
+        if (!user || !user._id) {
+            showError('User not found.');
+            return;
+        }
+
+        let threads = [];
+        try {
+            const threadsRes = await fetch(`${API}/api/discussions?author=${userId}&limit=10`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            if (threadsRes.ok) {
+                const tData = await threadsRes.json();
+                threads = tData.threads || tData.data || tData || [];
+                if (!Array.isArray(threads)) threads = [];
             }
+        } catch (err) {
+            console.log('Could not fetch discussion threads:', err);
         }
-        
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        loadProfile();
-    </script>
+
+        document.title = `${user.name} — Litlink`;
+
+        document.getElementById('loadingSkeleton').style.display = 'none';
+        document.getElementById('profileRoot').style.display = '';
+        renderProfile(user, threads, currentUser);
+
+    } catch (err) {
+        console.error('Profile load error:', err);
+        showError('Something went wrong loading this profile.');
+    }
+}
+
+function showError(msg) {
+    document.getElementById('loadingSkeleton').style.display = 'none';
+    const errorMsgEl = document.getElementById('errorMsg');
+    if (errorMsgEl) errorMsgEl.textContent = msg;
+    document.getElementById('errorState').style.display = '';
+}
+
+init();
+</script>
 </body>
 </html>

@@ -1128,7 +1128,7 @@
         };
 
         window.logout = async function() {
-            if (confirm('Are you sure you want to logout?')) {
+            const performLogout = () => {
                 // Clear ALL auth data
                 localStorage.removeItem('litlink_user');
                 localStorage.removeItem('litlink_token');
@@ -1137,8 +1137,21 @@
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 localStorage.removeItem('userId');
-                
+                sessionStorage.clear();
                 window.location.href = '../Homepage/index.html';
+            };
+
+            if (typeof window.showConfirmModal === 'function') {
+                window.showConfirmModal(
+                    'Log Out',
+                    'Do you want to log out from Litlink?',
+                    performLogout
+                );
+                return;
+            }
+
+            if (confirm('Are you sure you want to logout?')) {
+                performLogout();
             }
         };
 

@@ -7,6 +7,122 @@
     <link rel="stylesheet" href="chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <style>
+        /* ── Block / Report Modal ─────────────────────────────────── */
+        .br-modal-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(20, 10, 5, 0.72);
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px;
+            animation: brFadeIn .18s ease;
+        }
+        @keyframes brFadeIn { from { opacity:0 } to { opacity:1 } }
+
+        .br-modal {
+            background: #2a1810;
+            border: 1px solid rgba(224,185,115,.25);
+            border-radius: 16px;
+            width: 100%; max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.6);
+            animation: brSlideUp .2s ease;
+            overflow: hidden;
+        }
+        @keyframes brSlideUp { from { transform:translateY(24px); opacity:0 } to { transform:translateY(0); opacity:1 } }
+
+        .br-modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid rgba(224,185,115,.15);
+        }
+        .br-modal-header h3 {
+            margin: 0; color: #E0B973; font-size: 1.05rem;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .br-close-btn {
+            background: none; border: none; color: #a89070; cursor: pointer;
+            font-size: 1rem; padding: 4px 8px; border-radius: 6px;
+            transition: color .15s, background .15s;
+        }
+        .br-close-btn:hover { color: #E0B973; background: rgba(224,185,115,.12); }
+
+        .br-modal-body { padding: 18px 20px 20px; }
+
+        .br-user-info {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 16px; padding: 10px 12px;
+            background: rgba(255,255,255,.04); border-radius: 10px;
+        }
+        .br-avatar { width:40px; height:40px; border-radius:50%; object-fit:cover; }
+        .br-username { color: #d4b5a0; font-weight: 600; font-size: .95rem; }
+
+        .br-tabs {
+            display: flex; gap: 6px; margin-bottom: 16px;
+        }
+        .br-tab {
+            flex: 1; padding: 8px 0; border-radius: 8px;
+            border: 1px solid rgba(224,185,115,.2);
+            background: transparent; color: #a89070;
+            cursor: pointer; font-size: .875rem; font-weight: 500;
+            transition: all .15s;
+        }
+        .br-tab:hover { border-color: rgba(224,185,115,.45); color: #E0B973; }
+        .br-tab.active { background: rgba(224,185,115,.15); border-color: #E0B973; color: #E0B973; }
+
+        .br-label {
+            display: block; color: #a89070; font-size: .8rem;
+            margin: 10px 0 5px; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .br-required { color: #e06060; }
+        .br-select, .br-input, .br-textarea {
+            width: 100%; box-sizing: border-box;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(224,185,115,.2);
+            border-radius: 8px; color: #d4b5a0;
+            padding: 9px 12px; font-size: .9rem;
+            transition: border .15s;
+            font-family: inherit;
+        }
+        .br-select:focus, .br-input:focus, .br-textarea:focus {
+            outline: none; border-color: #E0B973;
+        }
+        .br-textarea { resize: vertical; min-height: 70px; }
+        .br-select option { background: #2a1810; }
+
+        .br-panel-desc {
+            color: #a89070; font-size: .85rem;
+            margin: 0 0 12px; line-height: 1.5;
+        }
+
+        .br-submit-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; margin-top: 16px; padding: 11px;
+            border: none; border-radius: 10px;
+            font-size: .95rem; font-weight: 600; cursor: pointer;
+            transition: opacity .15s, transform .1s;
+        }
+        .br-submit-btn:hover { opacity: .9; transform: translateY(-1px); }
+        .br-submit-btn:active { transform: translateY(0); }
+        .br-submit-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+        .br-report-btn { background: #E0B973; color: #3B1D14; }
+        .br-block-btn  { background: #c0392b; color: #fff; }
+
+        .br-block-warning {
+            background: rgba(192,57,43,.12);
+            border: 1px solid rgba(192,57,43,.3);
+            border-radius: 10px; padding: 14px 16px;
+            color: #d4b5a0; font-size: .875rem; line-height: 1.6;
+        }
+        .br-block-warning i { color: #e07060; margin-right: 6px; }
+        .br-block-warning p { margin: 0 0 8px; }
+        .br-block-warning ul { margin: 4px 0 8px 18px; padding: 0; }
+        .br-block-warning li { margin-bottom: 3px; }
+        .br-note { font-size: .8rem; color: #8a7060; margin-top: 6px !important; }
+
+        /* shield button highlight when a match is active */
+        .br-trigger-btn { color: #a89070; }
+        .br-trigger-btn:hover { color: #E0B973; }
+    </style>
 </head>
 <body>
     <!-- Navigation Bar for Mobile -->
@@ -126,6 +242,9 @@
                     </button>
                     <button class="icon-btn" onclick="LitlinkChat.refreshMatches()">
                         <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="icon-btn br-trigger-btn" onclick="LitlinkChat.showBlockReportModal()" title="Block or Report user">
+                        <i class="fas fa-shield-alt"></i>
                     </button>
                     <button class="icon-btn" onclick="LitlinkChat.showSettings()">
                         <i class="fas fa-cog"></i>
