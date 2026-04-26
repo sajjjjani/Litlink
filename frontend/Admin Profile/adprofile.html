@@ -951,31 +951,33 @@
         
         // ===== AUTHENTICATION =====
         function checkAdminAuth() {
-            const token = localStorage.getItem('authToken');
-            const userStr = localStorage.getItem('user');
+            // Check all possible storage keys for token and user
+            authToken = sessionStorage.getItem('litlink_token') || 
+                        sessionStorage.getItem('authToken') || 
+                        localStorage.getItem('litlink_token') || 
+                        localStorage.getItem('authToken');
+                        
+            const userStr = sessionStorage.getItem('litlink_user') || 
+                            sessionStorage.getItem('user') || 
+                            localStorage.getItem('litlink_user') || 
+                            localStorage.getItem('user');
             
-            if (!token || !userStr) {
-                // For demo purposes, create default admin
-                const defaultAdmin = {
-                    id: 1,
-                    name: 'Eleanor Vance',
-                    email: 'eleanor@litlink.com',
-                    adminLevel: 'super_admin',
-                    createdAt: '2023-01-15T10:00:00Z',
-                    lastLogin: new Date().toISOString(),
-                    isAdmin: true,
-                    location: 'New York, USA'
-                };
-                currentAdmin = defaultAdmin;
-                return { token: 'demo-token', user: defaultAdmin };
+            if (!authToken || !userStr) {
+                console.warn('❌ No admin authentication found, redirecting...');
+                window.location.href = '../Homepage/index.html';
+                return null;
             }
             
             try {
                 const user = JSON.parse(userStr);
+                if (!user.isAdmin) {
+                    throw new Error('Not an admin');
+                }
                 currentAdmin = user;
-                return { token, user };
+                return { token: authToken, user };
             } catch (error) {
                 console.error('Auth error:', error);
+                window.location.href = '../Homepage/index.html';
                 return null;
             }
         }
@@ -984,16 +986,24 @@
         function initNavbar() {
             const navToggle = document.getElementById('navToggle');
             const navbar = document.getElementById('adminNavbar');
+            const mainContainer = document.getElementById('mainContainer');
             
             if (navToggle && navbar) {
                 navToggle.addEventListener('click', function(e) {
                     e.stopPropagation();
                     navbar.classList.toggle('active');
+                    if (window.innerWidth > 1024) {
+                        if (navbar.classList.contains('active')) {
+                            mainContainer.style.marginLeft = '280px';
+                        } else {
+                            mainContainer.style.marginLeft = '0';
+                        }
+                    }
                 });
                 
                 // Close navbar when clicking outside on mobile
                 document.addEventListener('click', function(event) {
-                    if (window.innerWidth <= 768) {
+                    if (window.innerWidth <= 1024) {
                         if (!navbar.contains(event.target) && !navToggle.contains(event.target)) {
                             navbar.classList.remove('active');
                         }
@@ -1150,6 +1160,11 @@
             if (confirm('Are you sure you want to logout?')) {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('user');
+                sessionStorage.removeItem('litlink_token');
+                sessionStorage.removeItem('litlink_user');
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('user');
+                
                 showToast('Logged out successfully!', 'success');
                 setTimeout(() => {
                     window.location.href = '../Homepage/index.html';

@@ -1705,8 +1705,44 @@ function displayBookDetails(data) {
             showMessageModal('Success', `"${bookData?.title || 'Book'}" added to your library!`, 'success');
         }
 
-        function addToReadingList() {
-            showMessageModal('Success', `"${bookData?.title || 'Book'}" added to your reading list!`, 'success');
+        async function addToReadingList() {
+            if (!bookData) return;
+            const auth = checkAuth();
+            if (!auth) {
+                showMessageModal('Error', 'Please login to add to your reading list.', 'error');
+                return;
+            }
+            const { token, user } = auth;
+            const currentUserId = user?.id || user?._id || localStorage.getItem('litlink_userId') || localStorage.getItem('userId');
+            
+            if (!currentUserId) {
+                showMessageModal('Error', 'User ID not found. Please login again.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/${currentUserId}/want-to-read`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        bookId: bookData?.key ? bookData.key.replace('/works/', '') : bookId,
+                        bookTitle: bookData.title,
+                        bookAuthor: bookData?.authorDetails?.name || bookData?.authors?.[0]?.name || 'Unknown Author'
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessageModal('Success', `"${bookData.title}" added to your reading list!`, 'success');
+                } else {
+                    showMessageModal('Notice', data.message || 'Could not add book to reading list', 'info');
+                }
+            } catch (error) {
+                console.error('Error adding to reading list:', error);
+                showMessageModal('Error', 'Failed to add book to reading list', 'error');
+            }
         }
 
         function shareBook() {

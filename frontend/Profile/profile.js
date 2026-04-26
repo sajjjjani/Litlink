@@ -10,8 +10,11 @@
 
         // ===== FIXED HELPER FUNCTIONS =====
         function getToken() {
-            const token = localStorage.getItem('litlink_token') || 
+            const token = sessionStorage.getItem('litlink_token') || 
+                          localStorage.getItem('litlink_token') || 
+                          sessionStorage.getItem('authToken') || 
                           localStorage.getItem('authToken') || 
+                          sessionStorage.getItem('token') || 
                           localStorage.getItem('token');
             
             console.log('🔑 Token check:', token ? 'Found ✓' : 'Not found ✗');
@@ -19,7 +22,9 @@
         }
 
         function getUserId() {
-            let userId = localStorage.getItem('litlink_userId') || 
+            let userId = sessionStorage.getItem('litlink_userId') || 
+                         localStorage.getItem('litlink_userId') || 
+                         sessionStorage.getItem('userId') || 
                          localStorage.getItem('userId');
             
             if (userId) {
@@ -27,7 +32,9 @@
                 return userId;
             }
             
-            const userStr = localStorage.getItem('litlink_user') || 
+            const userStr = sessionStorage.getItem('litlink_user') || 
+                            localStorage.getItem('litlink_user') || 
+                            sessionStorage.getItem('user') || 
                             localStorage.getItem('user');
             if (userStr) {
                 try {
@@ -35,8 +42,8 @@
                     userId = user.id || user._id;
                     if (userId) {
                         console.log('🆔 UserId from user object:', userId);
-                        localStorage.setItem('litlink_userId', userId);
-                        localStorage.setItem('userId', userId);
+                        sessionStorage.setItem('litlink_userId', userId);
+                        sessionStorage.setItem('userId', userId);
                         return userId;
                     }
                 } catch (e) {
@@ -50,11 +57,13 @@
 
         function getCurrentUserFromStorage() {
             try {
-                let userStr = localStorage.getItem('litlink_user') || 
+                let userStr = sessionStorage.getItem('litlink_user') || 
+                              localStorage.getItem('litlink_user') || 
+                              sessionStorage.getItem('user') || 
                               localStorage.getItem('user');
                 
                 if (!userStr) {
-                    console.error('❌ No user found in localStorage!');
+                    console.error('❌ No user found in storage!');
                     throw new Error('No user data found');
                 }
                 
@@ -62,14 +71,12 @@
                 
                 if (!user.id && user._id) {
                     user.id = user._id;
-                    localStorage.setItem('litlink_user', JSON.stringify(user));
-                    localStorage.setItem('user', JSON.stringify(user));
+                    sessionStorage.setItem('litlink_user', JSON.stringify(user));
                 }
                 
                 if (!user.createdAt) {
                     user.createdAt = new Date().toISOString();
-                    localStorage.setItem('litlink_user', JSON.stringify(user));
-                    localStorage.setItem('user', JSON.stringify(user));
+                    sessionStorage.setItem('litlink_user', JSON.stringify(user));
                 }
                 
                 console.log('✅ Retrieved user from storage:', user.name || user.email);
@@ -142,13 +149,11 @@
                 if (data.success && data.user) {
                     const mergedUser = { ...cachedUser, ...data.user };
                     
-                    localStorage.setItem('litlink_user', JSON.stringify(mergedUser));
-                    localStorage.setItem('user', JSON.stringify(mergedUser));
+                    sessionStorage.setItem('litlink_user', JSON.stringify(mergedUser));
                     
                     if (mergedUser.id || mergedUser._id) {
                         const uid = mergedUser.id || mergedUser._id;
-                        localStorage.setItem('litlink_userId', uid);
-                        localStorage.setItem('userId', uid);
+                        sessionStorage.setItem('litlink_userId', uid);
                     }
                     
                     console.log('✅ Updated user from API');
@@ -258,6 +263,8 @@
             updateTagsSection('sectionGenres', user.favoriteGenres || [], 'favoriteGenres');
             updateTagsSection('sectionAuthors', user.favoriteAuthors || [], 'favoriteAuthors');
             updateBooksSection(user.favoriteBooks || []);
+            updateWantToReadSection(user.wantToRead || []);
+            fetchWantToRead(); // explicitly fetch to ensure it is always up to date
             updateTagsSection('preferredFormats', user.preferredFormats || [], null, true);
             updateTagsSection('discussionPreferences', user.discussionPreferences || [], null, true);
             
@@ -393,6 +400,92 @@
                 showMessage('Loading your books...', 'info');
             };
             container.appendChild(loadBooksBtn);
+        }
+
+        function updateWantToReadSection(books) {
+            const container = document.getElementById('sectionWantToRead');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (books && books.length > 0) {
+                const emptyState = document.getElementById('emptyWantToRead');
+                if (emptyState) emptyState.style.display = 'none';
+                
+                books.forEach(book => {
+                    const bookCard = document.createElement('div');
+                    bookCard.className = 'book-card';
+                    bookCard.style.position = 'relative';
+                    
+                    const cover = document.createElement('div');
+                    cover.className = 'book-cover';
+                    if (book.cover || book.bookId || book.id) {
+                        const targetId = book.bookId || book.id;
+                        const coverUrl = `https://covers.openlibrary.org/b/olid/${targetId}-M.jpg`;
+                        cover.innerHTML = `<img src="${coverUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><i class="fas fa-book" style="display:none; font-size:24px; color:#8b6f47;"></i>`;
+                    } else {
+                        cover.innerHTML = '<i class="fas fa-book"></i>';
+                    }
+                    
+                    const title = document.createElement('div');
+                    title.className = 'book-title';
+                    title.textContent = book.title || book;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-tag';
+                    removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                    removeBtn.style.position = 'absolute';
+                    removeBtn.style.top = '-5px';
+                    removeBtn.style.right = '-5px';
+                    removeBtn.onclick = async () => {
+                        const token = getToken();
+                        const userId = getUserId();
+                        const targetId = book.bookId || book.id;
+                        if (targetId) {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/users/${userId}/want-to-read/${targetId}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (response.ok) {
+                                    // Refresh the list directly
+                                    fetchWantToRead();
+                                    showMessage('Book removed from Want to Read list', 'success');
+                                }
+                            } catch (e) {
+                                console.error('Error removing want to read:', e);
+                            }
+                        }
+                    };
+                    
+                    bookCard.appendChild(cover);
+                    bookCard.appendChild(title);
+                    bookCard.appendChild(removeBtn);
+                    container.appendChild(bookCard);
+                });
+            } else {
+                const emptyState = document.getElementById('emptyWantToRead');
+                if (emptyState) emptyState.style.display = 'flex';
+            }
+        }
+
+        async function fetchWantToRead() {
+            try {
+                const token = getToken();
+                const userId = getUserId();
+                if (!token || !userId) return;
+                
+                const response = await fetch(`${API_BASE_URL}/users/${userId}/want-to-read`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                if (data.success && data.wantToRead) {
+                    updateWantToReadSection(data.wantToRead);
+                }
+            } catch (error) {
+                console.error('Error fetching want-to-read list:', error);
+            }
         }
 
         function updateProfileCompleteness(user) {
