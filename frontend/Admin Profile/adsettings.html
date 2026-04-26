@@ -670,7 +670,7 @@
                 User Management
             </a>
             
-            <a href="#" class="nav-item" id="reportsLink">
+            <a href="reports.html" class="nav-item" id="reportsLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -680,7 +680,7 @@
                 Reports
             </a>
             
-            <a href="#" class="nav-item" id="analyticsLink">
+            <a href="analytics.html" class="nav-item" id="analyticsLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
@@ -1244,6 +1244,7 @@
     <script>
         // ===== API CONFIGURATION =====
         const API_BASE = 'http://localhost:5002/api';
+        let authToken = null;
         
         // ===== UTILITY FUNCTIONS =====
         function showToast(message, type = 'info') {
@@ -1312,6 +1313,21 @@
         function showLoading(message = 'Loading...') {
             const overlay = document.createElement('div');
             overlay.className = 'loading-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(5px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                color: white;
+                font-size: 1.2rem;
+            `;
             overlay.innerHTML = `<div>${message}</div>`;
             document.body.appendChild(overlay);
             return overlay;
@@ -1325,23 +1341,28 @@
         
         // ===== AUTHENTICATION =====
         function checkAdminAuth() {
-            const token = localStorage.getItem('authToken');
-            const userStr = localStorage.getItem('user');
+            authToken = sessionStorage.getItem('litlink_token') || 
+                        sessionStorage.getItem('authToken') || 
+                        localStorage.getItem('litlink_token') || 
+                        localStorage.getItem('authToken');
+                        
+            const userStr = sessionStorage.getItem('litlink_user') || 
+                            sessionStorage.getItem('user') || 
+                            localStorage.getItem('litlink_user') || 
+                            localStorage.getItem('user');
             
-            if (!token || !userStr) {
+            if (!authToken || !userStr) {
                 redirectToLogin();
                 return null;
             }
             
             try {
                 const user = JSON.parse(userStr);
-                
                 if (!user.isAdmin) {
                     redirectToLogin();
                     return null;
                 }
-                
-                return { token, user };
+                return { token: authToken, user };
             } catch (error) {
                 console.error('Auth error:', error);
                 redirectToLogin();
@@ -1352,92 +1373,296 @@
         function redirectToLogin() {
             alert('Admin access required. Please login as administrator.');
             localStorage.clear();
+            sessionStorage.clear();
             setTimeout(() => {
                 window.location.href = '../Homepage/index.html';
             }, 1000);
+        }
+        
+        // ===== SETTINGS DATA PERSISTENCE =====
+        async function loadSettings() {
+            const overlay = showLoading('Fetching settings...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/settings`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    applySettingsToUI(data.settings);
+                } else {
+                    showToast(data.message || 'Failed to load settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                showToast('Server connection error', 'error');
+            } finally {
+                hideLoading(overlay);
+            }
+        }
+
+        function applySettingsToUI(settings) {
+            if (!settings) return;
+
+            // General
+            if (settings.general) {
+                document.getElementById('siteName').value = settings.general.siteName || '';
+                document.getElementById('siteUrl').value = settings.general.siteUrl || '';
+                document.getElementById('adminEmail').value = settings.general.adminEmail || '';
+                document.getElementById('timezone').value = settings.general.timezone || 'UTC';
+                document.getElementById('autoModeration').checked = !!settings.general.autoModeration;
+                document.getElementById('requireEmailVerification').checked = !!settings.general.requireEmailVerification;
+                document.getElementById('allowRegistration').checked = !!settings.general.allowRegistration;
+                document.getElementById('enableReporting').checked = !!settings.general.enableReporting;
+            }
+
+            // Security
+            if (settings.security) {
+                document.getElementById('sessionTimeout').value = settings.security.sessionTimeout || 60;
+                document.getElementById('maxLoginAttempts').value = settings.security.maxLoginAttempts || 5;
+                document.getElementById('require2FA').checked = !!settings.security.require2FA;
+                document.getElementById('strongPasswords').checked = !!settings.security.strongPasswords;
+                document.getElementById('forceHTTPS').checked = !!settings.security.forceHTTPS;
+                document.getElementById('ipWhitelist').checked = !!settings.security.ipWhitelist;
+                document.getElementById('auditLogging').checked = !!settings.security.auditLogging;
+                document.getElementById('logRetention').value = settings.security.logRetention || 90;
+            }
+
+            // Appearance
+            if (settings.appearance) {
+                document.getElementById('themeMode').value = settings.appearance.themeMode || 'dark';
+                document.getElementById('enableAnimations').checked = !!settings.appearance.enableAnimations;
+                document.getElementById('compactMode').checked = !!settings.appearance.compactMode;
+                
+                if (settings.appearance.widgets) {
+                    document.getElementById('widgetUsers').checked = !!settings.appearance.widgets.users;
+                    document.getElementById('widgetActivity').checked = !!settings.appearance.widgets.activity;
+                    document.getElementById('widgetReports').checked = !!settings.appearance.widgets.reports;
+                    document.getElementById('widgetSystem').checked = !!settings.appearance.widgets.system;
+                    document.getElementById('widgetAnalytics').checked = !!settings.appearance.widgets.analytics;
+                }
+
+                const primaryColor = settings.appearance.primaryColor || '#d4a574';
+                document.querySelectorAll('.color-option').forEach(opt => {
+                    opt.classList.remove('active');
+                    if (opt.dataset.color === primaryColor) opt.classList.add('active');
+                });
+            }
+
+            // Notifications
+            if (settings.notifications) {
+                if (settings.notifications.email) {
+                    document.getElementById('emailSystemAlerts').checked = !!settings.notifications.email.systemAlerts;
+                    document.getElementById('emailUserReports').checked = !!settings.notifications.email.userReports;
+                    document.getElementById('emailNewUsers').checked = !!settings.notifications.email.newUsers;
+                    document.getElementById('emailSecurityEvents').checked = !!settings.notifications.email.securityEvents;
+                }
+                if (settings.notifications.inApp) {
+                    document.getElementById('desktopNotifications').checked = !!settings.notifications.inApp.desktopNotifications;
+                    const soundVal = settings.notifications.inApp.notificationSound || 'none';
+                    const radio = document.querySelector(`input[name="notificationSound"][value="${soundVal}"]`);
+                    if (radio) radio.checked = true;
+                }
+            }
+
+            // API
+            if (settings.api) {
+                document.getElementById('enableAPI').checked = !!settings.api.enableAPI;
+                document.getElementById('apiRateLimit').value = settings.api.apiRateLimit || 100;
+                document.getElementById('apiKey').value = settings.api.apiKey || 'No key generated';
+                document.getElementById('readOnlyApiKey').value = settings.api.readOnlyApiKey || 'No key generated';
+            }
+        }
+
+        async function saveAllSettings() {
+            const auth = checkAdminAuth();
+            if (!auth) return;
+
+            const selectedColor = document.querySelector('.color-option.active')?.dataset.color || '#d4a574';
+            const selectedSound = document.querySelector('input[name="notificationSound"]:checked')?.value || 'none';
+
+            const settings = {
+                general: {
+                    siteName: document.getElementById('siteName').value,
+                    siteUrl: document.getElementById('siteUrl').value,
+                    adminEmail: document.getElementById('adminEmail').value,
+                    timezone: document.getElementById('timezone').value,
+                    autoModeration: document.getElementById('autoModeration').checked,
+                    requireEmailVerification: document.getElementById('requireEmailVerification').checked,
+                    allowRegistration: document.getElementById('allowRegistration').checked,
+                    enableReporting: document.getElementById('enableReporting').checked
+                },
+                security: {
+                    sessionTimeout: parseInt(document.getElementById('sessionTimeout').value),
+                    maxLoginAttempts: parseInt(document.getElementById('maxLoginAttempts').value),
+                    require2FA: document.getElementById('require2FA').checked,
+                    strongPasswords: document.getElementById('strongPasswords').checked,
+                    forceHTTPS: document.getElementById('forceHTTPS').checked,
+                    ipWhitelist: document.getElementById('ipWhitelist').checked,
+                    auditLogging: document.getElementById('auditLogging').checked,
+                    logRetention: parseInt(document.getElementById('logRetention').value)
+                },
+                appearance: {
+                    primaryColor: selectedColor,
+                    themeMode: document.getElementById('themeMode').value,
+                    enableAnimations: document.getElementById('enableAnimations').checked,
+                    compactMode: document.getElementById('compactMode').checked,
+                    widgets: {
+                        users: document.getElementById('widgetUsers').checked,
+                        activity: document.getElementById('widgetActivity').checked,
+                        reports: document.getElementById('widgetReports').checked,
+                        system: document.getElementById('widgetSystem').checked,
+                        analytics: document.getElementById('widgetAnalytics').checked
+                    }
+                },
+                notifications: {
+                    email: {
+                        systemAlerts: document.getElementById('emailSystemAlerts').checked,
+                        userReports: document.getElementById('emailUserReports').checked,
+                        newUsers: document.getElementById('emailNewUsers').checked,
+                        securityEvents: document.getElementById('emailSecurityEvents').checked
+                    },
+                    inApp: {
+                        desktopNotifications: document.getElementById('desktopNotifications').checked,
+                        notificationSound: selectedSound
+                    }
+                },
+                api: {
+                    enableAPI: document.getElementById('enableAPI').checked,
+                    apiRateLimit: parseInt(document.getElementById('apiRateLimit').value)
+                }
+            };
+
+            const overlay = showLoading('Saving changes...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/settings`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Settings saved successfully!', 'success');
+                    closeSaveModal();
+                } else {
+                    showToast(data.message || 'Failed to save settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showToast('Server connection error', 'error');
+            } finally {
+                hideLoading(overlay);
+            }
+        }
+
+        async function regenerateKey(type) {
+            const overlay = showLoading(`Regenerating ${type} key...`);
+            try {
+                const response = await fetch(`${API_BASE}/admin/settings/regenerate-key`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`${type} API key regenerated`, 'success');
+                    if (type === 'admin') document.getElementById('apiKey').value = data.apiKey;
+                    else document.getElementById('readOnlyApiKey').value = data.apiKey;
+                } else {
+                    showToast(data.message || 'Failed to regenerate key', 'error');
+                }
+            } catch (error) {
+                console.error('Error regenerating key:', error);
+                showToast('Server connection error', 'error');
+            } finally {
+                hideLoading(overlay);
+            }
+        }
+
+        async function resetToDefaults() {
+            if (!confirm('Are you sure you want to reset ALL settings to defaults? This cannot be undone.')) return;
+            
+            const overlay = showLoading('Resetting to defaults...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/settings/reset`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Settings reset to defaults', 'success');
+                    applySettingsToUI(data.settings);
+                } else {
+                    showToast(data.message || 'Failed to reset settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error resetting settings:', error);
+                showToast('Server connection error', 'error');
+            } finally {
+                hideLoading(overlay);
+            }
         }
         
         // ===== NAVBAR FUNCTIONALITY =====
         function initNavbar() {
             const navToggle = document.getElementById('navToggle');
             const navbar = document.getElementById('adminNavbar');
+            const mainContainer = document.getElementById('mainContainer');
             
             if (navToggle && navbar) {
                 navToggle.addEventListener('click', function(e) {
                     e.stopPropagation();
                     navbar.classList.toggle('active');
+                    if (window.innerWidth > 1024) {
+                        if (navbar.classList.contains('active')) {
+                            mainContainer.style.marginLeft = '280px';
+                        } else {
+                            mainContainer.style.marginLeft = '0';
+                        }
+                    }
                 });
                 
                 // Close navbar when clicking outside on mobile
                 document.addEventListener('click', function(event) {
-                    if (window.innerWidth <= 768) {
+                    if (window.innerWidth <= 1024) {
                         if (!navbar.contains(event.target) && !navToggle.contains(event.target)) {
                             navbar.classList.remove('active');
                         }
                     }
                 });
             }
-            
-            // Setup navigation links
             setupNavLinks();
         }
         
         function setupNavLinks() {
-            // Reports
-            const reportsLink = document.getElementById('reportsLink');
-            if (reportsLink) {
-                reportsLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    createRipple(e);
-                    showToast('Reports page coming soon!', 'info');
-                });
-            }
-            
-            // Analytics
-            const analyticsLink = document.getElementById('analyticsLink');
-            if (analyticsLink) {
-                analyticsLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    createRipple(e);
-                    showToast('Analytics page coming soon!', 'info');
-                });
-            }
-            
-            // Logout button
-            const logoutBtn = document.getElementById('logoutBtn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    logoutAdmin();
-                });
-            }
-        }
-        
-        function logoutAdmin() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('user');
-                
-                showToast('Logged out successfully!', 'success');
-                
-                setTimeout(() => {
+            const logoutBtn = document.getElementById('logoutBtn') || document.getElementById('logoutBtnSidebar');
+            logoutBtn?.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (confirm('Are you sure you want to logout?')) {
+                    sessionStorage.clear();
+                    localStorage.clear();
                     window.location.href = '../Homepage/index.html';
-                }, 1000);
-            }
+                }
+            });
         }
         
-        // ===== SETTINGS FUNCTIONS =====
+        // ===== SETTINGS TABS =====
         function initSettingsTabs() {
             const tabButtons = document.querySelectorAll('.tab-btn');
             const tabContents = document.querySelectorAll('.tab-content');
             
             tabButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    // Remove active class from all tabs
                     tabButtons.forEach(btn => btn.classList.remove('active'));
                     tabContents.forEach(content => content.classList.remove('active'));
                     
-                    // Add active class to clicked tab
                     this.classList.add('active');
                     const tabId = this.dataset.tab + 'Tab';
                     document.getElementById(tabId).classList.add('active');
@@ -1446,7 +1671,6 @@
         }
         
         function initSettingsUI() {
-            // Color picker
             const colorOptions = document.querySelectorAll('.color-option');
             colorOptions.forEach(option => {
                 option.addEventListener('click', function() {
@@ -1455,252 +1679,173 @@
                 });
             });
             
-            // Copy API keys
             document.getElementById('copyApiKey').addEventListener('click', function() {
                 const apiKey = document.getElementById('apiKey');
                 apiKey.select();
                 document.execCommand('copy');
-                
                 this.textContent = 'Copied!';
-                this.classList.add('copied');
-                
-                setTimeout(() => {
-                    this.textContent = 'Copy';
-                    this.classList.remove('copied');
-                }, 2000);
+                setTimeout(() => this.textContent = 'Copy', 2000);
             });
             
             document.getElementById('copyReadOnlyApiKey').addEventListener('click', function() {
                 const apiKey = document.getElementById('readOnlyApiKey');
                 apiKey.select();
                 document.execCommand('copy');
-                
                 this.textContent = 'Copied!';
-                this.classList.add('copied');
-                
-                setTimeout(() => {
-                    this.textContent = 'Copy';
-                    this.classList.remove('copied');
-                }, 2000);
+                setTimeout(() => this.textContent = 'Copy', 2000);
             });
             
-            // Regenerate API keys
-            document.getElementById('regenerateAdminKey').addEventListener('click', function() {
-                if (confirm('Are you sure you want to regenerate the Admin API Key? This will invalidate the current key.')) {
-                    showLoading('Generating new API key...');
-                    
-                    setTimeout(() => {
-                        hideLoading();
-                        showToast('Admin API Key regenerated successfully!', 'success');
-                        // In real app, you would update the API key input field
-                    }, 1000);
-                }
-            });
+            document.getElementById('regenerateAdminKey').addEventListener('click', () => regenerateKey('admin'));
+            document.getElementById('regenerateReadOnlyKey').addEventListener('click', () => regenerateKey('readOnly'));
             
-            document.getElementById('regenerateReadOnlyKey').addEventListener('click', function() {
-                if (confirm('Are you sure you want to regenerate the Read-Only API Key?')) {
-                    showLoading('Generating new read-only API key...');
-                    
-                    setTimeout(() => {
-                        hideLoading();
-                        showToast('Read-Only API Key regenerated successfully!', 'success');
-                        // In real app, you would update the API key input field
-                    }, 1000);
-                }
-            });
-            
-            // Reset platform
             const resetOption = document.getElementById('resetOption');
             const resetPlatformBtn = document.getElementById('resetPlatform');
+            resetOption.addEventListener('change', () => resetPlatformBtn.disabled = !resetOption.value);
             
-            resetOption.addEventListener('change', function() {
-                resetPlatformBtn.disabled = !this.value;
-            });
-            
-            resetPlatformBtn.addEventListener('click', function() {
+            resetPlatformBtn.addEventListener('click', async () => {
                 const option = resetOption.value;
-                let message = '';
-                
-                switch(option) {
-                    case 'cache':
-                        message = 'Clear system cache?';
-                        break;
-                    case 'reports':
-                        message = 'Delete all reports? This cannot be undone.';
-                        break;
-                    case 'users':
-                        message = 'Delete all non-admin users? This cannot be undone.';
-                        break;
-                    case 'content':
-                        message = 'Delete all user content (posts, comments, etc.)? This cannot be undone.';
-                        break;
-                    case 'everything':
-                        message = 'RESET EVERYTHING? This will delete ALL data and cannot be undone!';
-                        break;
-                }
-                
-                if (confirm(message)) {
-                    showLoading(`Resetting ${option}...`);
-                    
-                    setTimeout(() => {
-                        hideLoading();
-                        showToast(`${option.charAt(0).toUpperCase() + option.slice(1)} reset successfully!`, 'success');
-                        resetOption.value = '';
-                        resetPlatformBtn.disabled = true;
-                    }, 2000);
+                if (confirm(`Are you sure you want to reset ${option}? This action is irreversible.`)) {
+                    const overlay = showLoading(`Resetting ${option}...`);
+                    try {
+                        const response = await fetch(`${API_BASE}/admin/settings/reset-platform`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${authToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ option })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            showToast(`${option} reset successfully`, 'success');
+                            resetOption.value = '';
+                            resetPlatformBtn.disabled = true;
+                        } else {
+                            showToast(data.message || 'Reset failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Reset error:', error);
+                        showToast('Server connection error', 'error');
+                    } finally {
+                        hideLoading(overlay);
+                    }
                 }
             });
-            
+
             // Export data
-            document.getElementById('exportData').addEventListener('click', function() {
-                showLoading('Preparing export...');
-                
-                setTimeout(() => {
-                    hideLoading();
-                    showToast('Database exported successfully!', 'success');
-                    // In real app, you would trigger a file download
-                }, 1500);
+            document.getElementById('exportData').addEventListener('click', async function() {
+                const overlay = showLoading('Preparing export...');
+                try {
+                    const response = await fetch(`${API_BASE}/admin/settings/export`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `litlink_backup_${new Date().toISOString().slice(0,10)}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        showToast('Database exported successfully!', 'success');
+                    } else {
+                        showToast('Export failed', 'error');
+                    }
+                } catch (error) {
+                    console.error('Export error:', error);
+                    showToast('Server connection error', 'error');
+                } finally {
+                    hideLoading(overlay);
+                }
             });
             
             // Import data
-            document.getElementById('importData').addEventListener('click', function() {
+            document.getElementById('importData').addEventListener('click', () => {
                 document.getElementById('importFile').click();
             });
             
             document.getElementById('importFile').addEventListener('change', function(e) {
                 if (e.target.files.length > 0) {
-                    if (confirm('Import database? This will overwrite existing data.')) {
-                        showLoading('Importing database...');
-                        
-                        setTimeout(() => {
-                            hideLoading();
-                            showToast('Database imported successfully!', 'success');
-                            e.target.value = ''; // Reset file input
-                        }, 2000);
-                    }
-                }
-            });
-            
-            // Reset settings
-            document.getElementById('resetSettings').addEventListener('click', function() {
-                if (confirm('Reset all settings to default values?')) {
-                    showLoading('Resetting settings...');
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
                     
-                    setTimeout(() => {
-                        hideLoading();
-                        showToast('Settings reset to default!', 'success');
-                        // In real app, you would reset form values
-                    }, 1000);
+                    reader.onload = async function(event) {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            if (confirm('Import database? This will overwrite existing data.')) {
+                                const overlay = showLoading('Importing database...');
+                                const response = await fetch(`${API_BASE}/admin/settings/import`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${authToken}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ data })
+                                });
+                                
+                                const result = await response.json();
+                                if (result.success) {
+                                    showToast('Database imported successfully!', 'success');
+                                    location.reload(); // Reload to apply settings
+                                } else {
+                                    showToast(result.message || 'Import failed', 'error');
+                                }
+                                hideLoading(overlay);
+                            }
+                        } catch (error) {
+                            console.error('Import parse error:', error);
+                            showToast('Invalid backup file format', 'error');
+                        }
+                        e.target.value = ''; // Reset file input
+                    };
+                    
+                    reader.readAsText(file);
                 }
             });
-            
-            // Save settings
-            document.getElementById('saveSettings').addEventListener('click', function() {
-                openSaveModal();
-            });
+
+            document.getElementById('resetSettings').addEventListener('click', resetToDefaults);
+            document.getElementById('saveSettings').addEventListener('click', openSaveModal);
         }
         
         // ===== SAVE MODAL =====
         function openSaveModal() {
             const modal = document.getElementById('saveModal');
             modal.classList.add('active');
-            setTimeout(() => {
-                modal.querySelector('.modal').classList.add('active');
-            }, 10);
+            setTimeout(() => modal.querySelector('.modal').classList.add('active'), 10);
         }
         
         function closeSaveModal() {
             const modal = document.getElementById('saveModal');
             modal.querySelector('.modal').classList.remove('active');
-            setTimeout(() => {
-                modal.classList.remove('active');
-            }, 300);
+            setTimeout(() => modal.classList.remove('active'), 300);
         }
         
         function setupSaveModal() {
-            const closeBtn = document.getElementById('closeSaveModal');
-            const cancelBtn = document.getElementById('cancelSave');
-            const confirmBtn = document.getElementById('confirmSave');
-            
-            if (closeBtn) closeBtn.addEventListener('click', closeSaveModal);
-            if (cancelBtn) cancelBtn.addEventListener('click', closeSaveModal);
-            
-            if (confirmBtn) {
-                confirmBtn.addEventListener('click', async function() {
-                    const auth = checkAdminAuth();
-                    if (!auth) return;
-                    
-                    const loadingOverlay = showLoading('Saving settings...');
-                    
-                    try {
-                        // In real app, collect all settings and send to API
-                        const settings = {
-                            general: {
-                                siteName: document.getElementById('siteName').value,
-                                siteUrl: document.getElementById('siteUrl').value,
-                                adminEmail: document.getElementById('adminEmail').value,
-                                timezone: document.getElementById('timezone').value
-                            },
-                            security: {
-                                sessionTimeout: document.getElementById('sessionTimeout').value,
-                                maxLoginAttempts: document.getElementById('maxLoginAttempts').value,
-                                require2FA: document.getElementById('require2FA').checked,
-                                strongPasswords: document.getElementById('strongPasswords').checked,
-                                forceHTTPS: document.getElementById('forceHTTPS').checked,
-                                ipWhitelist: document.getElementById('ipWhitelist').checked,
-                                auditLogging: document.getElementById('auditLogging').checked,
-                                logRetention: document.getElementById('logRetention').value
-                            }
-                            // Add more settings as needed
-                        };
-                        
-                        // Simulate API call
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        
-                        hideLoading(loadingOverlay);
-                        closeSaveModal();
-                        showToast('Settings saved successfully!', 'success');
-                        
-                    } catch (error) {
-                        console.error('Error saving settings:', error);
-                        hideLoading(loadingOverlay);
-                        showToast('Failed to save settings', 'error');
-                    }
-                });
-            }
+            document.getElementById('closeSaveModal')?.addEventListener('click', closeSaveModal);
+            document.getElementById('cancelSave')?.addEventListener('click', closeSaveModal);
+            document.getElementById('confirmSave')?.addEventListener('click', saveAllSettings);
         }
         
         // ===== INITIALIZATION =====
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Settings Page Initializing...');
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!checkAdminAuth()) return;
             
-            // Check authentication first
-            if (!checkAdminAuth()) {
-                return;
-            }
-            
-            // Initialize all components
             initNavbar();
             initSettingsTabs();
             initSettingsUI();
             setupSaveModal();
             
-            // Add ripple effect to buttons
-            document.querySelectorAll('button, .nav-item').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    createRipple(e);
-                });
-            });
+            await loadSettings();
             
-            console.log('✅ Settings Page Initialized');
+            document.querySelectorAll('button, .nav-item').forEach(button => {
+                button.addEventListener('click', (e) => createRipple(e));
+            });
         });
         
-        // Handle window resize
-        window.addEventListener('resize', function() {
-            const navbar = document.getElementById('adminNavbar');
-            if (window.innerWidth > 1024 && navbar) {
-                navbar.classList.remove('active');
-            }
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 1024) document.getElementById('adminNavbar')?.classList.remove('active');
         });
     </script>
 </body>
