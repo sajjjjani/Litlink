@@ -4,6 +4,7 @@ const router = express.Router();
 const authenticate = require('../middleware/auth');
 const Circle = require('../models/Circle');
 const CircleRequest = require('../models/CircleRequest');
+const Activity = require('../models/Activity');
 const UserNotificationService = require('../services/UserNotificationService');
 
 // GET /api/circle-requests
@@ -102,6 +103,17 @@ async function handleCircleRequestDecision(req, res, decision) {
           role: 'member'
         });
         circle.stats.memberCount += 1;
+        
+        try {
+          await Activity.create({
+            type: 'CIRCLE_JOINED',
+            user: request.senderId,
+            referenceId: circle.circleId,
+            message: `Joined circle "${circle.name}"`
+          });
+        } catch (err) {
+          console.error('Error logging activity:', err);
+        }
       }
 
       try {

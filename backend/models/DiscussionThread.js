@@ -23,6 +23,12 @@ const discussionThreadSchema = new mongoose.Schema({
   isCircleThread: { type: Boolean, default: false },
   isPublic: { type: Boolean, default: true },
   
+  // Attachments support
+  attachments: [{
+    url: { type: String, required: true },
+    isCensored: { type: Boolean, default: false }
+  }],
+  
   // Categorization
   genre: { type: String, default: 'General' },
   tags: [{ type: String }],
