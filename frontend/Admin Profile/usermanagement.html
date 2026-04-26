@@ -853,7 +853,8 @@
                 User Management
             </a>
             
-            <a href="#" class="nav-item" id="reportsLink">
+            <!-- Reports Link - Points to reports.html -->
+            <a href="reports.html" class="nav-item" id="reportsLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -863,7 +864,8 @@
                 Reports
             </a>
             
-            <a href="#" class="nav-item" id="analyticsLink">
+            <!-- Analytics Link - Points to analytics.html -->
+            <a href="analytics.html" class="nav-item" id="analyticsLink">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
@@ -1276,26 +1278,33 @@
         
         // ===== AUTHENTICATION =====
         function checkAdminAuth() {
-            const token = localStorage.getItem('authToken');
-            const userStr = localStorage.getItem('user');
+            // Check all possible storage keys for token and user
+            authToken = sessionStorage.getItem('litlink_token') || 
+                        sessionStorage.getItem('authToken') || 
+                        localStorage.getItem('litlink_token') || 
+                        localStorage.getItem('authToken');
+                        
+            const userStr = sessionStorage.getItem('litlink_user') || 
+                            sessionStorage.getItem('user') || 
+                            localStorage.getItem('litlink_user') || 
+                            localStorage.getItem('user');
             
-            if (!token || !userStr) {
-                redirectToLogin();
+            if (!authToken || !userStr) {
+                console.warn('❌ No admin authentication found, redirecting...');
+                window.location.href = '../Homepage/index.html';
                 return null;
             }
             
             try {
                 const user = JSON.parse(userStr);
-                
                 if (!user.isAdmin) {
-                    redirectToLogin();
-                    return null;
+                    throw new Error('Not an admin');
                 }
-                
-                return { token, user };
+                currentAdmin = user;
+                return { token: authToken, user };
             } catch (error) {
                 console.error('Auth error:', error);
-                redirectToLogin();
+                window.location.href = '../Homepage/index.html';
                 return null;
             }
         }
@@ -1312,56 +1321,36 @@
         function initNavbar() {
             const navToggle = document.getElementById('navToggle');
             const navbar = document.getElementById('adminNavbar');
+            const mainContainer = document.getElementById('mainContainer');
             
             if (navToggle && navbar) {
                 navToggle.addEventListener('click', function(e) {
                     e.stopPropagation();
                     navbar.classList.toggle('active');
+                    if (window.innerWidth > 1024) {
+                        if (navbar.classList.contains('active')) {
+                            mainContainer.style.marginLeft = '280px';
+                        } else {
+                            mainContainer.style.marginLeft = '0';
+                        }
+                    }
                 });
                 
                 // Close navbar when clicking outside on mobile
                 document.addEventListener('click', function(event) {
-                    if (window.innerWidth <= 768) {
+                    if (window.innerWidth <= 1024) {
                         if (!navbar.contains(event.target) && !navToggle.contains(event.target)) {
                             navbar.classList.remove('active');
                         }
                     }
                 });
             }
-            
-            // Setup navigation links
             setupNavLinks();
         }
         
         function setupNavLinks() {
-            // Dashboard link is already a regular href
-            // Profile link is already a regular href
-            // User Management link is already a regular href and active
-            
-            // Reports - coming soon
-            const reportsLink = document.getElementById('reportsLink');
-            if (reportsLink) {
-                reportsLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    createRipple(e);
-                    showToast('Reports page coming soon!', 'info');
-                });
-            }
-            
-            // Analytics - coming soon
-            const analyticsLink = document.getElementById('analyticsLink');
-            if (analyticsLink) {
-                analyticsLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    createRipple(e);
-                    showToast('Analytics page coming soon!', 'info');
-                });
-            }
-            
-            // Settings link is already a regular href
-            
             // Logout button
-            const logoutBtn = document.getElementById('logoutBtn');
+            const logoutBtn = document.getElementById('logoutBtn') || document.getElementById('logoutBtnSidebar');
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -1374,6 +1363,10 @@
             if (confirm('Are you sure you want to logout?')) {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('user');
+                sessionStorage.removeItem('litlink_token');
+                sessionStorage.removeItem('litlink_user');
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('user');
                 
                 showToast('Logged out successfully!', 'success');
                 

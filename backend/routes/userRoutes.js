@@ -606,6 +606,109 @@ router.delete('/:userId/books/:bookId', authenticate, async (req, res) => {
   }
 });
 
+// ==================== WANT TO READ ENDPOINTS ====================
+
+// GET /api/users/:userId/want-to-read - Get user's want-to-read list
+router.get('/:userId/want-to-read', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (userId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const wantToRead = (user.wantToRead || []).map(book => ({
+      bookId: book.bookId,
+      id: book.bookId,
+      title: book.title,
+      author: book.author,
+      cover: `https://covers.openlibrary.org/b/olid/${book.bookId}-M.jpg`
+    }));
+    
+    res.json({ success: true, wantToRead, total: wantToRead.length });
+  } catch (error) {
+    console.error('Get want to read error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching want to read list' });
+  }
+});
+
+// POST /api/users/:userId/want-to-read - Add book to want-to-read list
+router.post('/:userId/want-to-read', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { bookId, bookTitle, bookAuthor } = req.body;
+    
+    if (userId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    if (!bookId || !bookTitle) {
+      return res.status(400).json({ success: false, message: 'Book ID and Title are required' });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    if (!user.wantToRead) user.wantToRead = [];
+    
+    const existingIndex = user.wantToRead.findIndex(book => book.bookId === bookId);
+    if (existingIndex !== -1) {
+      return res.status(400).json({ success: false, message: 'Book is already in your Want to Read list' });
+    }
+    
+    user.wantToRead.push({
+      bookId,
+      title: bookTitle,
+      author: bookAuthor || 'Unknown Author'
+    });
+    
+    await user.save();
+    
+    res.json({ success: true, message: 'Book added to Want to Read list' });
+  } catch (error) {
+    console.error('Add want to read error:', error);
+    res.status(500).json({ success: false, message: 'Error adding book to want to read list' });
+  }
+});
+
+// DELETE /api/users/:userId/want-to-read/:bookId - Remove book from want-to-read list
+router.delete('/:userId/want-to-read/:bookId', authenticate, async (req, res) => {
+  try {
+    const { userId, bookId } = req.params;
+    
+    if (userId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    if (!user.wantToRead) user.wantToRead = [];
+    
+    const initialLength = user.wantToRead.length;
+    user.wantToRead = user.wantToRead.filter(book => book.bookId !== bookId);
+    
+    if (user.wantToRead.length < initialLength) {
+      await user.save();
+      res.json({ success: true, message: 'Book removed from Want to Read list' });
+    } else {
+      res.status(404).json({ success: false, message: 'Book not found in Want to Read list' });
+    }
+  } catch (error) {
+    console.error('Remove want to read error:', error);
+    res.status(500).json({ success: false, message: 'Error removing book from want to read list' });
+  }
+});
+
 // ==================== FOLLOW/UNFOLLOW ENDPOINTS ====================
 
 // POST /api/users/:userId/follow - Follow a user
