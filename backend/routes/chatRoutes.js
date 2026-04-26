@@ -71,15 +71,16 @@ router.get('/matches', authenticate, async (req, res) => {
   try {
     const me = req.user._id.toString();
 
-    const currentUser = await User.findById(me).select('blockedUsers');
+    const currentUser = await User.findById(me).select('favoriteGenres discussionPreferences readingHabit blockedUsers');
     const blockedUserIds = (currentUser && currentUser.blockedUsers) ? 
       currentUser.blockedUsers.map(id => id.toString()) : [];
 
     const users = await User.find({
       _id: { $ne: me, $nin: blockedUserIds },
+      blockedUsers: { $ne: me },
       isBanned: { $ne: true },
       isAdmin: { $ne: true }
-    }).select('name username profilePicture favoriteGenres favoriteBooks lastLogin').lean();
+    }).select('name username profilePicture favoriteGenres discussionPreferences readingHabit favoriteBooks lastLogin').lean();
 
     const conversations = await Conversation.find({ participants: me }).sort({ lastMessage: -1 });
 
@@ -108,13 +109,60 @@ router.get('/matches', authenticate, async (req, res) => {
       }
     });
 
+    // Try to get AI match scores
+    let aiMatchesMap = new Map();
+    try {
+      const axios = require('axios');
+      const FASTAPI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+      const userProfileForAI = await User.findById(me).select('-password -resetToken -resetTokenExpiry');
+      const aiResponse = await axios.post(`${FASTAPI_URL}/match`, {
+        userProfile: userProfileForAI.toObject(),
+        currentUserId: me
+      });
+      if (aiResponse.data && Array.isArray(aiResponse.data)) {
+        aiResponse.data.forEach(match => {
+          aiMatchesMap.set(match.userId.toString(), match.score);
+        });
+      }
+    } catch (e) {
+      console.warn('Chat AI matching fallback used due to error:', e.message);
+    }
+
     const matches = users.map(user => {
       const info = convMap.get(user._id.toString()) || {};
+      
       let compatibility = 70;
-      if (req.user.favoriteGenres && user.favoriteGenres) {
-        const shared = req.user.favoriteGenres.filter(g => user.favoriteGenres.includes(g));
+      if (aiMatchesMap.has(user._id.toString())) {
+        compatibility = Math.round(aiMatchesMap.get(user._id.toString()) * 100);
+      } else if (currentUser.favoriteGenres && user.favoriteGenres) {
+        const shared = currentUser.favoriteGenres.filter(g => user.favoriteGenres.includes(g));
         compatibility = 70 + Math.min(25, shared.length * 5);
       }
+
+      // Generate Explanation
+      const commonGenres = (currentUser.favoriteGenres || []).filter(g => (user.favoriteGenres || []).includes(g));
+      const commonDiscussion = (currentUser.discussionPreferences || []).filter(d => (user.discussionPreferences || []).includes(d));
+      const commonHabit = currentUser.readingHabit && user.readingHabit && currentUser.readingHabit === user.readingHabit ? currentUser.readingHabit : null;
+
+      let explanationParts = [];
+      if (commonGenres.length > 0) {
+          explanationParts.push(`enjoy ${commonGenres[0]}`);
+      }
+      if (commonDiscussion.length > 0) {
+          const styleStr = commonDiscussion[0].toLowerCase().includes('discussion') ? commonDiscussion[0].toLowerCase() : `${commonDiscussion[0].toLowerCase()} discussions`;
+          explanationParts.push(`prefer ${styleStr}`);
+      }
+      if (commonHabit && explanationParts.length < 2) {
+          explanationParts.push(`are both ${commonHabit.toLowerCase()} readers`);
+      }
+
+      let explanation = "You have similar reading interests.";
+      if (explanationParts.length === 1) {
+          explanation = `You both ${explanationParts[0]}.`;
+      } else if (explanationParts.length >= 2) {
+          explanation = `You both ${explanationParts[0]} and ${explanationParts[1]}.`;
+      }
+
       return {
         _id:            user._id,
         id:             user._id,
@@ -123,6 +171,7 @@ router.get('/matches', authenticate, async (req, res) => {
         profilePicture: user.profilePicture,
         genre:          (user.favoriteGenres && user.favoriteGenres[0]) || 'Reader',
         preview:        info.lastMessage || 'No messages yet',
+        explanation:    explanation,
         online:         user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false,
         unreadCount:    info.unreadCount || 0,
         conversationId: info.conversationId,
