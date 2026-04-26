@@ -2691,3 +2691,36 @@ body {
         width: 100%;
     }
 }
+/* Thread Attachments */
+.thread-attachments {
+    margin: 15px 0;
+    width: 100%;
+}
+
+.attachment-item {
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.attachment-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+.attachment-item.censored .censor-overlay {
+    backdrop-filter: blur(5px);
+}
+
+.attachment-item img {
+    display: block;
+    user-select: none;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner-small {
+    margin: 5px;
+}

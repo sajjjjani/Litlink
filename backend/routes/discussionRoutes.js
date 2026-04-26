@@ -5,9 +5,11 @@ const DiscussionThread = require('../models/DiscussionThread');
 const Circle = require('../models/Circle');
 const CircleRequest = require('../models/CircleRequest');
 const User = require('../models/User');
+const Activity = require('../models/Activity');
 const authMiddleware = require('../middleware/authMiddleware');
 const FilterService = require('../services/filterService');
 const UNS = require('../services/UserNotificationService');
+const upload = require('../middleware/upload');
 
 // Helper to check if user is suspended
 async function isUserSuspended(userId) {
@@ -314,12 +316,14 @@ router.get('/circles/:circleId/details', authMiddleware, async (req, res) => {
         isMember,
         userRole,
         pendingRequest: !!pendingRequest,
-        members: circle.members.map(m => ({
-          user: m.user,
-          role: m.role,
-          joinedAt: m.joinedAt
-        })),
-        pendingRequestsCount: circle.pendingRequests.length
+        pendingRequestsCount: circle.pendingRequests.length,
+        members: circle.members
+          .filter(m => m.user) // Ensure user object is not null
+          .map(m => ({
+            user: m.user,
+            role: m.role,
+            joinedAt: m.joinedAt
+          }))
       }
     });
   } catch (error) {
@@ -716,6 +720,17 @@ router.post('/circles/create', authMiddleware, async (req, res) => {
     });
     
     await circle.save();
+
+    try {
+      await Activity.create({
+        type: 'CIRCLE_CREATED',
+        user: req.userId,
+        referenceId: circle.circleId,
+        message: `Created circle "${circle.name}"`
+      });
+    } catch (err) {
+      console.error('Error logging activity:', err);
+    }
     
     try {
       const io = global.io;
@@ -1262,8 +1277,8 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
   }
 });
 
-// Create a new circle thread (with filter)
-router.post('/circles/threads', authMiddleware, async (req, res) => {
+// Create a new circle thread (with filter and image support)
+router.post('/circles/threads', authMiddleware, upload.array('images', 4), async (req, res) => {
   try {
     const { 
       title, 
@@ -1273,7 +1288,8 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       circleName, 
       tags, 
       poll, 
-      event 
+      event,
+      censorIndices // New: stringified array of indices to censor, e.g., "[0, 2]"
     } = req.body;
 
     if (!title || !content) {
@@ -1343,6 +1359,18 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       });
     }
 
+    // Process attachments
+    const attachments = [];
+    if (req.files && req.files.length > 0) {
+      const censors = censorIndices ? JSON.parse(censorIndices) : [];
+      req.files.forEach((file, index) => {
+        attachments.push({
+          url: `/uploads/threads/${file.filename}`,
+          isCensored: censors.includes(index)
+        });
+      });
+    }
+
     const thread = new DiscussionThread({
       title: filteredTitle,
       content: filteredContent,
@@ -1353,7 +1381,8 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
       tags: tags || [],
       isCircleThread: true,
       isPublic: false,
-      genre: circle.genre
+      genre: circle.genre,
+      attachments
     });
 
     if (type === 'poll' && poll) {
@@ -1389,6 +1418,16 @@ router.post('/circles/threads', authMiddleware, async (req, res) => {
 
     await thread.populate('author', 'name username profilePicture');
 
+    try {
+      await Activity.create({
+        type: 'POST_CREATED',
+        user: req.userId,
+        referenceId: thread._id.toString(),
+        message: `Posted in circle "${circle.name}": "${filteredTitle}"`
+      });
+    } catch (err) {
+      console.error('Error logging activity:', err);
+    }
     // ── Notify circle members (DB record + real-time) ─────────────────────
     const author = await User.findById(req.userId).select('name profilePicture');
     try {
@@ -2004,10 +2043,18 @@ router.get('/threads/:threadId', authMiddleware, async (req, res) => {
   }
 });
 
-// Create new thread (public discussion) with filter
-router.post('/threads', authMiddleware, async (req, res) => {
+// Create new thread (public discussion) with filter and image support
+router.post('/threads', authMiddleware, upload.array('images', 4), async (req, res) => {
   try {
-    const { title, content, genre, tags, bookReferences, category } = req.body;
+    const { 
+      title, 
+      content, 
+      genre, 
+      tags, 
+      bookReferences, 
+      category,
+      censorIndices 
+    } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ 
@@ -2053,6 +2100,18 @@ router.post('/threads', authMiddleware, async (req, res) => {
     }
     const filteredContent = contentFilterResult.hasViolation ? contentFilterResult.censoredText : content;
 
+    // Process attachments
+    const attachments = [];
+    if (req.files && req.files.length > 0) {
+      const censors = censorIndices ? JSON.parse(censorIndices) : [];
+      req.files.forEach((file, index) => {
+        attachments.push({
+          url: `/uploads/threads/${file.filename}`,
+          isCensored: censors.includes(index)
+        });
+      });
+    }
+
     const thread = new DiscussionThread({
       title: filteredTitle,
       content: filteredContent,
@@ -2062,11 +2121,23 @@ router.post('/threads', authMiddleware, async (req, res) => {
       bookReferences: bookReferences || [],
       category: category || 'general',
       isPublic: true,
-      isCircleThread: false
+      isCircleThread: false,
+      attachments
     });
 
     await thread.save();
     await thread.populate('author', 'name username profilePicture');
+
+    try {
+      await Activity.create({
+        type: 'DISCUSSION_CREATED',
+        user: req.userId,
+        referenceId: thread._id.toString(),
+        message: `Started a discussion: "${thread.title}"`
+      });
+    } catch (err) {
+      console.error('Error logging activity:', err);
+    }
 
     try {
       const io = global.io;
@@ -2345,6 +2416,17 @@ router.post('/threads/:threadId/comments', authMiddleware, async (req, res) => {
     thread.lastCommentBy = req.userId;
     
     await thread.save();
+
+    try {
+      await Activity.create({
+        type: 'COMMENT_ADDED',
+        user: req.userId,
+        referenceId: thread._id.toString(),
+        message: `Commented on discussion: "${thread.title}"`
+      });
+    } catch (err) {
+      console.error('Error logging activity:', err);
+    }
 
     // ── Notify thread author about new comment ────────────────────────────
     try {
