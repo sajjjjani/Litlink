@@ -42,7 +42,7 @@ async function init() {
     }
   }
 
-  if (!token || !user?.id) { window.location.href = '../login.html'; return; }
+  if (!token || !user?.id) { window.location.href = '../Homepage/index.html'; return; }
   currentUser = user;
   updateUserUI();
   await loadSocketIO();

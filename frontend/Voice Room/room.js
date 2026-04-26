@@ -121,7 +121,7 @@ async function init() {
     }
   }
 
-  if (!token || !user?.id) { window.location.href = '../login.html'; return; }
+  if (!token || !user?.id) { window.location.href = '../Homepage/index.html'; return; }
 
   currentUser = user;
   await loadSocketIO();
@@ -234,7 +234,7 @@ function connectToRoom(token) {
       } else {
         // Auth failed (e.g. expired token) — don't loop, redirect to login
         showToast('Session expired. Please log in again.', 'error');
-        setTimeout(() => window.location.href = '../login.html', 2000);
+        setTimeout(() => window.location.href = '../Homepage/index.html', 2000);
       }
     });
 
