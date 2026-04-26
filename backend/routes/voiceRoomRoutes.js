@@ -288,7 +288,8 @@ router.post('/rooms/:roomId/leave', authenticate, async (req, res) => {
         if (remainingCount === 0) {
             await VoiceRoom.findByIdAndUpdate(req.params.roomId, {
                 status: 'ended',
-                endedAt: new Date()
+                endedAt: new Date(),
+                duration: Math.round((new Date() - participant.roomId.createdAt) / 60000) || 0
             });
         }
 
@@ -331,6 +332,7 @@ router.post('/rooms/:roomId/end', authenticate, async (req, res) => {
 
         room.status = 'ended';
         room.endedAt = new Date();
+        room.duration = Math.round((room.endedAt - room.createdAt) / 60000) || 0;
         await room.save();
 
         await RoomParticipant.updateMany(
@@ -405,11 +407,11 @@ router.get('/rooms/stats', authenticate, async (req, res) => {
     }
 });
 
-// ── GET /rooms/history — User's voice room history ────────────────────────
+// ── GET /history — User's voice room history ────────────────────────
 router.get('/rooms/history', authenticate, async (req, res) => {
     try {
         const participants = await RoomParticipant.find({ userId: req.userId })
-            .populate('roomId', 'name description status hostId createdAt endedAt')
+            .populate('roomId', 'name description status hostId createdAt endedAt duration')
             .sort({ joinedAt: -1 })
             .limit(50);
 
@@ -417,7 +419,7 @@ router.get('/rooms/history', authenticate, async (req, res) => {
             room: p.roomId,
             joinedAt: p.joinedAt,
             leftAt: p.leftAt,
-            duration: p.leftAt ? Math.round((p.leftAt - p.joinedAt) / 60000) : null,
+            duration: p.roomId ? p.roomId.duration : (p.leftAt ? Math.round((p.leftAt - p.joinedAt) / 60000) : null),
             wasMuted: p.isMuted,
             raisedHand: p.handRaised
         }));
