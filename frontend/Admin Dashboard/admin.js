@@ -33,27 +33,41 @@ function loadSocketIO() {
 }
 
 async function checkAuthAndInitialize() {
-    authToken = localStorage.getItem('authToken');
-    const userStr = localStorage.getItem('user');
+    // ── AUTHENTICATION PRIORITY ──────────────────────────────────────────────
+    // We prioritize sessionStorage (current tab) over localStorage (global).
+    // This prevents stale regular-user data in localStorage from overriding 
+    // a fresh admin login in sessionStorage.
+    authToken = sessionStorage.getItem('litlink_token') || 
+                sessionStorage.getItem('authToken') || 
+                localStorage.getItem('litlink_token') || 
+                localStorage.getItem('authToken');
+                
+    const userStr = sessionStorage.getItem('litlink_user') || 
+                    sessionStorage.getItem('user') || 
+                    localStorage.getItem('litlink_user') || 
+                    localStorage.getItem('user');
     
     if (authToken) window.authToken = authToken;
     
     try {
         currentUser = userStr ? JSON.parse(userStr) : null;
     } catch (e) {
+        console.error('Failed to parse user data:', e);
         currentUser = null;
     }
     
-    console.log('🔐 Checking authentication...', { 
+    console.log('🔐 Admin Auth Check:', { 
         hasToken: !!authToken, 
+        tokenSource: sessionStorage.getItem('litlink_token') ? 'sessionStorage' : 'localStorage',
+        userFound: !!currentUser,
         isAdmin: currentUser?.isAdmin 
     });
     
     if (!authToken || !currentUser?.isAdmin) {
-        console.log('❌ Not authenticated as admin, redirecting...');
-        showToast('Admin access required. Please login as administrator.', 'warning');
+        console.warn('❌ Auth failed: No token or user is not an admin.');
+        showToast('Admin access required. Redirecting...', 'warning');
         setTimeout(() => {
-            window.location.href = '../login.html';
+            window.location.href = '../Homepage/index.html';
         }, 1500);
         return;
     }
@@ -91,7 +105,7 @@ async function checkAuthAndInitialize() {
         showToast(error.message || 'Admin authentication failed', 'error');
         localStorage.clear();
         setTimeout(() => {
-            window.location.href = '../login.html';
+            window.location.href = '../Homepage/index.html';
         }, 2000);
     }
 }
@@ -477,19 +491,19 @@ async function loadDashboardData() {
 function updateStats(stats) {
     console.log('📊 Updating stats:', stats);
     
-    updateStatValue('.stat-card:nth-child(1) .stat-value', stats.totalUsers || 0);
-    updateStatValue('.stat-card:nth-child(2) .stat-value', stats.activeToday || 0);
-    updateStatValue('.stat-card:nth-child(3) .stat-value', stats.activeMatches || 0);
-    updateStatValue('.stat-card:nth-child(4) .stat-value', stats.liveRooms || 0);
+    updateStatValue('#totalUsersStat', stats.totalUsers || 0);
+    updateStatValue('#activeTodayStat', stats.activeToday || 0);
+    updateStatValue('#activeMatchesStat', stats.activeMatches || 0);
+    updateStatValue('#liveRoomsStat', stats.liveRooms || 0);
     
-    updateStatValue('.mod-card.mod-warning .mod-value', stats.newReports || 0);
-    updateStatValue('.mod-card.mod-pending .mod-value', stats.pendingReports || 0);
-    updateStatValue('.mod-card.mod-resolved .mod-value', stats.resolvedReports || 0);
+    updateStatValue('#newReportsStat', stats.newReports || 0);
+    updateStatValue('#pendingReportsStat', stats.pendingReports || 0);
+    updateStatValue('#resolvedReportsStat', stats.resolvedReports || 0);
     
-    updateStatValue('.info-card:nth-child(1) .info-row:nth-child(1) .info-value', stats.joinedToday || 0);
-    updateStatValue('.info-card:nth-child(1) .info-row:nth-child(2) .info-value', stats.joinedWeek || 0);
-    updateStatValue('.info-card:nth-child(2) .info-row:nth-child(1) .info-value', stats.bannedUsers || 0);
-    updateStatValue('.info-card:nth-child(2) .info-row:nth-child(2) .info-value', stats.suspendedUsers || 0);
+    updateStatValue('#joinedTodayStat', stats.joinedToday || 0);
+    updateStatValue('#joinedWeekStat', stats.joinedWeek || 0);
+    updateStatValue('#bannedUsersStat', stats.bannedUsers || 0);
+    updateStatValue('#suspendedUsersStat', stats.suspendedUsers || 0);
 }
 
 function updateStatValue(selector, value) {
@@ -1554,7 +1568,7 @@ function setupUserMenu() {
             dropdown.className = 'user-dropdown';
             dropdown.innerHTML = `
                 <a href="../Admin%20Profile/adprofile.html" class="dropdown-item">My Profile</a>
-                <a href="../Admin%20Settings/adsettings.html" class="dropdown-item">Settings</a>
+                <a href="../Admin%20Profile/adsettings.html" class="dropdown-item">Settings</a>
                 <a href="#" class="dropdown-item" id="logoutBtn">Logout</a>
             `;
             
@@ -1608,7 +1622,7 @@ function handleAdminAction(action) {
             openReportsManagement();
             break;
         case 'monitor-voice':
-            showToast('Voice room monitoring coming soon', 'info');
+            showVoiceMonitoringModal();
             break;
         case 'edit-filters':
             openFilterWordsManager();
@@ -1616,6 +1630,215 @@ function handleAdminAction(action) {
         default:
             console.log('Unknown action:', action);
     }
+}
+
+async function showVoiceMonitoringModal() {
+    try {
+        const response = await fetch(`${API_ROOT}/voice-rooms/rooms/live`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showVoiceRoomsModal(data.rooms);
+        } else {
+            showToast('Failed to load live rooms', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching voice rooms:', error);
+        showToast('Could not load voice monitoring data', 'warning');
+    }
+}
+
+function showVoiceRoomsModal(rooms) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'voiceMonitoringModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 1000px; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="margin: 0; color: #e8d5c4;">Voice Room Management</h2>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            
+            <div class="modal-tabs" style="display: flex; gap: 20px; margin-bottom: 24px; border-bottom: 1px solid rgba(232, 213, 196, 0.1);">
+                <button class="tab-btn active" data-tab="live" style="background: none; border: none; color: #e8d5c4; padding: 10px 0; cursor: pointer; border-bottom: 2px solid #d4a574; font-weight: 600;">Live Rooms</button>
+                <button class="tab-btn" data-tab="history" style="background: none; border: none; color: #a78c6d; padding: 10px 0; cursor: pointer; font-weight: 600;">Room History</button>
+            </div>
+
+            <div id="liveTab" class="tab-content">
+                <div style="margin-bottom: 24px; padding: 16px; background: rgba(220, 38, 38, 0.1); border-left: 4px solid #dc2626; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #dc2626; margin-bottom: 4px;">Admin Note</div>
+                    <div style="font-size: 13px; color: rgba(232, 213, 196, 0.8);">Voice rooms are monitored by AI. High-risk rooms are flagged automatically. You can join rooms as a silent listener or end them if they violate terms.</div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(232, 213, 196, 0.1); text-align: left;">
+                                <th style="padding: 12px;">Room Name</th>
+                                <th style="padding: 12px;">Host</th>
+                                <th style="padding: 12px;">Participants</th>
+                                <th style="padding: 12px;">Started</th>
+                                <th style="padding: 12px;">Risk Level</th>
+                                <th style="padding: 12px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rooms.length === 0 ? `
+                                <tr>
+                                    <td colspan="6" style="padding: 40px; text-align: center; color: #a78c6d;">No live voice rooms currently active</td>
+                                </tr>
+                            ` : rooms.map(room => `
+                                <tr style="border-bottom: 1px solid rgba(232, 213, 196, 0.05);">
+                                    <td style="padding: 12px;">${room.name}</td>
+                                    <td style="padding: 12px;">${room.hostName || 'Unknown'}</td>
+                                    <td style="padding: 12px;">${room.participantCount || 0} users</td>
+                                    <td style="padding: 12px;">${getTimeAgo(room.createdAt)}</td>
+                                    <td style="padding: 12px;">
+                                        <span style="color: ${room.riskLevel === 'high' ? '#dc2626' : room.riskLevel === 'medium' ? '#eab308' : '#16a34a'};">
+                                            ${(room.riskLevel || 'Low').toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <button class="action-btn join-room" data-room-id="${room._id}" style="padding: 4px 8px; font-size: 12px;">Listen</button>
+                                        <button class="action-btn end-room" data-room-id="${room._id}" style="padding: 4px 8px; font-size: 12px; background: #dc2626; color: white;">End</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="historyTab" class="tab-content" style="display: none;">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(232, 213, 196, 0.1); text-align: left;">
+                                <th style="padding: 12px;">Room Name</th>
+                                <th style="padding: 12px;">Host</th>
+                                <th style="padding: 12px;">Ended</th>
+                                <th style="padding: 12px;">Duration</th>
+                                <th style="padding: 12px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="5" style="padding: 40px; text-align: center; color: #a78c6d;">Loading history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close logic
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    
+    // Tab logic
+    modal.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            modal.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.borderBottom = 'none';
+                b.style.color = '#a78c6d';
+            });
+            btn.classList.add('active');
+            btn.style.borderBottom = '2px solid #d4a574';
+            btn.style.color = '#e8d5c4';
+            
+            const tab = btn.dataset.tab;
+            modal.querySelector('#liveTab').style.display = tab === 'live' ? 'block' : 'none';
+            modal.querySelector('#historyTab').style.display = tab === 'history' ? 'block' : 'none';
+            
+            if (tab === 'history') {
+                loadHistoryTable();
+            }
+        };
+    });
+
+    // Live actions
+    setupLiveRoomActions(modal);
+}
+
+async function loadHistoryTable() {
+    const tbody = document.getElementById('historyTableBody');
+    if (!tbody) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/voice-rooms/history`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            if (data.rooms.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: #a78c6d;">No history found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = data.rooms.map(room => `
+                <tr style="border-bottom: 1px solid rgba(232, 213, 196, 0.05);">
+                    <td style="padding: 12px;">${room.name}</td>
+                    <td style="padding: 12px;">${room.hostName || 'Unknown'}</td>
+                    <td style="padding: 12px;">${new Date(room.endedAt).toLocaleString()}</td>
+                    <td style="padding: 12px;">${room.duration || 0} mins</td>
+                    <td style="padding: 12px;">
+                        <button class="action-btn view-room-details" data-room-id="${room._id}" style="padding: 4px 8px; font-size: 12px;">Details</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Add details click handlers
+            tbody.querySelectorAll('.view-room-details').forEach(btn => {
+                btn.onclick = () => {
+                    const roomId = btn.dataset.roomId;
+                    const room = data.rooms.find(r => r._id === roomId);
+                    if (room) {
+                        alert(`Room: ${room.name}\nHost: ${room.hostName || 'Unknown'}\nEnded: ${new Date(room.endedAt).toLocaleString()}\nDuration: ${room.duration || 0} mins\nDescription: ${room.description || 'No description'}`);
+                    }
+                };
+            });
+        }
+    } catch (error) {
+        console.error('Error loading history:', error);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: #dc2626;">Error loading history</td></tr>';
+    }
+}
+
+function setupLiveRoomActions(modal) {
+    modal.querySelectorAll('.join-room').forEach(btn => {
+        btn.onclick = () => {
+            showToast('Joining as silent listener...', 'info');
+        };
+    });
+    
+    modal.querySelectorAll('.end-room').forEach(btn => {
+        btn.onclick = async () => {
+            if (confirm('Are you sure you want to forcibly end this voice room?')) {
+                const roomId = btn.dataset.roomId;
+                try {
+                    const response = await fetch(`${API_ROOT}/voice-rooms/rooms/${roomId}/end`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast('Room ended successfully', 'success');
+                        modal.remove();
+                        showVoiceMonitoringModal();
+                    }
+                } catch (error) {
+                    showToast('Failed to end room', 'error');
+                }
+            }
+        };
+    });
 }
 
 function setupViewAllButton() {
@@ -1790,6 +2013,11 @@ function logout() {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
+        sessionStorage.removeItem('litlink_token');
+        sessionStorage.removeItem('litlink_user');
+        sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('user');
+        
         if (socket) {
             socket.disconnect();
         }

@@ -52,7 +52,7 @@
                             <path d="M3 19C3 15.134 6.13401 12 10 12C13.866 12 17 15.134 17 19" stroke="currentColor" stroke-width="1.5"/>
                         </svg>
                     </div>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value" id="totalUsersStat">0</div>
                     <div class="stat-description">All-time users</div>
                 </div>
 
@@ -63,7 +63,7 @@
                             <path d="M7 10L9 12L13 8M19 10C19 14.9706 14.9706 19 10 19C5.02944 19 1 14.9706 1 10C1 5.02944 5.02944 1 10 1C14.9706 1 19 5.02944 19 10Z" stroke="currentColor" stroke-width="1.5"/>
                         </svg>
                     </div>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value" id="activeTodayStat">0</div>
                     <div class="stat-description">Logged in within 24h</div>
                 </div>
 
@@ -74,7 +74,7 @@
                             <path d="M2 10L8 4M8 4L14 10M8 4V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                     </div>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value" id="activeMatchesStat">0</div>
                     <div class="stat-description">Active AI matches</div>
                 </div>
 
@@ -85,7 +85,7 @@
                             <path d="M10 1V5M10 15V19M5 10H1M19 10H15M15.5 4.5L13 7M15.5 15.5L13 13M4.5 15.5L7 13M4.5 4.5L7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                     </div>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value" id="liveRoomsStat">0</div>
                     <div class="stat-description">Ongoing discussions</div>
                 </div>
             </div>
@@ -103,7 +103,7 @@
                         </svg>
                         <div class="mod-info">
                             <div class="mod-label">New Reports (24h)</div>
-                            <div class="mod-value">0</div>
+                            <div class="mod-value" id="newReportsStat">0</div>
                         </div>
                     </div>
                     <div class="mod-card mod-pending">
@@ -113,7 +113,7 @@
                         </svg>
                         <div class="mod-info">
                             <div class="mod-label">Pending Reports</div>
-                            <div class="mod-value">0</div>
+                            <div class="mod-value" id="pendingReportsStat">0</div>
                         </div>
                     </div>
                     <div class="mod-card mod-resolved">
@@ -122,7 +122,7 @@
                         </svg>
                         <div class="mod-info">
                             <div class="mod-label">Resolved Reports</div>
-                            <div class="mod-value">0</div>
+                            <div class="mod-value" id="resolvedReportsStat">0</div>
                         </div>
                     </div>
                 </div>
@@ -153,11 +153,11 @@
                     </h3>
                     <div class="info-row">
                         <span>Joined Today</span>
-                        <span class="info-value">0</span>
+                        <span class="info-value" id="joinedTodayStat">0</span>
                     </div>
                     <div class="info-row">
                         <span>Joined This Week</span>
-                        <span class="info-value">0</span>
+                        <span class="info-value" id="joinedWeekStat">0</span>
                     </div>
                 </div>
 
@@ -175,7 +175,7 @@
                             </svg>
                             Banned Users
                         </span>
-                        <span class="info-value">0</span>
+                        <span class="info-value" id="bannedUsersStat">0</span>
                     </div>
                     <div class="info-row">
                         <span>
@@ -184,7 +184,7 @@
                             </svg>
                             Suspended Users
                         </span>
-                        <span class="info-value">0</span>
+                        <span class="info-value" id="suspendedUsersStat">0</span>
                     </div>
                 </div>
             </div>

@@ -5,6 +5,8 @@ const User = require('../models/User');
 const FilterWord = require('../models/FilterWord');
 const Report = require('../models/Report');
 const { requireAdmin, requirePermission } = require('../middleware/adminAuth');
+const Conversation = require('../models/Conversation');
+const VoiceRoom = require('../models/VoiceRoom');
 const AdminNotificationService = require('../services/adminNotificationService');
 
 // ===== DASHBOARD STATS =====
@@ -49,9 +51,9 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
       }),
       Report.countDocuments({ status: 'pending' }),
       Report.countDocuments({ status: 'resolved' }),
-      // Placeholders for now - implement with actual models later
-      Promise.resolve(156), // activeMatches
-      Promise.resolve(24), // liveVoiceRooms
+      // Use actual models to get active matches and live voice rooms
+      Conversation.countDocuments(), // activeMatches (using total conversations as proxy since matches are dynamic)
+      VoiceRoom.countDocuments({ status: 'live' }), // liveVoiceRooms
       FilterWord.countDocuments({ isActive: true })
     ]);
 
@@ -97,18 +99,30 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
         joinedToday: newUsersToday,
         joinedWeek: newUsersThisWeek,
         bannedUsers,
-        filteredWordsCount
+        filteredWords: filteredWordsCount
       },
       recentActivity,
       recentReports
     });
     
   } catch (error) {
-    console.error('Dashboard stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ===== VOICE ROOM HISTORY =====
+router.get('/voice-rooms/history', requireAdmin, async (req, res) => {
+  try {
+    const rooms = await VoiceRoom.find({ status: 'ended' })
+      .populate('hostId', 'name email profilePicture')
+      .sort({ endedAt: -1 })
+      .limit(100);
+
+    res.json({ success: true, rooms });
+  } catch (error) {
+    console.error('Error fetching voice room history:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
