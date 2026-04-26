@@ -71,4 +71,12 @@ router.get('/global', matchController.getGlobalMatches);
  */
 router.put('/preferences', matchController.updatePreferences);
 
+/**
+ * @route   GET /api/matches/:userId
+ * @desc    Get AI matches for a user via FastAPI service
+ * @access  Private
+ * @param   userId - User ID
+ */
+router.get('/:userId', matchController.getAIMatches);
+
 module.exports = router;

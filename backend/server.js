@@ -30,8 +30,8 @@ const voiceRoomRoutes = require('./routes/voiceRoomRoutes');
 const matchRoutes = require('./routes/matchRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const circleRequestRoutes = require('./routes/circleRequestRoutes');
-
-
+const activityRoutes = require('./routes/activityRoutes');
+const adminSettingsRoutes = require('./routes/adminSettings.routes');
 // Import WebSocket server
 const SocketServer = require('./socketServer');
 
@@ -116,6 +116,8 @@ app.use('/api/matches', matchRoutes);
 app.use('/api', miscRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/circle-requests', circleRequestRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/admin/settings', adminSettingsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

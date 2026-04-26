@@ -91,6 +91,10 @@ const voiceRoomSchema = new mongoose.Schema({
   endedAt: {
     type: Date,
     default: null
+  },
+  duration: {
+    type: Number,
+    default: 0
   }
 });
 
