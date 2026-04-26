@@ -29,6 +29,7 @@ function formatUserResponse(user) {
     favoriteGenres: user.favoriteGenres || [],
     favoriteAuthors: user.favoriteAuthors || [],
     favoriteBooks: user.favoriteBooks || [],
+    wantToRead: user.wantToRead || [],
     booksRead: user.booksRead || [],
     preferredFormats: user.preferredFormats || [],
     discussionPreferences: user.discussionPreferences || [],

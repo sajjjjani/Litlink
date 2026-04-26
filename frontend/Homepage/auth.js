@@ -11,15 +11,20 @@ console.log('Auth.js location: Homepage folder');
 // ===== AUTH STATE MANAGEMENT - COMPLETELY FIXED =====
 class AuthState {
   static getToken() {
-    // Check ALL possible token keys
-    return localStorage.getItem('litlink_token') || 
-           localStorage.getItem('authToken') || 
+    // Check sessionStorage first, then localStorage as fallback
+    return sessionStorage.getItem('litlink_token') ||
+           sessionStorage.getItem('authToken') ||
+           sessionStorage.getItem('token') ||
+           localStorage.getItem('litlink_token') ||
+           localStorage.getItem('authToken') ||
            localStorage.getItem('token');
   }
 
   static getUser() {
-    // Check ALL possible user keys
-    const userStr = localStorage.getItem('litlink_user') || 
+    // Check sessionStorage first, then localStorage as fallback
+    const userStr = sessionStorage.getItem('litlink_user') ||
+                    sessionStorage.getItem('user') ||
+                    localStorage.getItem('litlink_user') ||
                     localStorage.getItem('user');
     try {
       return userStr ? JSON.parse(userStr) : null;
@@ -30,52 +35,65 @@ class AuthState {
   }
 
   static getUserId() {
-    // Check ALL possible userId keys
-    const userId = localStorage.getItem('litlink_userId') || 
+    // Check sessionStorage first, then localStorage as fallback
+    const userId = sessionStorage.getItem('litlink_userId') ||
+                   sessionStorage.getItem('userId') ||
+                   localStorage.getItem('litlink_userId') ||
                    localStorage.getItem('userId');
-    
+
     if (userId) return userId;
-    
+
     // Fallback: Extract from user object
     const user = this.getUser();
     return user?.id || user?._id || null;
   }
 
   static setAuth(token, user) {
-    // Store in NEW format (litlink_*)
+    const userStr = JSON.stringify(user);
+    const userId = user.id || user._id;
+
+    // Store in sessionStorage (NEW & OLD formats)
+    sessionStorage.setItem('litlink_token', token);
+    sessionStorage.setItem('litlink_user', userStr);
+    sessionStorage.setItem('litlink_userId', userId);
+    sessionStorage.setItem('authToken', token);
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', userStr);
+    sessionStorage.setItem('userId', userId);
+
+    // ALSO store in localStorage so Chat, Discussion, Notifications pages can read it
     localStorage.setItem('litlink_token', token);
-    localStorage.setItem('litlink_user', JSON.stringify(user));
-    localStorage.setItem('litlink_userId', user.id || user._id);
-    
-    // Store in OLD format (backward compatibility)
+    localStorage.setItem('litlink_user', userStr);
+    localStorage.setItem('litlink_userId', userId);
     localStorage.setItem('authToken', token);
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('userId', user.id || user._id);
-    
-    console.log('✅ Auth data stored in ALL formats:', {
+    localStorage.setItem('user', userStr);
+    localStorage.setItem('userId', userId);
+
+    console.log('✅ Auth data stored in sessionStorage AND localStorage:', {
       token: token.substring(0, 20) + '...',
       user: user.name || user.email,
-      userId: user.id || user._id
+      userId
     });
-    
+
     // Verify storage immediately
     this.verifyStorage();
   }
 
   static clearAuth() {
-    // Clear ALL possible auth keys
+    // Clear ALL possible auth keys from both storages
     const keys = [
       'litlink_token', 'litlink_user', 'litlink_userId',
       'authToken', 'token', 'user', 'userId'
     ];
-    
+
     keys.forEach(key => {
+      sessionStorage.removeItem(key);
       localStorage.removeItem(key);
       console.log(`🗑️ Cleared: ${key}`);
     });
-    
-    console.log('✅ All auth data cleared');
+
+    console.log('✅ All auth data cleared from sessionStorage and localStorage');
   }
 
   static isAuthenticated() {
@@ -89,12 +107,12 @@ class AuthState {
 
   static verifyStorage() {
     console.log('🔍 Storage Verification:');
-    console.log('- litlink_token:', !!localStorage.getItem('litlink_token'));
-    console.log('- litlink_user:', !!localStorage.getItem('litlink_user'));
-    console.log('- litlink_userId:', localStorage.getItem('litlink_userId'));
-    console.log('- token:', !!localStorage.getItem('token'));
-    console.log('- user:', !!localStorage.getItem('user'));
-    console.log('- userId:', localStorage.getItem('userId'));
+    console.log('- litlink_token:', !!sessionStorage.getItem('litlink_token'));
+    console.log('- litlink_user:', !!sessionStorage.getItem('litlink_user'));
+    console.log('- litlink_userId:', sessionStorage.getItem('litlink_userId'));
+    console.log('- token:', !!sessionStorage.getItem('token'));
+    console.log('- user:', !!sessionStorage.getItem('user'));
+    console.log('- userId:', sessionStorage.getItem('userId'));
   }
 }
 
