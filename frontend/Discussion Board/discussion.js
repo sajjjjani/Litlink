@@ -580,47 +580,52 @@ function setupEventListeners() {
 }
 
 async function loadCircleMembers(circleId) {
+    const membersAvatars = document.getElementById('membersAvatars');
+    const memberCountSpan = document.getElementById('memberCount');
+    
+    if (!membersAvatars) return;
+
+    // Show loading state
+    membersAvatars.innerHTML = '<div class="loading-spinner-small" style="width: 20px; height: 20px; border: 2px solid rgba(232, 212, 192, 0.1); border-top: 2px solid #e8d4c0; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
+    
     try {
         const token = localStorage.getItem('token');
-        if (!token || !circleId) return;
-        
         const response = await fetch(`http://localhost:5002/api/discussions/circles/${circleId}/details`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
-            if (data.success && data.circle.isMember) {
-                const membersAvatars = document.getElementById('membersAvatars');
-                const onlineCount = document.getElementById('onlineCount');
+            if (data.success && data.circle.members) {
+                const members = data.circle.members;
+                const previewMembers = members.slice(0, 5);
                 
-                if (membersAvatars && data.circle.members) {
-                    const members = data.circle.members.slice(0, 5);
-                    if (members.length > 0) {
-                        membersAvatars.innerHTML = members.map(m => `
-                            <img src="${m.user.profilePicture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + m.user.name}" 
-                                 class="member-avatar" 
-                                 alt="${m.user.name}"
-                                 title="${m.user.name}">
-                        `).join('');
-                        
-                        if (data.circle.members.length > 5) {
-                            membersAvatars.innerHTML += `<span class="more-members">+${data.circle.members.length - 5}</span>`;
-                        }
-                    } else {
-                        membersAvatars.innerHTML = '<span class="empty-members">No members yet</span>';
+                if (members.length > 0) {
+                    membersAvatars.innerHTML = previewMembers.map(m => `
+                        <img src="${m.user.profilePicture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(m.user.name)}" 
+                             alt="${escapeHtml(m.user.name)}" 
+                             title="${escapeHtml(m.user.name)}"
+                             class="member-avatar"
+                             style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #e8d4c0; object-fit: cover; margin-right: -10px; transition: transform 0.2s; cursor: pointer;"
+                             onmouseover="this.style.transform='translateY(-5px)'; this.style.zIndex='10';"
+                             onmouseout="this.style.transform='translateY(0)'; this.style.zIndex='1';">
+                    `).join('');
+
+                    if (members.length > 5) {
+                        membersAvatars.innerHTML += `<span class="more-members" style="background: rgba(139, 69, 40, 0.5); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; border: 2px solid #e8d4c0; margin-left: 5px;">+${members.length - 5}</span>`;
                     }
+                } else {
+                    membersAvatars.innerHTML = '<span style="font-size: 12px; color: #a88b76;">No members yet</span>';
                 }
-                
-                if (onlineCount) {
-                    onlineCount.textContent = `${data.circle.stats.activeToday || Math.floor(Math.random() * 20) + 5} online`;
+
+                if (memberCountSpan) {
+                    memberCountSpan.textContent = `${members.length} members`;
                 }
             }
         }
     } catch (error) {
         console.error('Error loading circle members:', error);
+        membersAvatars.innerHTML = '<i class="fas fa-exclamation-circle" title="Error loading members" style="color: #ff4444;"></i>';
     }
 }
 
@@ -1624,6 +1629,19 @@ function showCircleThreadModal() {
                     <input type="text" id="circleTags" class="modal-input" 
                            placeholder="e.g., spoiler, theory, recommendation (comma separated)">
                 </div>
+
+                <!-- Image Attachments Section -->
+                <div class="form-group">
+                    <label><i class="fas fa-images"></i> Attach Images (Max 4)</label>
+                    <div id="imageUploadContainerCircle" class="image-upload-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
+                        <label class="image-upload-btn" style="aspect-ratio: 1; border: 2px dashed rgba(232, 212, 192, 0.3); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.1);">
+                            <i class="fas fa-plus" style="font-size: 20px; color: #a88b76; margin-bottom: 5px;"></i>
+                            <span style="font-size: 11px; color: #a88b76;">Add Image</span>
+                            <input type="file" id="circleThreadImageInput" accept="image/*" multiple style="display: none;">
+                        </label>
+                    </div>
+                    <div id="imagePreviewListCircle" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <span class="circle-privacy-note">
@@ -1637,6 +1655,74 @@ function showCircleThreadModal() {
     
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
+
+    // ── Image Upload Handling (Circle) ───────────────────────────────────────
+    const imageInput = modal.querySelector('#circleThreadImageInput');
+    const imagePreviewList = modal.querySelector('#imagePreviewListCircle');
+    const uploadedFiles = [];
+    const censoredIndices = new Set();
+
+    imageInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (uploadedFiles.length + files.length > 4) {
+            showNotification('You can only attach up to 4 images', 'warning');
+            return;
+        }
+
+        files.forEach(file => {
+            if (uploadedFiles.length < 4) {
+                uploadedFiles.push(file);
+                renderImagePreviews();
+            }
+        });
+        imageInput.value = ''; // Reset input
+    });
+
+    function renderImagePreviews() {
+        imagePreviewList.innerHTML = '';
+        uploadedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.createElement('div');
+                preview.className = 'image-preview-item';
+                preview.style = `position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 2px solid ${censoredIndices.has(index) ? '#ff4444' : 'rgba(232, 212, 192, 0.3)'};`;
+                preview.innerHTML = `
+                    <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; ${censoredIndices.has(index) ? 'filter: blur(8px);' : ''}">
+                    <button class="remove-img" data-index="${index}" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px;"><i class="fas fa-times"></i></button>
+                    <button class="toggle-censor" data-index="${index}" style="position: absolute; bottom: 5px; left: 5px; right: 5px; background: ${censoredIndices.has(index) ? '#ff4444' : 'rgba(0,0,0,0.6)'}; color: #fff; border: none; border-radius: 4px; padding: 3px 0; cursor: pointer; font-size: 9px; font-weight: 600;">
+                        <i class="fas ${censoredIndices.has(index) ? 'fa-eye' : 'fa-eye-slash'}"></i> ${censoredIndices.has(index) ? 'Censored' : 'Censor'}
+                    </button>
+                `;
+                
+                preview.querySelector('.remove-img').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    uploadedFiles.splice(index, 1);
+                    const newCensors = new Set();
+                    censoredIndices.forEach(idx => {
+                        if (idx < index) newCensors.add(idx);
+                        if (idx > index) newCensors.add(idx - 1);
+                    });
+                    censoredIndices.clear();
+                    newCensors.forEach(idx => censoredIndices.add(idx));
+                    renderImagePreviews();
+                });
+
+                preview.querySelector('.toggle-censor').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    if (censoredIndices.has(index)) {
+                        censoredIndices.delete(index);
+                    } else {
+                        censoredIndices.add(index);
+                    }
+                    renderImagePreviews();
+                });
+
+                imagePreviewList.appendChild(preview);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Update circleValue/circleName when user picks a different circle
     const targetCircleSelect = modal.querySelector('#targetCircleSelect');
@@ -1702,15 +1788,18 @@ function showCircleThreadModal() {
         
         try {
             const token = localStorage.getItem('token');
-            const threadData = {
-                title,
-                content,
-                type,
-                circleId: circleValue,
-                circleName: circleName,
-                tags: modal.querySelector('#circleTags').value.split(',').map(t => t.trim()).filter(t => t)
-            };
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('type', type);
+            formData.append('circleId', circleValue);
+            formData.append('circleName', circleName);
+            formData.append('tags', modal.querySelector('#circleTags').value.split(',').map(t => t.trim()).filter(t => t).join(','));
             
+            uploadedFiles.forEach(file => {
+                formData.append('images', file);
+            });
+            formData.append('censorIndices', JSON.stringify(Array.from(censoredIndices)));
             if (type === 'poll') {
                 const pollQuestion = modal.querySelector('#pollQuestion')?.value.trim();
                 const pollOptions = Array.from(modal.querySelectorAll('.poll-option-input'))
@@ -1724,10 +1813,7 @@ function showCircleThreadModal() {
                     return;
                 }
                 
-                threadData.poll = {
-                    question: pollQuestion,
-                    options: pollOptions
-                };
+                formData.append('poll', JSON.stringify({ question: pollQuestion, options: pollOptions }));
             } else if (type === 'event') {
                 const eventDate = modal.querySelector('#eventDate')?.value;
                 const eventDuration = modal.querySelector('#eventDuration')?.value;
@@ -1739,21 +1825,15 @@ function showCircleThreadModal() {
                     postBtn.disabled = false;
                     return;
                 }
-                
-                threadData.event = {
-                    date: eventDate,
-                    duration: eventDuration,
-                    type: eventType
-                };
+                formData.append('event', JSON.stringify({ date: eventDate, duration: eventDuration, type: eventType }));
             }
             
             const response = await fetch('http://localhost:5002/api/discussions/circles/threads', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(threadData)
+                body: formData
             });
             
             const data = await response.json();
@@ -1885,6 +1965,20 @@ function showNewThreadModal(defaultVisibility = 'public') {
                     <input type="text" id="discussionTags" class="modal-input"
                            placeholder="e.g., spoiler, analysis, debate (comma separated)">
                 </div>
+
+                <!-- Image Attachments Section -->
+                <div class="form-group">
+                    <label><i class="fas fa-images"></i> Attach Images (Max 4)</label>
+                    <div id="imageUploadContainer" class="image-upload-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
+                        <label class="image-upload-btn" style="aspect-ratio: 1; border: 2px dashed rgba(232, 212, 192, 0.3); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.1);">
+                            <i class="fas fa-plus" style="font-size: 20px; color: #a88b76; margin-bottom: 5px;"></i>
+                            <span style="font-size: 11px; color: #a88b76;">Add Image</span>
+                            <input type="file" id="threadImageInput" accept="image/*" multiple style="display: none;">
+                        </label>
+                    </div>
+                    <div id="imagePreviewList" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;"></div>
+                    <p style="font-size: 11px; color: #a88b76; margin-top: 8px;"><i class="fas fa-info-circle"></i> Tip: You can toggle a "censor" blur for each image if it contains spoilers or sensitive content.</p>
+                </div>
             </div>
             <div class="modal-footer">
                 <span id="footerPrivacyNote" style="font-size:13px; color:#4caf50;">
@@ -1936,6 +2030,75 @@ function showNewThreadModal(defaultVisibility = 'public') {
 
     visPublicBtn.addEventListener('click',  () => setVisibility(true));
     visPrivateBtn.addEventListener('click', () => setVisibility(false));
+    // ── Image Upload Handling ──────────────────────────────────────────────
+    const imageInput = modal.querySelector('#threadImageInput');
+    const imagePreviewList = modal.querySelector('#imagePreviewList');
+    const uploadedFiles = [];
+    const censoredIndices = new Set();
+
+    imageInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (uploadedFiles.length + files.length > 4) {
+            showNotification('You can only attach up to 4 images', 'warning');
+            return;
+        }
+
+        files.forEach(file => {
+            if (uploadedFiles.length < 4) {
+                uploadedFiles.push(file);
+                renderImagePreviews();
+            }
+        });
+        imageInput.value = ''; // Reset input
+    });
+
+    function renderImagePreviews() {
+        imagePreviewList.innerHTML = '';
+        uploadedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.createElement('div');
+                preview.className = 'image-preview-item';
+                preview.style = `position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 2px solid ${censoredIndices.has(index) ? '#ff4444' : 'rgba(232, 212, 192, 0.3)'};`;
+                preview.innerHTML = `
+                    <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; ${censoredIndices.has(index) ? 'filter: blur(8px);' : ''}">
+                    <button class="remove-img" data-index="${index}" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px;"><i class="fas fa-times"></i></button>
+                    <button class="toggle-censor" data-index="${index}" style="position: absolute; bottom: 5px; left: 5px; right: 5px; background: ${censoredIndices.has(index) ? '#ff4444' : 'rgba(0,0,0,0.6)'}; color: #fff; border: none; border-radius: 4px; padding: 3px 0; cursor: pointer; font-size: 9px; font-weight: 600;">
+                        <i class="fas ${censoredIndices.has(index) ? 'fa-eye' : 'fa-eye-slash'}"></i> ${censoredIndices.has(index) ? 'Censored' : 'Censor'}
+                    </button>
+                `;
+                
+                preview.querySelector('.remove-img').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    uploadedFiles.splice(index, 1);
+                    // Update censored indices
+                    const newCensors = new Set();
+                    censoredIndices.forEach(idx => {
+                        if (idx < index) newCensors.add(idx);
+                        if (idx > index) newCensors.add(idx - 1);
+                    });
+                    censoredIndices.clear();
+                    newCensors.forEach(idx => censoredIndices.add(idx));
+                    renderImagePreviews();
+                });
+
+                preview.querySelector('.toggle-censor').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    if (censoredIndices.has(index)) {
+                        censoredIndices.delete(index);
+                    } else {
+                        censoredIndices.add(index);
+                    }
+                    renderImagePreviews();
+                });
+
+                imagePreviewList.appendChild(preview);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Apply default on open
     setVisibility(isPublic);
     // ────────────────────────────────────────────────────────────────────────
@@ -1986,23 +2149,25 @@ function showNewThreadModal(defaultVisibility = 'public') {
         postBtn.disabled = true;
 
         try {
-            const token = localStorage.getItem('token');
-            const discussionData = {
-                title,
-                content,
-                category,
-                isPublic,
-                genre: selectedGenres[0] || 'General',
-                tags: modal.querySelector('#discussionTags').value.split(',').map(t => t.trim()).filter(t => t)
-            };
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('category', category);
+            formData.append('isPublic', isPublic);
+            formData.append('genre', selectedGenres[0] || 'General');
+            formData.append('tags', modal.querySelector('#discussionTags').value.split(',').map(t => t.trim()).filter(t => t).join(','));
+            
+            uploadedFiles.forEach(file => {
+                formData.append('images', file);
+            });
+            formData.append('censorIndices', JSON.stringify(Array.from(censoredIndices)));
 
             const response = await fetch('http://localhost:5002/api/discussions/threads', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(discussionData)
+                body: formData
             });
 
             const data = await response.json();
@@ -2447,6 +2612,31 @@ function createThreadCard(thread) {
         } else {
             typeSpecificHtml = `<div class="thread-excerpt" style="margin: 20px 0; padding: 20px; background: rgba(0, 0, 0, 0.1); border-radius: 12px; border-left: 3px solid rgba(232, 212, 192, 0.3);"><p style="color: #c4a891; font-size: 15px; line-height: 1.6;">${escapeHtml(excerpt)}</p></div>`;
         }
+
+        // Attachments Rendering
+        let attachmentsHtml = '';
+        if (thread.attachments && thread.attachments.length > 0) {
+            attachmentsHtml = `
+                <div class="thread-attachments" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 15px 0;">
+                    ${thread.attachments.map((att, idx) => `
+                        <div class="attachment-item ${att.isCensored ? 'censored' : ''}" 
+                             style="position: relative; border-radius: 12px; overflow: hidden; cursor: pointer; aspect-ratio: 16/9; background: #000;"
+                             onclick="handleAttachmentClick(this, '${att.url}', ${att.isCensored})">
+                            <img src="${att.url}" 
+                                 style="width: 100%; height: 100%; object-fit: cover; transition: all 0.3s; ${att.isCensored ? 'filter: blur(20px);' : ''}"
+                                 class="attachment-img">
+                            ${att.isCensored ? `
+                                <div class="censor-overlay" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); color: #fff; gap: 8px;">
+                                    <i class="fas fa-eye-slash" style="font-size: 20px;"></i>
+                                    <span style="font-size: 12px; font-weight: 600;">Censored Content</span>
+                                    <span style="font-size: 10px; opacity: 0.8;">Click to reveal</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
         
         card.innerHTML = `
             ${thread.isFeatured ? '<div class="thread-badge" style="position: absolute; top: -10px; right: 25px; background: linear-gradient(135deg, #ffd700, #ffa500); color: #2d1810; padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-crown"></i> Community Pick</div>' : ''}
@@ -2464,6 +2654,7 @@ function createThreadCard(thread) {
                 </div>
             </div>
             ${typeSpecificHtml}
+            ${attachmentsHtml}
             <div class="thread-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid rgba(232, 212, 192, 0.1);">
                 <div class="thread-stats" style="display: flex; gap: 25px;">
                     <span class="stat" style="color: #a88b76; font-size: 14px; display: flex; align-items: center; gap: 6px;"><i class="fas fa-comment"></i> ${thread.commentCount || 0}</span>
@@ -3154,4 +3345,23 @@ function formatNotifTime(ts) {
 
 function refreshNotifBadge() {
     // Discussion board intentionally has no notification icon.
+}
+
+function handleAttachmentClick(element, url, isCensored) {
+    if (isCensored) {
+        const img = element.querySelector('.attachment-img');
+        const overlay = element.querySelector('.censor-overlay');
+        
+        if (img.style.filter === 'blur(20px)') {
+            img.style.filter = 'none';
+            if (overlay) overlay.style.display = 'none';
+            element.classList.remove('censored');
+        } else {
+            img.style.filter = 'blur(20px)';
+            if (overlay) overlay.style.display = 'flex';
+            element.classList.add('censored');
+        }
+    } else {
+        window.open(url, '_blank');
+    }
 }
