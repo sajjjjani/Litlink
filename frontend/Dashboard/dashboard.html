@@ -132,8 +132,11 @@
         <section class="section">
             <div class="section-header">
                 <h2>📖 Your Top Matches</h2>
-                <a href="#" class="view-all">View all</a>
+                <button class="refresh-matches-btn" onclick="refreshMatches()">
+                    <i class="fas fa-sync-alt"></i> Refresh Matches
+                </button>
             </div>
+            <div id="aiGreeting" class="ai-greeting"></div>
             <div class="matches-grid" id="matchesGrid">
                 <!-- Matches will be loaded dynamically -->
             </div>
@@ -230,6 +233,7 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="../utils/notificationClient.js"></script>
+    <script src="../Discussion Board/CommunityPulse.js"></script>
     <script src="dashboard.js"></script>
     
     <!-- Add this script to ensure navigation works -->

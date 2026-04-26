@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const matchService = require('../services/matchService');
+const axios = require('axios');
 
 class MatchController {
   constructor() {
@@ -13,6 +14,7 @@ class MatchController {
     this.getGlobalMatches = this.getGlobalMatches.bind(this);
     this.updatePreferences = this.updatePreferences.bind(this);
     this.getMatchStats = this.getMatchStats.bind(this);
+    this.getAIMatches = this.getAIMatches.bind(this);
   }
 
   /**
@@ -491,6 +493,136 @@ class MatchController {
       res.status(500).json({
         success: false,
         message: 'Error fetching match statistics',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get matches using the new AI FastAPI service
+   */
+  async getAIMatches(req, res) {
+    try {
+      const { userId } = req.params;
+      
+      // 1. Fetch user profile from database
+      const user = await User.findById(userId).select('-password -resetToken -resetTokenExpiry');
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      // 2. Send profile to FastAPI /match endpoint
+      const FASTAPI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+      
+      let aiResponse;
+      try {
+        aiResponse = await axios.post(`${FASTAPI_URL}/match`, {
+          userProfile: user.toObject(),
+          currentUserId: userId
+        });
+      } catch (aiError) {
+        // If model is not trained, train it and retry once
+        if (aiError.response && aiError.response.status === 400 && aiError.response.data.detail === "Model is not trained yet.") {
+          console.log('🤖 AI Model not trained. Training now...');
+          const allUsers = await User.find({}).select('-password -resetToken -resetTokenExpiry');
+          
+          try {
+            await axios.post(`${FASTAPI_URL}/train`, { users: allUsers });
+            console.log('✅ AI Model trained successfully. Retrying match...');
+            
+            // Retry the match request
+            aiResponse = await axios.post(`${FASTAPI_URL}/match`, {
+              userProfile: user.toObject(),
+              currentUserId: userId
+            });
+          } catch (trainError) {
+            console.error('❌ AI Training failed:', trainError.message);
+            return res.status(503).json({ 
+              success: false, 
+              message: 'AI service is initializing. Please try again in a moment.' 
+            });
+          }
+        } else {
+          console.error('❌ AI service error:', aiError.message);
+          return res.status(503).json({ 
+            success: false, 
+            message: 'AI matching service is currently unavailable. Please try again later.' 
+          });
+        }
+      }
+
+      // 3. Receive similar user IDs and scores
+      const matches = aiResponse.data;
+      if (!matches || matches.length === 0) {
+        return res.json({
+          success: true,
+          matches: [],
+          message: 'No matches found.'
+        });
+      }
+
+      // 4. Fetch matched user details from DB
+      const blockedUserIds = (user.blockedUsers || []).map(id => id.toString());
+      const matchedUserIds = matches.map(m => m.userId).filter(id => !blockedUserIds.includes(id.toString()));
+      
+      const matchedUsers = await User.find({ 
+        _id: { $in: matchedUserIds },
+        blockedUsers: { $ne: user._id } // Also exclude if they blocked us
+      })
+        .select('name username profilePicture bio favoriteGenres favoriteAuthors favoriteBooks readingHabit location discussionPreferences');
+
+      // Combine AI scores with user details
+      const combinedMatches = matches.map(match => {
+        const userDetails = matchedUsers.find(u => u._id.toString() === match.userId.toString());
+        if (!userDetails) return null;
+
+        // Generate Explanation
+        const commonGenres = (user.favoriteGenres || []).filter(g => (userDetails.favoriteGenres || []).includes(g));
+        const commonDiscussion = (user.discussionPreferences || []).filter(d => (userDetails.discussionPreferences || []).includes(d));
+        const commonHabit = user.readingHabit && userDetails.readingHabit && user.readingHabit === userDetails.readingHabit ? user.readingHabit : null;
+
+        let explanationParts = [];
+        if (commonGenres.length > 0) {
+            explanationParts.push(`enjoy ${commonGenres[0]}`);
+        }
+        if (commonDiscussion.length > 0) {
+            // Adjust 'Casual Discussion' to 'casual discussions'
+            const styleStr = commonDiscussion[0].toLowerCase().includes('discussion') ? commonDiscussion[0].toLowerCase() : `${commonDiscussion[0].toLowerCase()} discussions`;
+            explanationParts.push(`prefer ${styleStr}`);
+        }
+        if (commonHabit && explanationParts.length < 2) {
+            explanationParts.push(`are both ${commonHabit.toLowerCase()} readers`);
+        }
+
+        let explanation = "You have similar reading interests.";
+        if (explanationParts.length === 1) {
+            explanation = `You both ${explanationParts[0]}.`;
+        } else if (explanationParts.length >= 2) {
+            explanation = `You both ${explanationParts[0]} and ${explanationParts[1]}.`;
+        }
+
+        return {
+          userId: match.userId,
+          score: match.score,
+          userDetails: userDetails,
+          explanation: explanation
+        };
+      }).filter(m => m !== null); // remove if user was deleted but still in model
+
+      // 5. Return combined response (Take top 6)
+      const finalMatches = combinedMatches.slice(0, 6);
+      
+      res.json({
+        success: true,
+        matches: finalMatches,
+        total: finalMatches.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error getting AI matches:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching AI matches',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

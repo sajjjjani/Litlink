@@ -23,14 +23,14 @@ const CHAT_WS_HOST = (function () {
 
 function getAuthToken() {
     try {
-        return localStorage.getItem('litlink_token') || localStorage.getItem('authToken') || localStorage.getItem('token');
+        return sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token') || sessionStorage.getItem('authToken') || localStorage.getItem('authToken') || sessionStorage.getItem('token') || localStorage.getItem('token');
     } catch (e) { return null; }
 }
 
 function getCurrentUserId() {
     if (currentUser && (currentUser._id || currentUser.id)) return (currentUser._id || currentUser.id).toString();
     try {
-        return localStorage.getItem('litlink_userId') || localStorage.getItem('userId') || '';
+        return sessionStorage.getItem('litlink_userId') || localStorage.getItem('litlink_userId') || sessionStorage.getItem('userId') || localStorage.getItem('userId') || '';
     } catch (e) { return ''; }
 }
 
@@ -78,7 +78,7 @@ async function initializeChat() {
     try {
         console.log('🚀 Initializing chat...');
         
-        const userStr = localStorage.getItem('litlink_user');
+        const userStr = sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user');
         if (userStr) {
             currentUser = JSON.parse(userStr);
             console.log('✅ User found:', currentUser.name);
@@ -591,6 +591,7 @@ function renderMatches() {
             <div class="match-info">
                 <h3 class="match-name">${escapeHtml(match.name)}</h3>
                 <p class="match-genre">${escapeHtml(match.genre || 'Reader')}</p>
+                <p class="match-explanation" style="color: #C9A27B; font-size: 0.75rem; font-style: italic; margin: 2px 0;">✨ ${escapeHtml(match.explanation || 'You have similar reading interests.')}</p>
                 <p class="match-preview">${escapeHtml(match.preview || 'No messages yet')}</p>
             </div>
             <div class="compatibility-badge">${match.compatibility || 75}%</div>

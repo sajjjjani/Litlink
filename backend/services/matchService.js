@@ -110,7 +110,7 @@ class MatchService {
       username: userB.username || userB.name,
       name: userB.name,
       email: userB.email,
-      profilePicture: userB.profilePicture || '📚',
+      profilePicture: userB.profilePicture || null,
       bio: userB.bio || '',
       location: userB.location || '',
       score: totalScore,
