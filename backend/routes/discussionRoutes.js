@@ -1562,20 +1562,6 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
     });
   }
 });
-      responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
-      responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
-    }
-    
-    res.json(responseData);
-  } catch (error) {
-    console.error('Error creating circle thread:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error creating thread: ' + error.message,
-      error: error.message 
-    });
-  }
-});
 
 // Create a circle poll
 router.post('/circles/polls', authMiddleware, async (req, res) => {
