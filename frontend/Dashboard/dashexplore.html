@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Explore - LitLink Dashboard</title>
     <!-- Inline favicon to avoid missing-asset 404s in dev servers -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1810'/%3E%3Cpath d='M18 18h20a8 8 0 0 1 8 8v20H26a8 8 0 0 1-8-8V18z' fill='%23d4a574'/%3E%3Cpath d='M24 22h16v4H24zm0 8h16v4H24zm0 8h12v4H24z' fill='%232c1810'/%3E%3C/svg%3E">
@@ -597,6 +599,29 @@
         .genre-book-year {
             color: #8b6f47;
             font-size: 0.7rem;
+        }
+
+        .add-book-btn {
+            background: rgba(212, 181, 160, 0.2);
+            border: 1px solid rgba(245, 230, 211, 0.3);
+            color: #f5e6d3;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 5px;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        .add-book-btn:hover {
+            background: #d4b5a0;
+            color: #2c1810;
+            transform: scale(1.1);
         }
 
         .genre-loading {
@@ -1847,7 +1872,7 @@
                     <span class="section-icon">🎙️</span>
                     Live Voice Rooms
                 </h2>
-                <a href="../Chat/chat.html" class="view-all">See All Rooms <i class="fas fa-arrow-right"></i></a>
+                <a href="../Voice%20Room/voice-rooms.html" class="view-all">See All Rooms <i class="fas fa-arrow-right"></i></a>
             </div>
             <div class="voice-rooms-grid" id="voiceRoomsGrid"></div>
         </section>
@@ -1881,7 +1906,7 @@
             <div class="section-header">
                 <h2 class="section-title">
                     <span class="section-icon">📚</span>
-                    Suggested Book Clubs
+                    Suggested Circles
                 </h2>
                 <a href="../Discussion%20Board/discussion.html" class="view-all">Browse directory <i class="fas fa-arrow-right"></i></a>
             </div>
@@ -1899,6 +1924,42 @@
             <div class="quick-actions-grid" id="quickActionsGrid"></div>
         </section>
     </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 40px; text-align: left;">
+            <div style="flex: 1; min-width: 200px;">
+                <h3 style="color: #f5e6d3; margin-bottom: 20px;"><i class="fas fa-book-open"></i> Litlink</h3>
+                <p style="color: #d4b5a0; line-height: 1.6;">Connecting readers through the stories they love.</p>
+            </div>
+            <div style="display: flex; gap: 60px; flex-wrap: wrap;">
+                <div>
+                    <h4 style="color: #f5e6d3; margin-bottom: 15px;">About Us</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px;"><a href="../homepage/about.html" style="color: #d4b5a0; text-decoration: none;">About</a></li>
+                        <li style="margin-bottom: 10px;"><a href="../homepage/about.html#team" style="color: #d4b5a0; text-decoration: none;">Team</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #f5e6d3; margin-bottom: 15px;">FAQ</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px;"><a href="../homepage/faq.html" style="color: #d4b5a0; text-decoration: none;">FAQ</a></li>
+                        <li style="margin-bottom: 10px;"><a href="../homepage/faq.html#terms" style="color: #d4b5a0; text-decoration: none;">Terms</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #f5e6d3; margin-bottom: 15px;">Support</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px;"><a href="../homepage/help.html" style="color: #d4b5a0; text-decoration: none;">Help</a></li>
+                        <li style="margin-bottom: 10px;"><a href="../homepage/help.html#contact" style="color: #d4b5a0; text-decoration: none;">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(245, 230, 211, 0.1); color: #8b6f47; font-size: 0.9rem;">
+            <p>© 2024 Litlink. All rights reserved.</p>
+        </div>
+    </footer>
 
     <script src="../utils/modal.js"></script>
     <script>
@@ -2033,8 +2094,8 @@
             },
             {
                 icon: '📚',
-                title: 'Book Clubs',
-                description: 'Browse all book clubs and join communities.',
+                title: 'Suggested Circles',
+                description: 'Browse all suggested circles and join communities.',
                 action: 'viewClubs'
             },
             {
@@ -2045,8 +2106,8 @@
             },
             {
                 icon: '👥',
-                title: 'Create Club',
-                description: 'Start your own book club and build a community.',
+                title: 'Create Circle',
+                description: 'Start your own circle and build a community.',
                 action: 'createClub'
             }
         ];
@@ -2169,17 +2230,54 @@ function updateGenreCategory(genre, genreData) {
         const coverUrl = book.coverUrl || `https://placehold.co/50x70/3d2617/f5e6d3?text=${encodeURIComponent(title.substring(0, 10))}&font=montserrat`;
         
         return `
-            <div class="genre-book-item" onclick="viewBookDetails('${book.key}', '${title.replace(/'/g, "\\'")}')">
+            <div class="genre-book-item">
                 <img src="${coverUrl}" alt="${title}" class="genre-book-cover" 
+                     onclick="viewBookDetails('${book.key}', '${title.replace(/'/g, "\\'")}')"
                      onerror="this.src='https://placehold.co/50x70/3d2617/f5e6d3?text=Book&font=montserrat'">
-                <div class="genre-book-info">
+                <div class="genre-book-info" onclick="viewBookDetails('${book.key}', '${title.replace(/'/g, "\\'")}')">
                     <div class="genre-book-title" title="${title}">${truncate(title, 25)}</div>
                     <div class="genre-book-author">${truncate(author, 20)}</div>
                     <div class="genre-book-year">${year}</div>
                 </div>
+                <button class="add-book-btn" onclick="addToWantToRead('${book.key}', '${title.replace(/'/g, "\\'")}', '${author.replace(/'/g, "\\'")}')" title="Add to Want to Read">
+                    <i class="fas fa-plus"></i>
+                </button>
             </div>
         `;
     }).join('');
+}
+
+async function addToWantToRead(bookKey, title, author) {
+    try {
+        const auth = checkAuth();
+        if (!auth) return;
+        
+        const bookId = bookKey.split('/').pop();
+        const userId = auth.user.id || auth.user._id;
+        
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/want-to-read`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${auth.token}`
+            },
+            body: JSON.stringify({
+                bookId: bookId,
+                bookTitle: title,
+                bookAuthor: author
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showMessageModal('Success', 'Book added to your "Want to Read" list!', 'success');
+        } else {
+            showMessageModal('Note', result.message || 'Book already in your list.', 'info');
+        }
+    } catch (error) {
+        console.error('Error adding book:', error);
+        showMessageModal('Error', 'Failed to add book. Please try again.', 'error');
+    }
 }
 
 function updateGenreCategoryWithError(genre) {
@@ -2268,138 +2366,86 @@ function updateGenreCategoryWithError(genre) {
         // ===== DASHBOARD DATA LOADING =====
         async function loadDashboardData(userId, token) {
             try {
-                console.log('Loading dashboard data for user:', userId);
+                console.log('Loading real dashboard data for user:', userId);
                 
-                // Try to load real data if API is available
-                try {
-                    const [matchesResponse, clubsResponse] = await Promise.allSettled([
-                        fetch(`${API_BASE_URL}/users/${userId}/matches`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        }),
-                        fetch(`${API_BASE_URL}/users/${userId}/clubs`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        })
-                    ]);
+                const response = await fetch(`${API_BASE_URL}/dashboard/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('Dashboard API failed');
+                
+                const data = await response.json();
+                if (data.success && data.dashboard) {
+                    const db = data.dashboard;
                     
-                    // Handle matches data
-                    if (matchesResponse.status === 'fulfilled' && matchesResponse.value.ok) {
-                        const matchesData = await matchesResponse.value.json();
-                        if (matchesData.success && matchesData.matches?.length > 0) {
-                            console.log('Loaded real matches:', matchesData.matches.length);
-                            updateMatchesWithRealData(matchesData.matches);
-                        }
+                    // Update UI components with real data (or fallbacks if empty)
+                    if (db.voiceRooms && db.voiceRooms.length > 0) {
+                        renderRealVoiceRooms(db.voiceRooms);
+                    } else {
+                        generateVoiceRooms();
                     }
                     
-                    // Handle clubs data
-                    if (clubsResponse.status === 'fulfilled' && clubsResponse.value.ok) {
-                        const clubsData = await clubsResponse.value.json();
-                        if (clubsData.success && clubsData.clubs?.length > 0) {
-                            console.log('Loaded real clubs:', clubsData.clubs.length);
-                            updateClubsWithRealData(clubsData.clubs);
-                        }
+                    if (db.trendingBoards && db.trendingBoards.length > 0) {
+                        renderRealDiscussions(db.trendingBoards);
+                    } else {
+                        generateDiscussions();
                     }
                     
-                } catch (apiError) {
-                    console.log('API not available, using fallback data:', apiError.message);
+                    if (db.topMatches && db.topMatches.length > 0) {
+                        renderRealMatches(db.topMatches);
+                    } else if (db.suggestedReaders && db.suggestedReaders.length > 0) {
+                        renderRealMatches(db.suggestedReaders);
+                    } else {
+                        generateMatches();
+                    }
+
+                    if (db.suggestedCircles && db.suggestedCircles.length > 0) {
+                        renderRealCircles(db.suggestedCircles);
+                    } else {
+                        generateBookClubs();
+                    }
+                } else {
+                    // Success but no data structure
+                    generateVoiceRooms();
+                    generateDiscussions();
+                    generateMatches();
+                    generateBookClubs();
                 }
-                
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
+                // Fallback to static generation if API fails
+                generateVoiceRooms();
+                generateDiscussions();
+                generateMatches();
+                generateBookClubs();
             }
         }
 
-        function updateMatchesWithRealData(realMatches) {
-            const container = document.getElementById('matchesList');
-            if (!container || !realMatches || realMatches.length === 0) return;
-            
-            container.innerHTML = '';
-            
-            realMatches.slice(0, 4).forEach(match => {
-                const card = document.createElement('div');
-                card.className = 'match-card';
-                
-                const initials = match.name ? match.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'UR';
-                
-                card.innerHTML = `
-                    <div class="match-avatar">${initials}</div>
-                    <div class="match-score">${match.matchScore || Math.floor(Math.random() * 20) + 80}% Match</div>
-                    <div class="match-name">${match.name || 'Unknown User'}</div>
-                    <div class="match-genres">Likes: ${match.favoriteGenres ? match.favoriteGenres.slice(0, 3).join(', ') : 'Various genres'}</div>
-                    <button class="match-btn" data-user-id="${match.id || match._id}" data-user-name="${match.name || 'User'}">
-                        Connect
-                    </button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function updateClubsWithRealData(realClubs) {
-            const container = document.getElementById('clubsGrid');
-            if (!container || !realClubs || realClubs.length === 0) return;
-            
-            container.innerHTML = '';
-            
-            realClubs.slice(0, 2).forEach(club => {
-                const card = document.createElement('div');
-                card.className = 'club-card';
-                
-                const icons = ['📖', '📚', '👥', '💬', '🔥', '✨'];
-                const randomIcon = icons[Math.floor(Math.random() * icons.length)];
-                
-                card.innerHTML = `
-                    <div class="club-banner">${club.icon || randomIcon}</div>
-                    <div class="club-content">
-                        <h3 class="club-title">${club.name || 'Book Club'}</h3>
-                        <p class="club-description">${club.description || 'A community of passionate readers.'}</p>
-                        <div class="club-current-book">📖 ${club.currentBook || 'Currently reading together'}</div>
-                        <div class="club-stats">
-                            <div class="club-stat">
-                                <i class="fas fa-users"></i>
-                                <span>${club.memberCount || club.members?.length || '50'} members</span>
-                            </div>
-                            <div class="club-stat">
-                                <i class="fas fa-comments"></i>
-                                <span>Active weekly</span>
-                            </div>
-                        </div>
-                        <button class="club-join-btn" data-club-id="${club.id || club._id}">Join Club</button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // ===== CONTENT GENERATION FUNCTIONS =====
-        function generateVoiceRooms() {
+        function renderRealVoiceRooms(rooms) {
             const container = document.getElementById('voiceRoomsGrid');
             if (!container) return;
+            container.innerHTML = '';
             
-            voiceRooms.forEach(room => {
+            rooms.forEach(room => {
+                const initials = room.host?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'H';
                 const card = document.createElement('div');
                 card.className = 'voice-room-card';
                 card.innerHTML = `
                     <div class="room-header">
-                        <div class="room-host-avatar">${room.hostInitials}</div>
+                        <div class="room-host-avatar" style="background-image: url(${room.host?.image})">${room.host?.image ? '' : initials}</div>
                         <div class="room-info">
                             <div class="room-live-badge">
                                 <i class="fas fa-circle"></i>
-                                LIVE • ${room.listeners} listening
+                                LIVE • ${room.participants} listening
                             </div>
-                            <div class="room-title">${room.title}</div>
+                            <div class="room-title">${room.name}</div>
                         </div>
                     </div>
                     <div class="room-meta">
-                        <span><i class="fas fa-user"></i> ${room.host}</span>
-                        <span><i class="fas fa-book"></i> ${room.book}</span>
+                        <span><i class="fas fa-user"></i> ${room.host?.name}</span>
+                        <span><i class="fas fa-tag"></i> ${room.tags.join(', ')}</span>
                     </div>
-                    <div class="room-participants">
-                        <div class="participants-avatars">
-                            <div class="participant-avatar">${room.hostInitials[0]}</div>
-                            ${room.listeners > 1 ? '<div class="participant-avatar">' + (room.listeners - 1) + '</div>' : ''}
-                        </div>
-                        <span class="participants-count">${room.listeners} / ${room.capacity}</span>
-                    </div>
-                    <button class="room-join-btn">
+                    <button class="room-join-btn" onclick="window.location.href='../Voice%20Room/voice-rooms.html'">
                         <i class="fas fa-microphone"></i>
                         Join Room
                     </button>
@@ -2408,34 +2454,32 @@ function updateGenreCategoryWithError(genre) {
             });
         }
 
-        function generateDiscussions() {
+        function renderRealDiscussions(threads) {
             const container = document.getElementById('discussionsList');
             if (!container) return;
+            container.innerHTML = '';
             
-            discussions.forEach(discussion => {
+            threads.forEach(thread => {
                 const card = document.createElement('div');
                 card.className = 'discussion-card';
+                card.style.cursor = 'pointer';
+                card.onclick = () => window.location.href = '../Discussion%20Board/discussion.html';
                 card.innerHTML = `
                     <div class="discussion-header">
-                        <div class="discussion-avatar">${discussion.authorInitials}</div>
+                        <div class="discussion-avatar" style="background: ${thread.color}">${thread.icon}</div>
                         <div class="discussion-user-info">
-                            <div class="discussion-author">${discussion.author}</div>
+                            <div class="discussion-author">Trending Board</div>
                             <div class="discussion-time">
-                                <i class="far fa-clock"></i>
-                                ${discussion.time} • ${discussion.category}
+                                <i class="fas fa-fire"></i>
+                                ${thread.activeUsers} views
                             </div>
                         </div>
                     </div>
-                    <h3 class="discussion-title">${discussion.title}</h3>
-                    <p class="discussion-excerpt">${discussion.excerpt}</p>
+                    <h3 class="discussion-title">${thread.name}</h3>
                     <div class="discussion-stats">
                         <div class="discussion-stat">
-                            <i class="fas fa-comment"></i>
-                            <span>${discussion.comments} comments</span>
-                        </div>
-                        <div class="discussion-stat">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>${discussion.likes}</span>
+                            <i class="fas fa-eye"></i>
+                            <span>Active Conversation</span>
                         </div>
                     </div>
                 `;
@@ -2443,55 +2487,111 @@ function updateGenreCategoryWithError(genre) {
             });
         }
 
-        function generateMatches() {
+        function renderRealMatches(matches) {
             const container = document.getElementById('matchesList');
             if (!container) return;
+            container.innerHTML = '';
             
             matches.forEach(match => {
+                const initials = match.name ? match.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+                const score = match.score || match.matchScore || 0;
+                // Ensure score is 0-100
+                const displayScore = score <= 1 ? Math.round(score * 100) : Math.round(score);
+                
                 const card = document.createElement('div');
                 card.className = 'match-card';
                 card.innerHTML = `
-                    <div class="match-avatar">${match.initials}</div>
-                    <div class="match-score">${match.score}</div>
-                    <div class="match-name">${match.name}</div>
-                    <div class="match-genres">${match.genres}</div>
-                    <button class="match-btn" data-user-name="${match.name}">
-                        Connect
-                    </button>
+                    <div class="match-badge">${displayScore}% Match</div>
+                    <div class="match-avatar" style="background: linear-gradient(135deg, #667eea, #764ba2)">${match.profilePicture ? `<img src="${match.profilePicture}">` : initials}</div>
+                    <h3 class="match-name">${match.name}</h3>
+                    <p class="match-bio">${match.bio ? truncate(match.bio, 40) : 'Fellow book lover'}</p>
+                    <button class="match-connect-btn" onclick="window.location.href='../Chat/chat.html?userId=${match.id || match._id}'">Message</button>
                 `;
                 container.appendChild(card);
             });
+        }
+        
+        function renderRealCircles(circles) {
+            const container = document.getElementById('clubsGrid');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            circles.forEach(circle => {
+                const card = document.createElement('div');
+                card.className = 'club-card';
+                card.innerHTML = `
+                    <div class="club-banner">${circle.icon || '📚'}</div>
+                    <div class="club-content">
+                        <h3 class="club-title">${circle.name}</h3>
+                        <p class="club-description">${circle.description}</p>
+                        <div class="club-current-book">📖 ${circle.currentBook}</div>
+                        <div class="club-stats">
+                            <div class="club-stat">
+                                <i class="fas fa-users"></i>
+                                <span>${circle.members} members</span>
+                            </div>
+                        </div>
+                        <button class="club-join-btn" onclick="window.location.href='../Discussion%20Board/discussion.html'">Explore Circle</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function generateVoiceRooms() {
+            const container = document.getElementById('voiceRoomsGrid');
+            if (!container) return;
+            
+            const fallbackRooms = [
+                { id: 'f1', name: 'Fantasy Book Club', participants: 24, host: { name: 'Emma R.' }, tags: ['Fantasy', 'Public'] },
+                { id: 'f2', name: 'Thriller Theories', participants: 12, host: { name: 'James K.' }, tags: ['Thriller', 'Public'] },
+                { id: 'f3', name: 'Classic Literature', participants: 8, host: { name: 'Sophia L.' }, tags: ['Classics', 'Public'] }
+            ];
+            
+            renderRealVoiceRooms(fallbackRooms);
+        }
+
+        function generateDiscussions() {
+            const container = document.getElementById('discussionsList');
+            if (!container) return;
+            
+            const fallbackThreads = [
+                { id: 't1', name: 'Best magic systems in 2024?', color: 'purple', icon: '✨', activeUsers: 142 },
+                { id: 't2', name: 'Underrated thriller authors', color: 'blue', icon: '🔍', activeUsers: 89 },
+                { id: 't3', name: 'Historical fiction debate', color: 'brown', icon: '📜', activeUsers: 256 }
+            ];
+            
+            renderRealDiscussions(fallbackThreads);
+        }
+
+        function generateMatches() {
+            const container = document.getElementById('matchesList');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const fallbackMatches = [
+                { id: 'm1', name: 'Anuska', bio: 'Romcom enthusiast', score: 0.95 },
+                { id: 'm2', name: 'Sajani', bio: 'Thriller seeker', score: 0.88 },
+                { id: 'm3', name: 'Pandey', bio: 'History buff', score: 0.82 }
+            ];
+            
+            renderRealMatches(fallbackMatches);
         }
 
         function generateBookClubs() {
             const container = document.getElementById('clubsGrid');
             if (!container) return;
             
-            clubs.forEach(club => {
-                const card = document.createElement('div');
-                card.className = 'club-card';
-                card.innerHTML = `
-                    <div class="club-banner">${club.icon}</div>
-                    <div class="club-content">
-                        <h3 class="club-title">${club.name}</h3>
-                        <p class="club-description">${club.description}</p>
-                        <div class="club-current-book">📖 ${club.currentBook}</div>
-                        <div class="club-stats">
-                            <div class="club-stat">
-                                <i class="fas fa-users"></i>
-                                <span>${club.members} members</span>
-                            </div>
-                            <div class="club-stat">
-                                <i class="fas fa-comments"></i>
-                                <span>Active weekly</span>
-                            </div>
-                        </div>
-                        <button class="club-join-btn">Join Club</button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+            const fallbackClubs = [
+                { id: 'c1', name: 'Epic Fantasy Guild', description: 'Exploring massive worlds together.', currentBook: 'The Name of the Wind', members: 156, icon: '🐉' },
+                { id: 'c2', name: 'Midnight Thrillers', description: 'Discussing the latest plot twists.', currentBook: 'Gone Girl', members: 89, icon: '🔪' },
+                { id: 'c3', name: 'Classic Souls', description: 'Revisiting the masterpieces.', currentBook: 'Pride and Prejudice', members: 245, icon: '📜' }
+            ];
+            
+            renderRealCircles(fallbackClubs);
         }
+
+
 
         function generateQuickActions() {
             const container = document.getElementById('quickActionsGrid');
@@ -2890,11 +2990,12 @@ function updateGenreCategoryWithError(genre) {
                 e.stopPropagation();
                 
                 showConfirmModal('Confirm Logout', 'Are you sure you want to logout?', function() {
-                    localStorage.removeItem('litlink_token');
-                    localStorage.removeItem('litlink_user');
-                    localStorage.removeItem('authToken');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
+                    // Clear all possible keys from both storages
+                    const keys = ['litlink_token', 'litlink_user', 'litlink_userId', 'authToken', 'token', 'user', 'userId'];
+                    keys.forEach(k => {
+                        localStorage.removeItem(k);
+                        sessionStorage.removeItem(k);
+                    });
                     
                     showMessageModal('Success', 'Logged out successfully!', 'success');
                     
@@ -2931,31 +3032,17 @@ function updateGenreCategoryWithError(genre) {
                     return;
                 }
                 
-                // Load user data
-                await loadUserData();
-                
-                // Load genre books from Open Library (primary feature)
-                await loadGenreBooks();
-                
-                // Generate fallback content for other sections
-                generateVoiceRooms();
-                generateDiscussions();
-                generateMatches();
-                generateBookClubs();
+                // 1. Load static/local UI elements first
                 generateQuickActions();
+                
+                // 2. Load user and dashboard data (parallel-ish)
+                loadUserData().catch(err => console.error('Error loading user data:', err));
+                
+                // 3. Load genre books from Open Library
+                loadGenreBooks().catch(err => console.error('Error loading genre books:', err));
                 
             } catch (error) {
                 console.error('Initialization error:', error);
-                // Load all fallback content even on error
-                try {
-                    generateVoiceRooms();
-                    generateDiscussions();
-                    generateMatches();
-                    generateBookClubs();
-                    generateQuickActions();
-                } catch (fallbackError) {
-                    console.error('Error generating fallback content:', fallbackError);
-                }
             }
             
             // Setup all interactive handlers
@@ -2985,5 +3072,6 @@ function updateGenreCategoryWithError(genre) {
         });
 
     </script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

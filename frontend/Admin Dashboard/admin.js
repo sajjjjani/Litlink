@@ -65,8 +65,16 @@ async function checkAuthAndInitialize() {
     
     if (!authToken || !currentUser?.isAdmin) {
         console.warn('❌ Auth failed: No token or user is not an admin.');
-        showToast('Admin access required. Redirecting...', 'warning');
+        
+        // GUARD: Don't redirect if we are already at the homepage
+        if (window.location.pathname.includes('index.html')) {
+            console.log('🛡️ Guard: Already at homepage, skipping admin auth failure redirect');
+            return;
+        }
+
+        if (typeof showToast === 'function') showToast('Admin access required. Redirecting...', 'warning');
         setTimeout(() => {
+            console.trace('↪️ Admin auth fail redirect to homepage');
             window.location.href = '../Homepage/index.html';
         }, 1500);
         return;
@@ -102,9 +110,29 @@ async function checkAuthAndInitialize() {
     } catch (error) {
         console.error('❌ Admin authentication failed:', error);
         showLoadingState(false);
-        showToast(error.message || 'Admin authentication failed', 'error');
-        localStorage.clear();
+        
+        // Distinguish between network error and auth error
+        const isNetworkError = error.message.includes('fetch') || error.name === 'AbortError' || error.message.includes('timeout');
+        
+        if (isNetworkError) {
+            console.warn('⚠️ Server seems down or timed out. Staying on page for retry.');
+            if (typeof showToast === 'function') showToast('Server connection error. Retrying...', 'info');
+            return;
+        }
+
+        if (typeof showToast === 'function') showToast(error.message || 'Admin authentication failed', 'error');
+        
+        // Targeted clear
+        if (window.AuthState) {
+            AuthState.clearAuth();
+        } else {
+            localStorage.removeItem('litlink_token');
+            localStorage.removeItem('litlink_user');
+        }
+
         setTimeout(() => {
+            if (window.location.pathname.includes('index.html')) return;
+            console.trace('↪️ Admin credential fail redirect');
             window.location.href = '../Homepage/index.html';
         }, 2000);
     }
@@ -2011,19 +2039,22 @@ function showToast(message, type = 'info') {
 
 function logout() {
     if (confirm('Are you sure you want to logout?')) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('litlink_token');
-        sessionStorage.removeItem('litlink_user');
-        sessionStorage.removeItem('authToken');
-        sessionStorage.removeItem('user');
+        if (window.AuthState) {
+            AuthState.clearAuth();
+        } else {
+            localStorage.removeItem('litlink_token');
+            localStorage.removeItem('litlink_user');
+            sessionStorage.removeItem('litlink_token');
+            sessionStorage.removeItem('litlink_user');
+        }
         
         if (socket) {
             socket.disconnect();
         }
         if (refreshInterval) clearInterval(refreshInterval);
-        showToast('Logged out successfully', 'success');
+        if (typeof showToast === 'function') showToast('Logged out successfully', 'success');
         setTimeout(() => {
+            console.trace('↪️ Admin manual logout redirect');
             window.location.href = '../Homepage/index.html';
         }, 1000);
     }

@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+
+    <script src="../config.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Litlink - Find Readers</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -626,6 +628,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+function formatCompatibility(val) {
+    let score = val || 0;
+    if (score > 0 && score <= 1) {
+        return Math.round(score * 100);
+    } else if (score > 1 && score <= 100) {
+        return Math.round(score);
+    } else if (score > 100) {
+        if (score % 100 === 0 && score <= 10000) {
+            return Math.round(score / 100);
+        }
+        return Math.round(score % 100);
+    }
+    return Math.round(score);
+}
+
 // Load readers from API
 async function loadReaders() {
     try {
@@ -669,12 +686,15 @@ async function loadReaders() {
                    user.name !== 'Admin' &&
                    !user.isBanned &&
                    !user.isSuspended;
-        }).map(user => ({
-            ...user,
-            matchPercentage: matchesMap.get(user._id)?.percentage || 0,
-            matchDetails: matchesMap.get(user._id)?.commonInterests || {},
-            online: user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false
-        }));
+        }).map(user => {
+            const rawPct = matchesMap.get(user._id)?.percentage || matchesMap.get(user._id)?.score || 0;
+            return {
+                ...user,
+                matchPercentage: formatCompatibility(rawPct),
+                matchDetails: matchesMap.get(user._id)?.commonInterests || {},
+                online: user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false
+            };
+        });
         
         // Sort by match percentage (highest first)
         allReaders.sort((a, b) => b.matchPercentage - a.matchPercentage);
@@ -892,5 +912,6 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Profile - Litlink</title>
     <style>
         /* Navbar and container styles that are specific to this page */
@@ -864,6 +866,11 @@
         <!-- Footer -->
         <footer class="footer">
             <p>LitLink Admin Panel • Logged in as: <span id="footerAdminName">Admin</span></p>
+            <div style="margin-top: 10px; display: flex; justify-content: center; gap: 15px;">
+                <a href="../homepage/about.html" style="color: rgba(232, 212, 201, 0.6); text-decoration: none; font-size: 12px;">About</a>
+                <a href="../homepage/help.html" style="color: rgba(232, 212, 201, 0.6); text-decoration: none; font-size: 12px;">Help</a>
+                <a href="../homepage/faq.html" style="color: rgba(232, 212, 201, 0.6); text-decoration: none; font-size: 12px;">FAQ</a>
+            </div>
         </footer>
     </div>
 
@@ -1237,5 +1244,6 @@
             }
         });
     </script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

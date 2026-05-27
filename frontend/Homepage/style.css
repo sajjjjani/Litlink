@@ -1,4 +1,12 @@
 /* ===== GLOBAL STYLES ===== */
+:root {
+    --font-scale: 1;
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -132,6 +140,35 @@ body {
 .btn-logout:hover {
     background: rgba(239, 68, 68, 0.1);
 }
+
+/* ===== TEXT SIZE CONTROLS ===== */
+.text-size-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.size-btn {
+    background: rgba(245, 230, 211, 0.1);
+    color: #f5e6d3;
+    border: 1px solid rgba(245, 230, 211, 0.2);
+    border-radius: 4px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.size-btn:hover {
+    background: rgba(245, 230, 211, 0.2);
+}
+
+.size-btn.active {
+    background: #f5e6d3;
+    color: #3d2617;
+    border-color: #f5e6d3;
+}
+
 
 /* ===== MODAL OVERLAY ===== */
 .modal-overlay {

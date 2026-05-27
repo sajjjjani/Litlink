@@ -24,8 +24,10 @@
         if (isConnecting) return;
         isConnecting = true;
         
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const host = options.wsHost || 'localhost:5002';
+        const backendOrigin = window.LitlinkConfig?.backendOrigin || 'http://localhost:5002';
+        const backendUrl = new URL(backendOrigin);
+        const protocol = backendUrl.protocol === 'https:' ? 'wss' : 'ws';
+        const host = options.wsHost || backendUrl.host;
         const wsUrl = `${protocol}://${host}?token=${encodeURIComponent(authToken)}`;
         
         console.log('🔌 Connecting to WebSocket:', wsUrl);
@@ -86,7 +88,7 @@
             reconnectTimer = null;
             if (window.authToken) {
                 console.log('🔄 Reconnecting WebSocket...');
-                init({ authToken: window.authToken, wsHost: 'localhost:5002' });
+                init({ authToken: window.authToken });
             }
         }, 5000);
     }

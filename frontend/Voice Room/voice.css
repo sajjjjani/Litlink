@@ -2,6 +2,7 @@
 
 /* ===== VARIABLES ===== */
 :root {
+  --font-scale: 1;
   --bg-primary:   #3B1D14;
   --bg-secondary: #5A2E1F;
   --bg-tertiary:  #4A2519;
@@ -18,6 +19,10 @@
   --sidebar-bg:   #EDE0CB;
   --sidebar-text: #3B1D14;
   --sidebar-muted:#7A5C45;
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
 }
 
 /* ===== RESET ===== */

@@ -2,6 +2,7 @@
 
 /* ---- CSS Variables ---- */
 :root {
+  --font-scale: 1;
   --cream:       #F5E6CC;
   --deep-brown:  #5A2E1F;
   --muted-tan:   #E8D8B5;
@@ -11,6 +12,10 @@
   --border-warm: #D7C2A3;
   --shadow-warm: 0 4px 20px rgba(90,46,31,0.15);
   --shadow-warm-lg: 0 10px 30px rgba(90,46,31,0.25);
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
