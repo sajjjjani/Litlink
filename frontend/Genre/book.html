@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LitLink – Book Details</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c1810'/%3E%3Cpath d='M18 18h20a8 8 0 0 1 8 8v20H26a8 8 0 0 1-8-8V18z' fill='%23d4a574'/%3E%3Cpath d='M24 22h16v4H24zm0 8h16v4H24zm0 8h12v4H24z' fill='%232c1810'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -935,6 +937,215 @@
             gap: 5px;
         }
 
+        .community-toolbar {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            color: #f5e6d3;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(245, 230, 211, 0.08);
+            border-color: rgba(200, 155, 60, 0.3);
+        }
+
+        .toolbar-btn.secondary {
+            color: #d4b5a0;
+        }
+
+        .community-form {
+            background: rgba(245, 230, 211, 0.04);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .community-form input,
+        .community-form textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px solid rgba(245, 230, 211, 0.12);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: #f5e6d3;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .community-form textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .community-form input:focus,
+        .community-form textarea:focus {
+            border-color: rgba(200, 155, 60, 0.5);
+            box-shadow: 0 0 0 4px rgba(200, 155, 60, 0.08);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .form-hint {
+            margin-right: auto;
+            color: #d4b5a0;
+            font-size: 0.85rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 35px 18px;
+            color: #d4b5a0;
+            border: 2px dashed rgba(245, 230, 211, 0.12);
+            border-radius: 12px;
+        }
+
+        .discussion-thread-view {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .thread-back-btn {
+            background: none;
+            border: none;
+            color: #d4b5a0;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            padding: 0;
+            margin-bottom: 12px;
+        }
+
+        .thread-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #f5e6d3;
+            margin-bottom: 6px;
+        }
+
+        .thread-meta {
+            color: #d4b5a0;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .thread-content {
+            margin-top: 12px;
+            color: #d4b5a0;
+            line-height: 1.65;
+            white-space: pre-wrap;
+        }
+
+        .replies-list {
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .reply-item {
+            background: rgba(0, 0, 0, 0.16);
+            border: 2px solid rgba(245, 230, 211, 0.08);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .reply-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #d4b5a0;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+
+        .reply-content {
+            color: #d4b5a0;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .rating-input {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .rating-input .star {
+            font-size: 1.1rem;
+            cursor: pointer;
+            color: rgba(245, 230, 211, 0.4);
+            transition: transform 0.15s ease, color 0.15s ease;
+        }
+
+        .rating-input .star.active {
+            color: #c89b3c;
+        }
+
+        .rating-input .star:hover {
+            transform: translateY(-1px);
+        }
+
+        .review-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .icon-btn {
+            background: rgba(245, 230, 211, 0.05);
+            border: 2px solid rgba(245, 230, 211, 0.1);
+            color: #d4b5a0;
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .icon-btn:hover {
+            background: rgba(245, 230, 211, 0.08);
+            border-color: rgba(200, 155, 60, 0.3);
+            color: #f5e6d3;
+        }
+
         /* Reviews List */
         .reviews-list {
             display: flex;
@@ -1369,6 +1580,27 @@
 
                     <!-- Discussions Tab -->
                     <div class="tab-content active" id="discussionsTab">
+                        <div class="community-toolbar">
+                            <button class="toolbar-btn" id="startDiscussionBtn" type="button">
+                                <i class="fas fa-plus"></i> Start Discussion
+                            </button>
+                            <button class="toolbar-btn secondary" id="refreshDiscussionsBtn" type="button">
+                                <i class="fas fa-rotate"></i> Refresh
+                            </button>
+                        </div>
+
+                        <div class="community-form" id="startDiscussionForm" style="display:none;">
+                            <input id="discussionTitleInput" type="text" maxlength="200" placeholder="Title (optional)">
+                            <textarea id="discussionContentInput" maxlength="8000" placeholder="Write your message…"></textarea>
+                            <div class="form-actions">
+                                <div class="form-hint" id="discussionFormHint"></div>
+                                <button class="toolbar-btn secondary" id="cancelDiscussionBtn" type="button">Cancel</button>
+                                <button class="toolbar-btn" id="submitDiscussionBtn" type="button">Post</button>
+                            </div>
+                        </div>
+
+                        <div class="discussion-thread-view" id="discussionThreadView" style="display:none;"></div>
+
                         <div class="discussions-list" id="discussionsList">
                             <div class="loading" style="padding: 20px;">
                                 <i class="fas fa-spinner fa-spin"></i> Loading discussions...
@@ -1378,6 +1610,33 @@
 
                     <!-- Reviews Tab -->
                     <div class="tab-content" id="reviewsTab">
+                        <div class="community-toolbar">
+                            <button class="toolbar-btn" id="leaveReviewBtn" type="button">
+                                <i class="fas fa-pen"></i> Leave Review
+                            </button>
+                            <button class="toolbar-btn secondary" id="refreshReviewsBtn" type="button">
+                                <i class="fas fa-rotate"></i> Refresh
+                            </button>
+                        </div>
+
+                        <div class="community-form" id="reviewForm" style="display:none;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                                <div class="rating-input" id="reviewRatingInput" aria-label="Rating (1 to 5 stars)">
+                                    <i class="far fa-star star" data-value="1"></i>
+                                    <i class="far fa-star star" data-value="2"></i>
+                                    <i class="far fa-star star" data-value="3"></i>
+                                    <i class="far fa-star star" data-value="4"></i>
+                                    <i class="far fa-star star" data-value="5"></i>
+                                </div>
+                                <div class="form-hint" id="reviewFormHint"></div>
+                            </div>
+                            <textarea id="reviewTextInput" maxlength="5000" placeholder="Write your review…"></textarea>
+                            <div class="form-actions">
+                                <button class="toolbar-btn secondary" id="cancelReviewBtn" type="button">Cancel</button>
+                                <button class="toolbar-btn" id="submitReviewBtn" type="button">Submit</button>
+                            </div>
+                        </div>
+
                         <div class="reviews-list" id="reviewsList">
                             <div class="loading" style="padding: 20px;">
                                 <i class="fas fa-spinner fa-spin"></i> Loading reviews...
@@ -1568,87 +1827,579 @@ function displayBookDetails(data) {
         }
 
         // ===== COMMUNITY DATA =====
-        function loadDiscussions() {
-            const container = document.getElementById('discussionsList');
-            
-            // Simulated discussions (in real app, fetch from your API)
-            const discussions = [
-                {
-                    title: `Discussion about "${bookData?.title || 'this book'}"`,
-                    author: 'Sarah H.',
-                    comments: 38,
-                    likes: 128,
-                    time: '2h ago'
-                },
-                {
-                    title: 'Spoiler thread: Let\'s talk about the ending',
-                    author: 'Mike R.',
-                    comments: 73,
-                    likes: 367,
-                    time: '5h ago'
-                },
-                {
-                    title: 'Character analysis: Main protagonist',
-                    author: 'Emma W.',
-                    comments: 24,
-                    likes: 89,
-                    time: '1d ago'
-                }
-            ];
+        let currentDiscussionId = null;
+        let currentReviewRating = 0;
+        let editingReviewId = null;
 
-            container.innerHTML = discussions.map(d => `
-                <div class="discussion-item" onclick="window.location.href='../Discussion/discussion.html'">
-                    <div class="discussion-title">${d.title}</div>
-                    <div class="discussion-meta">
-                        <span><i class="fas fa-user"></i> ${d.author}</span>
-                        <span><i class="fas fa-comment"></i> ${d.comments}</span>
-                        <span><i class="fas fa-heart"></i> ${d.likes}</span>
-                        <span><i class="far fa-clock"></i> ${d.time}</span>
-                    </div>
-                </div>
-            `).join('');
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
-        function loadReviews() {
-            const container = document.getElementById('reviewsList');
-            
-            // Simulated reviews
-            const reviews = [
-                {
-                    user: 'AlexReads02',
-                    rating: 5,
-                    time: '2 days ago',
-                    content: 'Absolutely loved this book! The character development was amazing and the plot kept me guessing until the very end. Highly recommend to anyone looking for their next great read.'
-                },
-                {
-                    user: 'BookwormBella',
-                    rating: 4,
-                    time: '1 week ago',
-                    content: 'Really enjoyable read. The pacing was good and the world-building was immersive. Would definitely read more from this author.'
-                },
-                {
-                    user: 'PageTurner99',
-                    rating: 3,
-                    time: '2 weeks ago',
-                    content: 'It was okay. Some parts dragged a bit, but overall an interesting story. Might check out other books in the series.'
-                }
-            ];
+        function formatTimeAgo(dateValue) {
+            const date = new Date(dateValue);
+            const time = date.getTime();
+            if (!Number.isFinite(time)) return '';
 
-            container.innerHTML = reviews.map(review => `
-                <div class="review-item">
-                    <div class="review-header">
-                        <div class="reviewer-avatar">${review.user[0]}</div>
-                        <div class="reviewer-info">
-                            <h4>${review.user}</h4>
-                            <p>${review.time}</p>
+            const now = Date.now();
+            const diffMs = Math.max(0, now - time);
+            const mins = Math.floor(diffMs / 60000);
+            const hours = Math.floor(diffMs / 3600000);
+            const days = Math.floor(diffMs / 86400000);
+
+            if (mins < 1) return 'Just now';
+            if (mins < 60) return `${mins}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function getUserLabel(user) {
+            if (!user) return 'User';
+            return user.username || user.name || 'User';
+        }
+
+        function getInitials(label) {
+            const safe = String(label || '').trim();
+            if (!safe) return 'U';
+            const parts = safe.split(/\s+/).slice(0, 2);
+            return parts.map(p => p[0]).join('').toUpperCase();
+        }
+
+        function getCurrentUserId() {
+            const auth = checkAuth();
+            if (!auth) return '';
+            const user = auth.user || {};
+            return String(user.id || user._id || localStorage.getItem('litlink_userId') || localStorage.getItem('userId') || '');
+        }
+
+        async function loadDiscussions() {
+            const listContainer = document.getElementById('discussionsList');
+            const threadView = document.getElementById('discussionThreadView');
+
+            if (!bookId) return;
+
+            listContainer.innerHTML = `
+                <div class="loading" style="padding: 20px;">
+                    <i class="fas fa-spinner fa-spin"></i> Loading discussions...
+                </div>
+            `;
+
+            if (threadView) {
+                threadView.style.display = 'none';
+                threadView.innerHTML = '';
+            }
+            currentDiscussionId = null;
+
+            const auth = checkAuth();
+            if (!auth) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/discussions`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to load discussions');
+                }
+
+                const discussions = Array.isArray(data.discussions) ? data.discussions : [];
+
+                if (discussions.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-comments" style="font-size: 2rem; color:#c89b3c; margin-bottom: 10px;"></i>
+                            <div style="font-weight:600; color:#f5e6d3; margin-bottom:6px;">No discussions yet</div>
+                            <div>Be the first to start a discussion for this book.</div>
                         </div>
-                        <div class="review-rating">
-                            ${Array(review.rating).fill('<i class="fas fa-star star" style="color: #c89b3c;"></i>').join('')}
+                    `;
+                    return;
+                }
+
+                listContainer.innerHTML = discussions.map(d => {
+                    const title = (d.title && String(d.title).trim()) ? d.title : `Discussion: ${String(d.content || '').slice(0, 80)}${String(d.content || '').length > 80 ? '…' : ''}`;
+                    const authorLabel = getUserLabel(d.author);
+                    const timeLabel = formatTimeAgo(d.lastActivity || d.createdAt);
+                    const replyCount = Number(d.replyCount || 0);
+
+                    return `
+                        <div class="discussion-item" data-id="${escapeHtml(d._id)}">
+                            <div class="discussion-title">${escapeHtml(title)}</div>
+                            <div class="discussion-meta">
+                                <span><i class="fas fa-user"></i> ${escapeHtml(authorLabel)}</span>
+                                <span><i class="fas fa-comment"></i> ${replyCount}</span>
+                                <span><i class="far fa-clock"></i> ${escapeHtml(timeLabel)}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading discussions:', error);
+                listContainer.innerHTML = `
+                    <div class="error" style="padding: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p style="margin-top: 10px;">Failed to load discussions</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function openDiscussionThread(discussionId) {
+            const listContainer = document.getElementById('discussionsList');
+            const threadView = document.getElementById('discussionThreadView');
+            if (!threadView || !discussionId || !bookId) return;
+
+            const auth = checkAuth();
+            if (!auth) return;
+
+            currentDiscussionId = discussionId;
+            threadView.style.display = 'block';
+            threadView.innerHTML = `
+                <div class="loading" style="padding: 20px;">
+                    <i class="fas fa-spinner fa-spin"></i> Loading thread...
+                </div>
+            `;
+            if (listContainer) listContainer.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/discussions/${encodeURIComponent(discussionId)}`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to load thread');
+                }
+
+                const discussion = data.discussion;
+                const title = (discussion.title && String(discussion.title).trim()) ? discussion.title : 'Discussion';
+                const authorLabel = getUserLabel(discussion.author);
+                const timeLabel = formatTimeAgo(discussion.createdAt);
+                const replies = Array.isArray(discussion.replies) ? discussion.replies : [];
+
+                threadView.innerHTML = `
+                    <button class="thread-back-btn" type="button" id="backToDiscussionsBtn">
+                        <i class="fas fa-arrow-left"></i> Back to discussions
+                    </button>
+
+                    <div class="thread-title">${escapeHtml(title)}</div>
+                    <div class="thread-meta">
+                        <span><i class="fas fa-user"></i> ${escapeHtml(authorLabel)}</span>
+                        <span><i class="far fa-clock"></i> ${escapeHtml(timeLabel)}</span>
+                        <span><i class="fas fa-comment"></i> ${replies.length}</span>
+                    </div>
+                    <div class="thread-content">${escapeHtml(discussion.content)}</div>
+
+                    <div class="replies-list" id="repliesList">
+                        ${replies.length === 0 ? `
+                            <div class="empty-state" style="padding: 18px;">
+                                <div style="font-weight:600; color:#f5e6d3; margin-bottom:6px;">No replies yet</div>
+                                <div>Be the first to reply.</div>
+                            </div>
+                        ` : replies.map(r => {
+                            const rAuthor = getUserLabel(r.author);
+                            const rTime = formatTimeAgo(r.createdAt);
+                            return `
+                                <div class="reply-item">
+                                    <div class="reply-meta">
+                                        <span><i class="fas fa-user"></i> ${escapeHtml(rAuthor)}</span>
+                                        <span><i class="far fa-clock"></i> ${escapeHtml(rTime)}</span>
+                                    </div>
+                                    <div class="reply-content">${escapeHtml(r.content)}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <div class="community-form" id="replyForm" style="margin-top: 15px;">
+                        <textarea id="replyContentInput" maxlength="4000" placeholder="Write a reply…"></textarea>
+                        <div class="form-actions">
+                            <div class="form-hint" id="replyFormHint"></div>
+                            <button class="toolbar-btn" id="submitReplyBtn" type="button">Reply</button>
                         </div>
                     </div>
-                    <div class="review-content">${review.content}</div>
+                `;
+
+                document.getElementById('backToDiscussionsBtn')?.addEventListener('click', () => {
+                    currentDiscussionId = null;
+                    threadView.style.display = 'none';
+                    threadView.innerHTML = '';
+                    if (listContainer) listContainer.style.display = '';
+                });
+
+                document.getElementById('submitReplyBtn')?.addEventListener('click', async () => {
+                    const hint = document.getElementById('replyFormHint');
+                    const input = document.getElementById('replyContentInput');
+                    if (!input) return;
+
+                    const content = String(input.value || '').trim();
+                    if (!content) {
+                        if (hint) hint.textContent = 'Reply cannot be empty.';
+                        return;
+                    }
+
+                    if (hint) hint.textContent = 'Posting…';
+
+                    try {
+                        const replyRes = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/discussions/${encodeURIComponent(discussionId)}/replies`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${auth.token}`
+                            },
+                            body: JSON.stringify({ content })
+                        });
+                        const replyData = await replyRes.json().catch(() => ({}));
+                        if (!replyRes.ok || !replyData.success) {
+                            throw new Error(replyData.message || 'Failed to add reply');
+                        }
+
+                        input.value = '';
+                        if (hint) hint.textContent = '';
+                        await openDiscussionThread(discussionId);
+                    } catch (err) {
+                        console.error('Error posting reply:', err);
+                        if (hint) hint.textContent = 'Failed to post reply.';
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading discussion thread:', error);
+                threadView.innerHTML = `
+                    <button class="thread-back-btn" type="button" id="backToDiscussionsBtn">
+                        <i class="fas fa-arrow-left"></i> Back to discussions
+                    </button>
+                    <div class="error" style="padding: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p style="margin-top: 10px;">Failed to load thread</p>
+                    </div>
+                `;
+                document.getElementById('backToDiscussionsBtn')?.addEventListener('click', () => {
+                    currentDiscussionId = null;
+                    threadView.style.display = 'none';
+                    threadView.innerHTML = '';
+                    if (listContainer) listContainer.style.display = '';
+                });
+            }
+        }
+
+        async function loadReviews() {
+            const container = document.getElementById('reviewsList');
+            if (!container || !bookId) return;
+
+            container.innerHTML = `
+                <div class="loading" style="padding: 20px;">
+                    <i class="fas fa-spinner fa-spin"></i> Loading reviews...
                 </div>
-            `).join('');
+            `;
+
+            const auth = checkAuth();
+            if (!auth) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/reviews`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to load reviews');
+                }
+
+                const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+                const currentUserId = getCurrentUserId();
+
+                if (reviews.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-star" style="font-size: 2rem; color:#c89b3c; margin-bottom: 10px;"></i>
+                            <div style="font-weight:600; color:#f5e6d3; margin-bottom:6px;">No reviews yet</div>
+                            <div>Be the first to leave a review.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = reviews.map(review => {
+                    const userLabel = getUserLabel(review.user);
+                    const initials = getInitials(userLabel);
+                    const timeLabel = formatTimeAgo(review.updatedAt || review.createdAt);
+                    const rating = Math.max(1, Math.min(5, Number(review.rating || 0)));
+                    const isMine = currentUserId && review.user && String(review.user._id) === String(currentUserId);
+
+                    const stars = Array.from({ length: 5 }, (_, i) =>
+                        i < rating ? '<i class="fas fa-star star" style="color: #c89b3c;"></i>' : '<i class="far fa-star star" style="color: rgba(245,230,211,0.35);"></i>'
+                    ).join('');
+
+                    return `
+                        <div class="review-item" data-id="${escapeHtml(review._id)}" data-mine="${isMine ? '1' : '0'}" data-rating="${escapeHtml(rating)}" data-text="${escapeHtml(review.text)}">
+                            <div class="review-header">
+                                <div class="reviewer-avatar">${escapeHtml(initials)}</div>
+                                <div class="reviewer-info">
+                                    <h4>${escapeHtml(userLabel)}${isMine ? ' (You)' : ''}</h4>
+                                    <p>${escapeHtml(timeLabel)}</p>
+                                </div>
+                                <div class="review-rating">${stars}</div>
+                                ${isMine ? `
+                                    <div class="review-actions">
+                                        <button class="icon-btn" type="button" data-action="edit"><i class="fas fa-pen"></i> Edit</button>
+                                        <button class="icon-btn" type="button" data-action="delete"><i class="fas fa-trash"></i> Delete</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="review-content">${escapeHtml(review.text)}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading reviews:', error);
+                container.innerHTML = `
+                    <div class="error" style="padding: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p style="margin-top: 10px;">Failed to load reviews</p>
+                    </div>
+                `;
+            }
+        }
+
+        function setReviewRating(value) {
+            const rating = Math.max(0, Math.min(5, Number(value) || 0));
+            currentReviewRating = rating;
+
+            const stars = document.querySelectorAll('#reviewRatingInput .star');
+            stars.forEach(star => {
+                const v = Number(star.getAttribute('data-value'));
+                star.classList.toggle('active', v <= rating);
+                star.classList.toggle('fas', v <= rating);
+                star.classList.toggle('far', v > rating);
+            });
+        }
+
+        function showReviewForm(show) {
+            const form = document.getElementById('reviewForm');
+            if (!form) return;
+            form.style.display = show ? 'flex' : 'none';
+        }
+
+        function showDiscussionForm(show) {
+            const form = document.getElementById('startDiscussionForm');
+            if (!form) return;
+            form.style.display = show ? 'flex' : 'none';
+        }
+
+        function setupCommunityUI() {
+            const startDiscussionBtn = document.getElementById('startDiscussionBtn');
+            const refreshDiscussionsBtn = document.getElementById('refreshDiscussionsBtn');
+            const cancelDiscussionBtn = document.getElementById('cancelDiscussionBtn');
+            const submitDiscussionBtn = document.getElementById('submitDiscussionBtn');
+
+            const leaveReviewBtn = document.getElementById('leaveReviewBtn');
+            const refreshReviewsBtn = document.getElementById('refreshReviewsBtn');
+            const cancelReviewBtn = document.getElementById('cancelReviewBtn');
+            const submitReviewBtn = document.getElementById('submitReviewBtn');
+
+            startDiscussionBtn?.addEventListener('click', () => {
+                showDiscussionForm(true);
+                document.getElementById('discussionTitleInput')?.focus();
+            });
+            cancelDiscussionBtn?.addEventListener('click', () => {
+                showDiscussionForm(false);
+                const hint = document.getElementById('discussionFormHint');
+                if (hint) hint.textContent = '';
+                const title = document.getElementById('discussionTitleInput');
+                const content = document.getElementById('discussionContentInput');
+                if (title) title.value = '';
+                if (content) content.value = '';
+            });
+            refreshDiscussionsBtn?.addEventListener('click', () => loadDiscussions());
+            submitDiscussionBtn?.addEventListener('click', async () => {
+                const hint = document.getElementById('discussionFormHint');
+                const titleInput = document.getElementById('discussionTitleInput');
+                const contentInput = document.getElementById('discussionContentInput');
+                if (!contentInput) return;
+
+                if (!bookId) {
+                    if (hint) hint.textContent = 'Book is still loading. Please try again.';
+                    return;
+                }
+
+                const auth = checkAuth();
+                if (!auth) return;
+
+                const title = String(titleInput?.value || '').trim();
+                const content = String(contentInput.value || '').trim();
+
+                if (!content) {
+                    if (hint) hint.textContent = 'Message cannot be empty.';
+                    return;
+                }
+
+                if (hint) hint.textContent = 'Posting…';
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/discussions`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${auth.token}`
+                        },
+                        body: JSON.stringify({ title, content })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to start discussion');
+                    }
+
+                    if (hint) hint.textContent = '';
+                    if (titleInput) titleInput.value = '';
+                    contentInput.value = '';
+                    showDiscussionForm(false);
+                    await loadDiscussions();
+                } catch (error) {
+                    console.error('Error starting discussion:', error);
+                    if (hint) hint.textContent = error.message || 'Failed to start discussion.';
+                }
+            });
+
+            document.getElementById('discussionsList')?.addEventListener('click', (e) => {
+                const target = e.target?.closest?.('.discussion-item');
+                const discussionId = target?.getAttribute?.('data-id');
+                if (discussionId) openDiscussionThread(discussionId);
+            });
+
+            leaveReviewBtn?.addEventListener('click', () => {
+                showReviewForm(true);
+                document.getElementById('reviewTextInput')?.focus();
+            });
+            cancelReviewBtn?.addEventListener('click', () => {
+                showReviewForm(false);
+                editingReviewId = null;
+                const hint = document.getElementById('reviewFormHint');
+                if (hint) hint.textContent = '';
+                const text = document.getElementById('reviewTextInput');
+                if (text) text.value = '';
+                setReviewRating(0);
+                const submit = document.getElementById('submitReviewBtn');
+                if (submit) submit.textContent = 'Submit';
+            });
+            refreshReviewsBtn?.addEventListener('click', () => loadReviews());
+
+            document.querySelectorAll('#reviewRatingInput .star').forEach(star => {
+                star.addEventListener('click', () => setReviewRating(star.getAttribute('data-value')));
+            });
+
+            submitReviewBtn?.addEventListener('click', async () => {
+                const hint = document.getElementById('reviewFormHint');
+                const textInput = document.getElementById('reviewTextInput');
+                if (!textInput) return;
+
+                if (!bookId) {
+                    if (hint) hint.textContent = 'Book is still loading. Please try again.';
+                    return;
+                }
+
+                const auth = checkAuth();
+                if (!auth) return;
+
+                const text = String(textInput.value || '').trim();
+                const rating = Number(currentReviewRating);
+
+                if (!rating || rating < 1 || rating > 5) {
+                    if (hint) hint.textContent = 'Please select a star rating.';
+                    return;
+                }
+                if (!text) {
+                    if (hint) hint.textContent = 'Review cannot be empty.';
+                    return;
+                }
+
+                if (hint) hint.textContent = editingReviewId ? 'Saving…' : 'Submitting…';
+
+                try {
+                    const url = editingReviewId
+                        ? `${API_BASE_URL}/books/${encodeURIComponent(bookId)}/reviews/${encodeURIComponent(editingReviewId)}`
+                        : `${API_BASE_URL}/books/${encodeURIComponent(bookId)}/reviews`;
+                    const method = editingReviewId ? 'PUT' : 'POST';
+
+                    const response = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${auth.token}`
+                        },
+                        body: JSON.stringify({ rating, text })
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to submit review');
+                    }
+
+                    if (hint) hint.textContent = '';
+                    textInput.value = '';
+                    setReviewRating(0);
+                    editingReviewId = null;
+                    const submit = document.getElementById('submitReviewBtn');
+                    if (submit) submit.textContent = 'Submit';
+                    showReviewForm(false);
+                    await loadReviews();
+                } catch (error) {
+                    console.error('Error submitting review:', error);
+                    if (hint) hint.textContent = error.message || 'Failed to submit review.';
+                }
+            });
+
+            document.getElementById('reviewsList')?.addEventListener('click', async (e) => {
+                const actionBtn = e.target?.closest?.('button[data-action]');
+                if (!actionBtn) return;
+
+                const action = actionBtn.getAttribute('data-action');
+                const reviewEl = actionBtn.closest('.review-item');
+                const reviewId = reviewEl?.getAttribute('data-id');
+                if (!reviewId) return;
+
+                const auth = checkAuth();
+                if (!auth) return;
+
+                if (action === 'edit') {
+                    editingReviewId = reviewId;
+                    const rating = Number(reviewEl.getAttribute('data-rating'));
+                    const text = reviewEl.getAttribute('data-text') || '';
+
+                    setReviewRating(rating);
+                    const textInput = document.getElementById('reviewTextInput');
+                    if (textInput) textInput.value = text;
+                    const submit = document.getElementById('submitReviewBtn');
+                    if (submit) submit.textContent = 'Save';
+                    showReviewForm(true);
+                    document.getElementById('reviewTextInput')?.focus();
+                    return;
+                }
+
+                if (action === 'delete') {
+                    const ok = confirm('Delete your review? This cannot be undone.');
+                    if (!ok) return;
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/books/${encodeURIComponent(bookId)}/reviews/${encodeURIComponent(reviewId)}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${auth.token}` }
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.message || 'Failed to delete review');
+                        }
+                        await loadReviews();
+                    } catch (error) {
+                        console.error('Error deleting review:', error);
+                        showMessageModal('Error', 'Failed to delete review.', 'info');
+                    }
+                }
+            });
         }
 
         async function loadSimilarBooks() {
@@ -1870,6 +2621,9 @@ function displayBookDetails(data) {
             
             // Load user data
             loadUserData();
+
+            // Setup discussions/reviews UI
+            setupCommunityUI();
             
             // Load book details
             loadBookDetails();
@@ -2100,5 +2854,6 @@ function displayBookDetails(data) {
         window.closeInlineReader = closeInlineReader;
         window.closeNotAvailableModal = closeNotAvailableModal;
     </script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

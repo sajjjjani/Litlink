@@ -500,7 +500,7 @@ function buildGridCard(book, i) {
       </div>
       <div class="book-actions">
         <button class="btn-view" onclick="viewBook('${book.id}', '${genreKey}')">View</button>
-        <button class="btn-add" onclick="addToLibrary('${book.id}', '${genreKey}')">Add</button>
+        <button class="btn-add" onclick="addToLibrary(event, '${book.id}', '${genreKey}')">Add</button>
       </div>
     </div>
   `;
@@ -541,7 +541,7 @@ function buildCompactCard(book, i) {
       </div>
       <div class="compact-actions">
         <button class="btn-view" onclick="viewBook('${book.id}', '${genreKey}')">View</button>
-        <button class="btn-add" onclick="addToLibrary('${book.id}', '${genreKey}')">Add</button>
+        <button class="btn-add" onclick="addToLibrary(event, '${book.id}', '${genreKey}')">Add</button>
       </div>
     </div>
   `;
@@ -608,23 +608,82 @@ window.viewBook = function(bookId, genre) {
   navigateTo('book', { id: bookId, genre: genre });
 };
 
-window.addToLibrary = function(bookId, genre) {
-  // In a real app, this would call an API
-  console.log(`Adding book ${bookId} to library`);
-  
-  // Show temporary feedback
-  const btn = event.target;
-  const originalText = btn.textContent;
-  btn.textContent = '✓ Added!';
-  btn.style.background = '#10b981';
-  
-  setTimeout(() => {
-    btn.textContent = originalText;
-    btn.style.background = '';
-  }, 1500);
-  
-  // Here you would typically save to user's library
-  // saveToUserLibrary(bookId, genre);
+window.addToLibrary = async function(event, bookId, genre) {
+  // Prevent event bubbling if necessary
+  if (event) {
+    event.stopPropagation();
+  }
+
+  try {
+    // 1. Get auth data
+    const token = sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token');
+    const userStr = sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const userId = user ? (user.id || user._id) : null;
+
+    if (!token || !userId) {
+      alert('Please log in to add books to your library.');
+      return;
+    }
+
+    // 2. Find book details from allBooks
+    const book = allBooks.find(b => b.id === bookId);
+    if (!book) {
+      console.error('Book details not found in local state');
+      return;
+    }
+
+    // 3. Show loading state on button
+    const btn = event ? event.target : null;
+    let originalText = 'Add';
+    if (btn) {
+      originalText = btn.textContent;
+      btn.textContent = '...';
+      btn.disabled = true;
+    }
+
+    // 4. Call API
+    const response = await fetch('http://localhost:5002/api/users/' + userId + '/want-to-read', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        bookId: book.id,
+        bookTitle: book.title,
+        bookAuthor: book.author,
+        bookCover: book.coverUrl
+      })
+    });
+
+    const result = await response.json();
+    
+    if (btn) {
+      if (result.success) {
+        btn.textContent = '✓ Added!';
+        btn.style.background = '#10b981';
+        btn.style.color = 'white';
+      } else if (result.message && result.message.includes('already')) {
+        btn.textContent = 'In List';
+        btn.style.background = '#92400e';
+        btn.style.color = 'white';
+      } else {
+        btn.textContent = 'Error';
+      }
+
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.disabled = false;
+      }, 2000);
+    }
+
+  } catch (error) {
+    console.error('Error adding book:', error);
+    alert('Failed to add book. Please try again later.');
+  }
 };
 
 window.navigateTo = navigateTo;
