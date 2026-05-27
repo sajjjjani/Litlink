@@ -2,22 +2,158 @@ console.log('✅ Settings page loaded');
 
 // API Base URL - declared once
 const SETTINGS_API_BASE_URL = 'http://localhost:5002/api';
+const USER_SETTINGS_ENDPOINT = `${SETTINGS_API_BASE_URL}/user-settings/me`;
+
+function getToken() {
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getToken === 'function') {
+        return window.LitlinkSessionAuth.getToken();
+    }
+    return (
+        sessionStorage.getItem('litlink_token') ||
+        localStorage.getItem('litlink_token') ||
+        sessionStorage.getItem('authToken') ||
+        localStorage.getItem('authToken') ||
+        sessionStorage.getItem('token') ||
+        localStorage.getItem('token')
+    );
+}
+
+function getStoredUser() {
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUser === 'function') {
+        return window.LitlinkSessionAuth.getUser();
+    }
+
+    const userString =
+        sessionStorage.getItem('litlink_user') ||
+        localStorage.getItem('litlink_user') ||
+        sessionStorage.getItem('user') ||
+        localStorage.getItem('user');
+
+    if (!userString) return null;
+    try {
+        return JSON.parse(userString);
+    } catch {
+        return null;
+    }
+}
+
+let _settingsState = null;
+let _settingsLoading = false;
+let _settingsSaving = false;
+let _lastSaveId = 0;
+
+function setSettingsControlsDisabled(disabled) {
+    [
+        'messagePrivacy',
+        'profilePrivacy',
+        'emailNotifications',
+        'matchNotifications',
+        'messageNotifications',
+        'discussionNotifications'
+    ].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !!disabled;
+    });
+}
+
+function applySettingsToUI(settings) {
+    if (!settings) return;
+
+    const privacy = settings.privacy || {};
+    const notifications = settings.notifications || {};
+
+    const messagePrivacy = document.getElementById('messagePrivacy');
+    if (messagePrivacy && privacy.messagePrivacy) messagePrivacy.value = privacy.messagePrivacy;
+
+    const profilePrivacy = document.getElementById('profilePrivacy');
+    if (profilePrivacy && privacy.profilePrivacy) profilePrivacy.value = privacy.profilePrivacy;
+
+    Object.keys(notifications).forEach((key) => {
+        const checkbox = document.getElementById(key);
+        if (checkbox && typeof notifications[key] === 'boolean') {
+            checkbox.checked = notifications[key];
+        }
+    });
+}
+
+async function loadUserSettings() {
+    const token = getToken();
+    if (!token) return null;
+
+    _settingsLoading = true;
+    setSettingsControlsDisabled(true);
+
+    try {
+        const response = await fetch(USER_SETTINGS_ENDPOINT, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to load settings');
+        }
+
+        _settingsState = data.settings || {};
+        applySettingsToUI(_settingsState);
+        return _settingsState;
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        showNotification('Failed to load settings. Please try again.', 'error');
+        return null;
+    } finally {
+        _settingsLoading = false;
+        setSettingsControlsDisabled(false);
+    }
+}
+
+async function saveUserSettings(partialUpdate) {
+    const token = getToken();
+    if (!token) throw new Error('Not authenticated');
+
+    const saveId = ++_lastSaveId;
+    _settingsSaving = true;
+    setSettingsControlsDisabled(true);
+
+    try {
+        const response = await fetch(USER_SETTINGS_ENDPOINT, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(partialUpdate || {})
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to save settings');
+        }
+
+        // Ignore out-of-order responses
+        if (saveId !== _lastSaveId) return data.settings || _settingsState;
+
+        _settingsState = data.settings || _settingsState;
+        applySettingsToUI(_settingsState);
+        return _settingsState;
+    } finally {
+        _settingsSaving = false;
+        setSettingsControlsDisabled(false);
+    }
+}
 
 // Load user email and blocked users
 document.addEventListener('DOMContentLoaded', function() {
-    const token = localStorage.getItem('litlink_token') || localStorage.getItem('authToken');
-    const userString = localStorage.getItem('litlink_user') || localStorage.getItem('user');
+    const token = getToken();
+    const user = getStoredUser();
     
-    if (token && userString) {
-        const user = JSON.parse(userString);
+    if (token && user) {
         const emailEl = document.getElementById('userEmail');
         if (emailEl) {
             emailEl.textContent = user.email || 'Not set';
         }
         
-        // Load saved privacy settings
-        loadPrivacySettings();
-        loadNotificationSettings();
+        // Load settings from backend (source of truth)
+        loadUserSettings();
         
         // Load blocked users
         loadBlockedUsers();
@@ -29,11 +165,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const changePasswordForm = document.getElementById('changePasswordForm');
     if (changePasswordForm) {
         changePasswordForm.addEventListener('submit', handleChangePassword);
-    }
-    
-    const changeEmailForm = document.getElementById('changeEmailForm');
-    if (changeEmailForm) {
-        changeEmailForm.addEventListener('submit', handleChangeEmail);
     }
 });
 
@@ -179,6 +310,12 @@ function escapeHtml(text) {
 }
 
 function showNotification(message, type = 'info') {
+    // Check global notification preference
+    if (localStorage.getItem('notificationsEnabled') === 'false') {
+        console.log('🔇 Notification suppressed (global setting OFF):', message);
+        return;
+    }
+
     // Remove existing notifications
     const existing = document.querySelectorAll('.custom-notification');
     existing.forEach(n => n.remove());
@@ -212,41 +349,6 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Edit Email
-function editEmail() {
-    const modal = document.getElementById('changeEmailModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeEmailModal() {
-    const modal = document.getElementById('changeEmailModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-        const form = document.getElementById('changeEmailForm');
-        if (form) form.reset();
-    }
-}
-
-function handleChangeEmail(event) {
-    event.preventDefault();
-    
-    const newEmail = document.getElementById('newEmail').value.trim();
-    const password = document.getElementById('emailPassword').value;
-    
-    if (!newEmail || !password) {
-        alert('Please fill in all fields');
-        return;
-    }
-    
-    // TODO: Implement email change API call
-    alert('Email change feature coming soon!');
-    closeEmailModal();
-}
-
 // Change Password
 function changePassword() {
     const modal = document.getElementById('changePasswordModal');
@@ -274,91 +376,98 @@ function handleChangePassword(event) {
     const confirmPassword = document.getElementById('confirmNewPassword').value;
     
     if (!currentPassword || !newPassword || !confirmPassword) {
-        alert('Please fill in all fields');
+        showNotification('Please fill in all fields', 'error');
         return;
     }
     
     if (newPassword !== confirmPassword) {
-        alert('New passwords do not match');
+        showNotification('New passwords do not match', 'error');
         return;
     }
     
     if (newPassword.length < 8) {
-        alert('Password must be at least 8 characters');
+        showNotification('Password must be at least 8 characters', 'error');
         return;
     }
-    
-    // TODO: Implement password change API call
-    alert('Password change feature coming soon!');
-    closePasswordModal();
+
+    // Basic strength: must include a letter and a number
+    const hasLetter = /[A-Za-z]/.test(newPassword);
+    const hasNumber = /\d/.test(newPassword);
+    if (!hasLetter || !hasNumber) {
+        showNotification('Password must include at least one letter and one number', 'error');
+        return;
+    }
+
+    const submitBtn = document.querySelector('#changePasswordForm button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    const token = getToken();
+    if (!token) {
+        showNotification('Session expired. Please login again.', 'error');
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+    }
+
+    fetch(`${SETTINGS_API_BASE_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+    })
+    .then(res => res.json().then(body => ({ ok: res.ok, body })))
+    .then(({ ok, body }) => {
+        if (ok && body.success) {
+            showNotification('Password updated successfully', 'success');
+            closePasswordModal();
+        } else {
+            showNotification(body.message || 'Failed to update password', 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Change password error:', err);
+        showNotification('Network error. Please try again.', 'error');
+    })
+    .finally(() => {
+        if (submitBtn) submitBtn.disabled = false;
+    });
 }
 
 // Update Privacy Settings
 function updatePrivacySetting(setting, value) {
-    const userString = localStorage.getItem('litlink_user') || localStorage.getItem('user');
-    if (!userString) return;
-    
-    const user = JSON.parse(userString);
-    if (!user.privacySettings) {
-        user.privacySettings = {};
-    }
-    user.privacySettings[setting] = value;
-    localStorage.setItem('litlink_user', JSON.stringify(user));
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    console.log(`Privacy setting updated: ${setting} = ${value}`);
-    showNotification('Privacy setting saved', 'success');
-}
+    if (_settingsLoading || _settingsSaving) return;
 
-// Load Privacy Settings
-function loadPrivacySettings() {
-    const userString = localStorage.getItem('litlink_user') || localStorage.getItem('user');
-    if (!userString) return;
-    
-    const user = JSON.parse(userString);
-    if (user.privacySettings) {
-        if (user.privacySettings.messagePrivacy) {
-            const select = document.getElementById('messagePrivacy');
-            if (select) select.value = user.privacySettings.messagePrivacy;
-        }
-        if (user.privacySettings.profilePrivacy) {
-            const select = document.getElementById('profilePrivacy');
-            if (select) select.value = user.privacySettings.profilePrivacy;
-        }
-    }
+    const previous = _settingsState;
+    const select = document.getElementById(setting === 'messagePrivacy' ? 'messagePrivacy' : 'profilePrivacy');
+    if (select && select.value !== value) select.value = value;
+
+    saveUserSettings({ privacy: { [setting]: value } })
+        .then(() => showNotification('Privacy setting saved', 'success'))
+        .catch((error) => {
+            console.error('Privacy setting save error:', error);
+            _settingsState = previous;
+            applySettingsToUI(_settingsState);
+            showNotification(error.message || 'Failed to save privacy setting', 'error');
+        });
 }
 
 // Update Notification Settings
 function updateNotificationSetting(setting, enabled) {
-    const userString = localStorage.getItem('litlink_user') || localStorage.getItem('user');
-    if (!userString) return;
-    
-    const user = JSON.parse(userString);
-    if (!user.notificationSettings) {
-        user.notificationSettings = {};
-    }
-    user.notificationSettings[setting] = enabled;
-    localStorage.setItem('litlink_user', JSON.stringify(user));
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    console.log(`Notification setting updated: ${setting} = ${enabled}`);
-    showNotification('Notification preference saved', 'success');
-}
+    if (_settingsLoading || _settingsSaving) return;
 
-// Load Notification Settings
-function loadNotificationSettings() {
-    const userString = localStorage.getItem('litlink_user') || localStorage.getItem('user');
-    if (!userString) return;
-    
-    const user = JSON.parse(userString);
-    if (user.notificationSettings) {
-        Object.keys(user.notificationSettings).forEach(key => {
-            const checkbox = document.getElementById(key);
-            if (checkbox) {
-                checkbox.checked = user.notificationSettings[key];
-            }
+    const checkbox = document.getElementById(setting);
+    if (checkbox && checkbox.checked !== enabled) checkbox.checked = enabled;
+
+    const previous = _settingsState;
+    saveUserSettings({ notifications: { [setting]: !!enabled } })
+        .then(() => showNotification('Notification preference saved', 'success'))
+        .catch((error) => {
+            console.error('Notification setting save error:', error);
+            _settingsState = previous;
+            applySettingsToUI(_settingsState);
+            showNotification(error.message || 'Failed to save notification preference', 'error');
         });
-    }
 }
 
 // Deactivate Account
@@ -450,9 +559,7 @@ function logout() {
 }
 
 // Make functions globally available
-window.editEmail = editEmail;
 window.changePassword = changePassword;
-window.closeEmailModal = closeEmailModal;
 window.closePasswordModal = closePasswordModal;
 window.updatePrivacySetting = updatePrivacySetting;
 window.updateNotificationSetting = updateNotificationSetting;
