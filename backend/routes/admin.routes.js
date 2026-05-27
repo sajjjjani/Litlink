@@ -114,7 +114,7 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
 // ===== VOICE ROOM HISTORY =====
 router.get('/voice-rooms/history', requireAdmin, async (req, res) => {
   try {
-    const rooms = await VoiceRoom.find({ status: 'ended' })
+    const rooms = await VoiceRoom.find({ status: { $in: ['ended', 'completed'] } })
       .populate('hostId', 'name email profilePicture')
       .sort({ endedAt: -1 })
       .limit(100);
