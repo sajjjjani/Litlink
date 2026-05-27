@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LitLink - Discover Book Clubs</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -428,7 +430,7 @@
                     <label for="loginEmail">Email</label>
                     <div class="input-with-icon">
                         <i class="fas fa-envelope"></i>
-                        <input type="email" id="loginEmail" placeholder="Enter your email">
+                        <input type="email" id="loginEmail" placeholder="Enter your email" required>
                     </div>
                     <div class="error-message" id="loginEmailError"></div>
                 </div>
@@ -436,7 +438,7 @@
                     <label for="loginPassword">Password</label>
                     <div class="input-with-icon">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="loginPassword" placeholder="Enter your password">
+                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
                         <button type="button" class="toggle-password" id="toggleLoginPassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -444,15 +446,11 @@
                     <div class="error-message" id="loginPasswordError"></div>
                 </div>
                 <div class="form-options">
-                    <label class="checkbox">
-                        <input type="checkbox" id="rememberMe">
-                        <span>Remember me</span>
-                    </label>
-                    <a href="#" class="forgot-password">Forgot password?</a>
+                    <a href="#" class="forgot-password" id="forgotPasswordLink">Forgot password?</a>
                 </div>
-                <button type="submit" class="btn btn-modal-submit">Login</button>
+                <button type="submit" class="btn btn-modal-submit" id="loginSubmit">Login</button>
                 <div class="form-footer">
-                    <p>Don't have an account? <a href="#" class="switch-form" data-form="signup">Sign up</a></p>
+                    <p>Don't have an account? <a href="#" id="switchToSignupLink">Sign up</a></p>
                 </div>
             </form>
         </div>
@@ -470,7 +468,7 @@
                     <label for="signupName">Full Name</label>
                     <div class="input-with-icon">
                         <i class="fas fa-user"></i>
-                        <input type="text" id="signupName" placeholder="Enter your full name">
+                        <input type="text" id="signupName" placeholder="Enter your full name" required>
                     </div>
                     <div class="error-message" id="signupNameError"></div>
                 </div>
@@ -478,7 +476,7 @@
                     <label for="signupEmail">Email</label>
                     <div class="input-with-icon">
                         <i class="fas fa-envelope"></i>
-                        <input type="email" id="signupEmail" placeholder="Enter your email">
+                        <input type="email" id="signupEmail" placeholder="Enter your email" required>
                     </div>
                     <div class="error-message" id="signupEmailError"></div>
                 </div>
@@ -486,7 +484,7 @@
                     <label for="signupPassword">Password</label>
                     <div class="input-with-icon">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="signupPassword" placeholder="Create a password">
+                        <input type="password" id="signupPassword" placeholder="Create a password" required>
                         <button type="button" class="toggle-password" id="toggleSignupPassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -506,23 +504,16 @@
                     <label for="confirmPassword">Confirm Password</label>
                     <div class="input-with-icon">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="confirmPassword" placeholder="Confirm your password">
+                        <input type="password" id="confirmPassword" placeholder="Confirm your password" required>
                         <button type="button" class="toggle-password" id="toggleConfirmPassword">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
                     <div class="error-message" id="confirmPasswordError"></div>
                 </div>
-                <div class="form-group">
-                    <label class="checkbox">
-                        <input type="checkbox" id="terms" required>
-                        <span>I agree to the <a href="faq.html#privacy">Terms of Service</a> and <a href="faq.html#privacy">Privacy Policy</a></span>
-                    </label>
-                    <div class="error-message" id="termsError"></div>
-                </div>
-                <button type="submit" class="btn btn-modal-submit">Create Account</button>
+                <button type="submit" class="btn btn-modal-submit" id="signupSubmit">Create Account</button>
                 <div class="form-footer">
-                    <p>Already have an account? <a href="#" class="switch-form" data-form="login">Login</a></p>
+                    <p>Already have an account? <a href="#" id="switchToLoginLink">Login</a></p>
                 </div>
             </form>
         </div>
@@ -724,7 +715,7 @@
                     <div class="footer-column">
                         <h4>About Us</h4>
                         <ul>
-                            <li><a href="about.html">Our Story</a></li>
+                            <li><a href="about.html">About</a></li>
                             <li><a href="about.html#team">Team</a></li>
                         </ul>
                     </div>
@@ -738,7 +729,7 @@
                     <div class="footer-column">
                         <h4>Support</h4>
                         <ul>
-                            <li><a href="help.html">Help Center</a></li>
+                            <li><a href="help.html">Help</a></li>
                             <li><a href="help.html#contact">Contact</a></li>
                         </ul>
                     </div>
@@ -750,308 +741,10 @@
         </div>
     </footer>
     
-    <script>
-        // API Configuration
-        let searchTimeout;
-        
-        // Enhanced explore page functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🎬 Explore page loaded');
-            
-            // Search functionality only
-            const searchInput = document.getElementById('exploreSearchInput');
-            const searchModal = document.getElementById('searchModal');
-            const closeSearchBtn = document.getElementById('closeSearchBtn');
-            const searchResultsGrid = document.getElementById('searchResultsGrid');
-            const searchLoading = document.getElementById('searchLoading');
-            const noResults = document.getElementById('noResults');
-            
-            // Search on Enter key
-            searchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const query = this.value.trim();
-                    if (query.length >= 2) {
-                        performSearch(query);
-                    }
-                }
-            });
-            
-            // Search on input with debounce
-            searchInput.addEventListener('input', function() {
-                const query = this.value.trim();
-                
-                clearTimeout(searchTimeout);
-                
-                if (query.length >= 3) {
-                    searchTimeout = setTimeout(() => {
-                        performSearch(query);
-                    }, 400);
-                }
-            });
-            
-            // Close search modal
-            closeSearchBtn.addEventListener('click', function() {
-                searchModal.classList.remove('active');
-                searchInput.value = '';
-            });
-            
-            // Close modal when clicking outside
-            searchModal.addEventListener('click', function(e) {
-                if (e.target === searchModal) {
-                    searchModal.classList.remove('active');
-                    searchInput.value = '';
-                }
-            });
-            
-            // Close modal with Escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && searchModal.classList.contains('active')) {
-                    searchModal.classList.remove('active');
-                    searchInput.value = '';
-                }
-            });
-            
-            async function performSearch(query) {
-                if (!query || query.length < 2) return;
-                
-                // Show modal
-                searchModal.classList.add('active');
-                searchResultsGrid.innerHTML = '';
-                searchLoading.style.display = 'block';
-                noResults.style.display = 'none';
-                
-                try {
-                    // Use direct Open Library API for explore page (public access)
-                    const response = await fetch(
-                        `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=30`,
-                        {
-                            headers: {
-                                'Accept': 'application/json',
-                                'User-Agent': 'Litlink/1.0'
-                            }
-                        }
-                    );
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const searchData = await response.json();
-                    searchLoading.style.display = 'none';
-                    
-                    if (searchData.docs && searchData.docs.length > 0) {
-                        searchResultsGrid.innerHTML = '';
-                        
-                        searchData.docs.slice(0, 30).forEach(book => {
-                            const bookElement = document.createElement('div');
-                            bookElement.className = 'book-search-result';
-                            
-                            const coverUrl = book.cover_i 
-                                ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
-                                : `https://via.placeholder.com/200x300/2c1810/f5e6d3?text=${encodeURIComponent(book.title?.substring(0, 20) || 'Book')}`;
-                            
-                            bookElement.innerHTML = `
-                                <img src="${coverUrl}" alt="${book.title}" class="book-search-cover" 
-                                     onerror="this.src='https://via.placeholder.com/200x300/2c1810/f5e6d3?text=No+Cover'">
-                                <div class="book-search-info">
-                                    <h4 class="book-search-title">${book.title || 'Unknown Title'}</h4>
-                                    <p class="book-search-author">${book.author_name?.[0] || 'Unknown Author'}</p>
-                                    <p class="book-search-year">${book.first_publish_year ? `Published: ${book.first_publish_year}` : ''}</p>
-                                </div>
-                            `;
-                            
-                            bookElement.addEventListener('click', function() {
-                                searchModal.classList.remove('active');
-                                window.openModal('signupModal');
-                                
-                                const submitBtn = document.querySelector('#signupForm .btn-modal-submit');
-                                if (submitBtn) {
-                                    const bookTitle = book.title?.substring(0, 30) || 'this book';
-                                    submitBtn.innerHTML = `Join to Save "${bookTitle}" →`;
-                                    setTimeout(() => {
-                                        submitBtn.textContent = 'Create Account';
-                                    }, 3000);
-                                }
-                            });
-                            
-                            searchResultsGrid.appendChild(bookElement);
-                        });
-                    } else {
-                        noResults.style.display = 'block';
-                        noResults.innerHTML = `
-                            <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 10px; color: #d4b5a0;"></i>
-                            <p>No books found for "${query}"</p>
-                            <p style="font-size: 0.9rem; margin-top: 10px;">Try a different search term</p>
-                        `;
-                    }
-                } catch (error) {
-                    console.error('Search error:', error);
-                    searchLoading.style.display = 'none';
-                    searchResultsGrid.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                            <p>Search failed. Please try again.</p>
-                            <p style="font-size: 0.9rem; margin-top: 10px; color: #d4b5a0;">${error.message}</p>
-                        </div>
-                    `;
-                }
-            }
-            
-            // Add search icon click handler
-            document.querySelector('.search-icon').addEventListener('click', function() {
-                const query = searchInput.value.trim();
-                if (query.length >= 2) {
-                    performSearch(query);
-                } else {
-                    searchInput.focus();
-                }
-            });
-            
-            // Modal functionality
-            function closeModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.style.opacity = '0';
-                    modal.style.visibility = 'hidden';
-                    setTimeout(() => {
-                        modal.style.display = 'none';
-                    }, 300);
-                    document.body.style.overflow = 'auto';
-                }
-            }
-            
-            // Open modal function
-            window.openModal = function(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.style.display = 'flex';
-                    setTimeout(() => {
-                        modal.style.opacity = '1';
-                        modal.style.visibility = 'visible';
-                    }, 10);
-                    document.body.style.overflow = 'hidden';
-                }
-            }
-            
-            // Close buttons for modals
-            document.querySelectorAll('.close-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const modal = this.closest('.modal-overlay');
-                    if (modal) {
-                        closeModal(modal.id);
-                    }
-                });
-            });
-            
-            // Close modal when clicking outside
-            document.querySelectorAll('.modal-overlay').forEach(modal => {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === this) {
-                        closeModal(this.id);
-                    }
-                });
-            });
-            
-            // Close modal with Escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    // Close search modal if open
-                    const searchModal = document.getElementById('searchModal');
-                    if (searchModal && searchModal.classList.contains('active')) {
-                        searchModal.classList.remove('active');
-                        const searchInput = document.getElementById('exploreSearchInput');
-                        if (searchInput) searchInput.value = '';
-                        return;
-                    }
-                    
-                    // Close any other open modal
-                    const openModals = document.querySelectorAll('.modal-overlay[style*="display: flex"], .modal-overlay[style*="display:block"]');
-                    openModals.forEach(modal => {
-                        closeModal(modal.id);
-                    });
-                }
-            });
-            
-            // Switch between login/signup modals
-            document.querySelectorAll('.switch-form').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const targetForm = this.getAttribute('data-form');
-                    
-                    // Close current modal
-                    const currentModal = this.closest('.modal-overlay');
-                    if (currentModal) {
-                        closeModal(currentModal.id);
-                    }
-                    
-                    // Open target modal after a short delay
-                    setTimeout(() => {
-                        window.openModal(targetForm + 'Modal');
-                    }, 300);
-                });
-            });
-            
-            // Forgot password link
-            const forgotPasswordLink = document.querySelector('.forgot-password');
-            const backToLoginLink = document.getElementById('backToLoginLink');
-            
-            if (forgotPasswordLink) {
-                forgotPasswordLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const loginModal = document.getElementById('loginModal');
-                    if (loginModal) {
-                        closeModal('loginModal');
-                        setTimeout(() => {
-                            window.openModal('forgotPasswordModal');
-                        }, 300);
-                    }
-                });
-            }
-            
-            if (backToLoginLink) {
-                backToLoginLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const forgotModal = document.getElementById('forgotPasswordModal');
-                    if (forgotModal) {
-                        closeModal('forgotPasswordModal');
-                        setTimeout(() => {
-                            window.openModal('loginModal');
-                        }, 300);
-                    }
-                });
-            }
-            
-            // Login/Signup buttons on explore page
-            const exploreLoginBtn = document.getElementById('exploreLoginBtn');
-            const exploreSignupBtn = document.getElementById('exploreSignupBtn');
-            
-            if (exploreLoginBtn) {
-                exploreLoginBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    window.openModal('loginModal');
-                });
-            }
-            
-            if (exploreSignupBtn) {
-                exploreSignupBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    window.openModal('signupModal');
-                });
-            }
-            
-            // Preview signup buttons
-            document.querySelectorAll('#previewSignupBtn1, #previewSignupBtn2, #previewSignupBtn3, #previewSignupBtn4, #exploreCtaSignupBtn').forEach(btn => {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    window.openModal('signupModal');
-                });
-            });
-            
-            console.log('✅ Modal functionality added');
-        });
-    </script>
+    <!-- JavaScript Files -->
+    <script src="../utils/modal.js"></script>
     <script src="auth.js"></script>
     <script src="script.js"></script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

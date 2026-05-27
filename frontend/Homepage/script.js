@@ -214,7 +214,7 @@ function setupExplorePageEvents() {
         exploreLoginBtn.addEventListener('click', function(e) {
             e.preventDefault();
             console.log('Explore login button clicked');
-            checkAuthAndOpenModal('loginModal');
+            openModal('loginModal');
         });
     }
     
@@ -222,7 +222,7 @@ function setupExplorePageEvents() {
         exploreSignupBtn.addEventListener('click', function(e) {
             e.preventDefault();
             console.log('Explore signup button clicked');
-            checkAuthAndOpenModal('signupModal');
+            openModal('signupModal');
         });
     }
     
@@ -232,7 +232,7 @@ function setupExplorePageEvents() {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 console.log(`Preview signup button ${index + 1} clicked`);
-                checkAuthAndOpenModal('signupModal');
+                openModal('signupModal');
             });
         }
     });
@@ -243,7 +243,7 @@ function setupExplorePageEvents() {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 console.log(`Action button ${index + 1} clicked`);
-                checkAuthAndOpenModal('signupModal');
+                openModal('signupModal');
             });
         }
     });
@@ -253,7 +253,7 @@ function setupExplorePageEvents() {
         exploreCtaSignupBtn.addEventListener('click', function(e) {
             e.preventDefault();
             console.log('Explore CTA button clicked');
-            checkAuthAndOpenModal('signupModal');
+            openModal('signupModal');
         });
     }
 }
@@ -263,8 +263,8 @@ function checkAuthAndOpenModal(modalId) {
     // Check if user is already logged in
     const authToken = localStorage.getItem('authToken');
     if (authToken) {
-        showMessageModal('Already Logged In', 'You are already logged in! Redirecting to profile...', 'info');
-        window.location.href = 'profile.html';
+        showMessageModal('Already Logged In', 'You are already logged in! Redirecting to dashboard...', 'info');
+        window.location.href = '../Dashboard/dashboard.html';
         return;
     }
     
@@ -536,6 +536,157 @@ function debugElements() {
 // Call debug to see what's happening
 setTimeout(debugElements, 1000);
 
+// ===== Explore Page Features (Search) =====
+function initExplorePageFeatures() {
+    console.log('🎬 Initializing Explore Page Features...');
+    
+    const searchInput = document.getElementById('exploreSearchInput');
+    const searchModal = document.getElementById('searchModal');
+    const closeSearchBtn = document.getElementById('closeSearchBtn');
+    const searchResultsGrid = document.getElementById('searchResultsGrid');
+    const searchLoading = document.getElementById('searchLoading');
+    const noResults = document.getElementById('noResults');
+    
+    if (!searchInput || !searchModal) return;
+    
+    let searchTimeout;
+    
+    // Search on Enter key
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = this.value.trim();
+            if (query.length >= 2) {
+                performSearch(query);
+            }
+        }
+    });
+    
+    // Search on input with debounce
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length >= 3) {
+            searchTimeout = setTimeout(() => {
+                performSearch(query);
+            }, 400);
+        }
+    });
+    
+    // Close search modal
+    if (closeSearchBtn) {
+        closeSearchBtn.addEventListener('click', function() {
+            searchModal.classList.remove('active');
+            searchInput.value = '';
+        });
+    }
+    
+    // Close modal when clicking outside
+    searchModal.addEventListener('click', function(e) {
+        if (e.target === searchModal) {
+            searchModal.classList.remove('active');
+            searchInput.value = '';
+        }
+    });
+    
+    async function performSearch(query) {
+        if (!query || query.length < 2) return;
+        
+        console.log('🔍 Searching for:', query);
+        
+        // Show modal
+        searchModal.classList.add('active');
+        if (searchResultsGrid) searchResultsGrid.innerHTML = '';
+        if (searchLoading) searchLoading.style.display = 'block';
+        if (noResults) noResults.style.display = 'none';
+        
+        try {
+            // Use direct Open Library API for explore page (public access)
+            const response = await fetch(
+                `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=30`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'Litlink/1.0'
+                    }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const searchData = await response.json();
+            if (searchLoading) searchLoading.style.display = 'none';
+            
+            if (searchData.docs && searchData.docs.length > 0) {
+                if (searchResultsGrid) {
+                    searchResultsGrid.innerHTML = '';
+                    
+                    searchData.docs.slice(0, 30).forEach(book => {
+                        const bookElement = document.createElement('div');
+                        bookElement.className = 'book-search-result';
+                        
+                        const coverUrl = book.cover_i 
+                            ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
+                            : `https://via.placeholder.com/200x300/2c1810/f5e6d3?text=${encodeURIComponent(book.title?.substring(0, 20) || 'Book')}`;
+                        
+                        bookElement.innerHTML = `
+                            <img src="${coverUrl}" alt="${book.title}" class="book-search-cover" 
+                                 onerror="this.src='https://via.placeholder.com/200x300/2c1810/f5e6d3?text=No+Cover'">
+                            <div class="book-search-info">
+                                <h4 class="book-search-title">${book.title || 'Unknown Title'}</h4>
+                                <p class="book-search-author">${book.author_name?.[0] || 'Unknown Author'}</p>
+                                <p class="book-search-year">${book.first_publish_year ? `Published: ${book.first_publish_year}` : ''}</p>
+                            </div>
+                        `;
+                        
+                        bookElement.addEventListener('click', function() {
+                            searchModal.classList.remove('active');
+                            openModal('signupModal');
+                            
+                            const submitBtn = document.querySelector('#signupForm .btn-modal-submit');
+                            if (submitBtn) {
+                                const bookTitle = book.title?.substring(0, 30) || 'this book';
+                                const originalText = submitBtn.textContent;
+                                submitBtn.innerHTML = `Join to Save "${bookTitle}" →`;
+                                setTimeout(() => {
+                                    submitBtn.textContent = originalText;
+                                }, 3000);
+                            }
+                        });
+                        
+                        searchResultsGrid.appendChild(bookElement);
+                    });
+                }
+            } else {
+                if (noResults) {
+                    noResults.style.display = 'block';
+                    noResults.innerHTML = `
+                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 10px; color: #d4b5a0;"></i>
+                        <p>No books found for "${query}"</p>
+                        <p style="font-size: 0.9rem; margin-top: 10px;">Try a different search term</p>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            if (searchLoading) searchLoading.style.display = 'none';
+            if (searchResultsGrid) {
+                searchResultsGrid.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p>Search failed. Please try again.</p>
+                        <p style="font-size: 0.9rem; margin-top: 10px; color: #d4b5a0;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    }
+}
+
 // ===== Export functions to window object =====
 window.openModal = openModal;
 window.closeModal = closeModal;
@@ -547,6 +698,8 @@ window.showError = showError;
 window.showSuccess = showSuccess;
 window.showLoading = showLoading;
 window.hideLoading = hideLoading;
+window.initExplorePageFeatures = initExplorePageFeatures;
+
 
 // ===== Explore Page Genre Scrolling =====
 function initGenreScrolling() {

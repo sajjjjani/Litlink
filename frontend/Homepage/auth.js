@@ -351,7 +351,9 @@ async function handleSignup(formData) {
             
             // Wait a moment then redirect (verify-email.html is in same Homepage folder)
             setTimeout(() => {
-                window.location.href = `verify-email.html?email=${encodeURIComponent(formData.email)}&code=${data.verificationCode}`;
+                const target = `verify-email.html?email=${encodeURIComponent(formData.email)}&code=${data.verificationCode}`;
+                console.trace('↪️ Redirecting to signup verification:', target);
+                window.location.href = target;
             }, 1000);
             
         } else {
@@ -424,16 +426,16 @@ async function handleLogin(formData) {
                 
                 // Use server-provided redirect path
                 if (data.redirectTo) {
-                    console.log('📄 Using server redirect:', data.redirectTo);
+                    console.trace('📄 Redirecting using server path:', data.redirectTo);
                     window.location.href = data.redirectTo;
                 }
                 // Fallback based on user type
                 else if (data.user.isAdmin) {
-                    console.log('📄 Admin detected, redirecting to admin dashboard');
+                    console.trace('📄 Admin detected, redirecting to admin dashboard');
                     window.location.href = '../Admin%20Dashboard/admin.html';
                 } else {
-                    console.log('📄 Regular user, redirecting to profile');
-                    window.location.href = '../Profile/profile.html';
+                    console.trace('📄 Regular user, redirecting to dashboard');
+                    window.location.href = '../Dashboard/dashboard.html';
                 }
             }, 1000);
             
@@ -449,7 +451,9 @@ async function handleLogin(formData) {
             
             // Redirect to verify-email page (in same Homepage folder)
             setTimeout(() => {
-                window.location.href = `verify-email.html?email=${encodeURIComponent(formData.email)}`;
+                const target = `verify-email.html?email=${encodeURIComponent(formData.email)}`;
+                console.trace('↪️ Redirecting to login verification:', target);
+                window.location.href = target;
             }, 1000);
             
         } else {
@@ -498,7 +502,9 @@ async function handleForgotPassword(email) {
             
             // Redirect to OTP verification page (in same Homepage folder)
             setTimeout(() => {
-                window.location.href = `verify-otp.html?email=${encodeURIComponent(email)}`;
+                const target = `verify-otp.html?email=${encodeURIComponent(email)}`;
+                console.trace('↪️ Redirecting to forgot-password OTP:', target);
+                window.location.href = target;
             }, 1000);
             
         } else {
@@ -552,13 +558,17 @@ function handleLogout() {
     showMessageModal('Success', 'Logged out successfully', 'success');
     
     setTimeout(() => {
+        let target;
         // If we're in homepage already, just reload
         if (window.location.pathname.includes('Homepage')) {
-            window.location.href = 'index.html';
+            target = 'index.html';
         } else {
             // Go back to homepage from any other folder
-            window.location.href = '../Homepage/index.html';
+            target = '../Homepage/index.html';
         }
+        
+        console.trace('↪️ Logout redirect:', target);
+        window.location.href = target;
     }, 1000);
 }
 
@@ -588,9 +598,17 @@ function checkAuthentication() {
     
     // Redirect ONLY if trying to access protected page without auth
     if (isProtectedPage && !token) {
-        console.log('❌ Protected page requires authentication, redirecting...');
+        console.warn('❌ Protected page requires authentication, redirecting...');
+        
+        // GUARD: Don't redirect if we are already at the homepage to prevent reload loops
+        if (currentPath.includes('index.html') || currentPath.endsWith('Homepage/')) {
+            console.log('🛡️ Guard: Already at homepage, skipping redirect');
+            return false;
+        }
+
         showMessageModal('Login Required', 'Please login first', 'warning');
         setTimeout(() => {
+            console.trace('↪️ Auth fail redirect to login');
             window.location.href = '../Homepage/index.html';
         }, 1500);
         return false;
@@ -598,9 +616,17 @@ function checkAuthentication() {
     
     // Redirect ONLY if trying to access admin page without admin privileges
     if (isAdminPage && (!token || !user?.isAdmin)) {
-        console.log('❌ Admin page requires admin authentication, redirecting...');
+        console.warn('❌ Admin page requires admin authentication, redirecting...');
+        
+        // GUARD: Don't redirect if we are already at the homepage
+        if (currentPath.includes('index.html') || currentPath.endsWith('Homepage/')) {
+            console.log('🛡️ Guard: Already at homepage, skipping admin redirect');
+            return false;
+        }
+
         showMessageModal('Admin Access Required', 'Admin access required. Redirecting to homepage...', 'warning');
         setTimeout(() => {
+            console.trace('↪️ Admin auth fail redirect to homepage');
             window.location.href = '../Homepage/index.html';
         }, 1500);
         return false;
