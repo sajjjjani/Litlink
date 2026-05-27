@@ -17,7 +17,9 @@ class CommunityPulse {
 
   async fetchActivities() {
     try {
-      const token = localStorage.getItem('litlink_token');
+      const token = window.LitlinkSessionAuth
+        ? window.LitlinkSessionAuth.getToken()
+        : (sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token'));
       const response = await fetch(this.API_URL, {
         headers: {
           'Authorization': `Bearer ${token}`

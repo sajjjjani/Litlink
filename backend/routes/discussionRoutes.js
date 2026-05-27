@@ -10,6 +10,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const FilterService = require('../services/filterService');
 const UNS = require('../services/UserNotificationService');
 const upload = require('../middleware/upload');
+const { toAbsoluteUrl } = require('../utils/publicUrl');
 
 // Helper to check if user is suspended
 async function isUserSuspended(userId) {
@@ -42,6 +43,32 @@ function getTimeAgo(date) {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return new Date(date).toLocaleDateString();
+}
+
+function normalizeThread(thread) {
+  if (!thread) return null;
+  
+  const normalized = { ...thread };
+  
+  // Normalize attachments
+  if (normalized.attachments && normalized.attachments.length > 0) {
+    normalized.attachments = normalized.attachments.map(att => ({
+      ...att,
+      url: toAbsoluteUrl(att.url)
+    }));
+  }
+  
+  // Normalize author profile picture
+  if (normalized.author && normalized.author.profilePicture) {
+    normalized.author.profilePicture = toAbsoluteUrl(normalized.author.profilePicture);
+  }
+
+  normalized.timeAgo = getTimeAgo(normalized.createdAt);
+  normalized.isCircleThread = !!normalized.circleId;
+  normalized.commentCount = normalized.commentCount || 0;
+  normalized.likeCount = normalized.likeCount || 0;
+  
+  return normalized;
 }
 
 async function getCommunityHighlights() {
@@ -1243,14 +1270,7 @@ router.get('/circles/:circleId/threads', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      threads: threads.map(thread => ({
-        ...thread,
-        isCircleThread: true,
-        circleName: circle.name,
-        timeAgo: getTimeAgo(thread.createdAt),
-        commentCount: thread.commentCount || 0,
-        likeCount: thread.likeCount || 0
-      })),
+      threads: threads.map(thread => ({ ...normalizeThread(thread), circleName: circle.name })),
       circle: {
         id: circle._id,
         name: circle.name,
@@ -1289,8 +1309,12 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
       tags, 
       poll, 
       event,
+      bookReferences,
+      genre,
       censorIndices // New: stringified array of indices to censor, e.g., "[0, 2]"
     } = req.body;
+
+    console.log('Circle thread creation request:', { title, content, type, circleId, circleName, hasFiles: req.files?.length });
 
     if (!title || !content) {
       return res.status(400).json({ 
@@ -1362,13 +1386,44 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
     // Process attachments
     const attachments = [];
     if (req.files && req.files.length > 0) {
-      const censors = censorIndices ? JSON.parse(censorIndices) : [];
-      req.files.forEach((file, index) => {
-        attachments.push({
-          url: `/uploads/threads/${file.filename}`,
-          isCensored: censors.includes(index)
+      try {
+        const censors = censorIndices ? JSON.parse(censorIndices) : [];
+        req.files.forEach((file, index) => {
+          attachments.push({
+            url: file.path, // Full Cloudinary URL
+            isCensored: censors.includes(index)
+          });
         });
-      });
+      } catch (parseError) {
+        console.error('Error parsing censorIndices:', parseError);
+        // Continue without censoring if parsing fails
+        req.files.forEach((file) => {
+          attachments.push({
+            url: file.path,
+            isCensored: false
+          });
+        });
+      }
+    }
+
+    // Parse tags if it's a string
+    let parsedTags = [];
+    if (tags) {
+      if (typeof tags === 'string') {
+        parsedTags = tags.split(',').map(t => t.trim()).filter(t => t);
+      } else if (Array.isArray(tags)) {
+        parsedTags = tags;
+      }
+    }
+
+    // Parse bookReferences if it's a string
+    let parsedBookReferences = [];
+    if (bookReferences) {
+      try {
+        parsedBookReferences = typeof bookReferences === 'string' ? JSON.parse(bookReferences) : bookReferences;
+      } catch (e) {
+        console.error('Error parsing bookReferences:', e);
+      }
     }
 
     const thread = new DiscussionThread({
@@ -1377,38 +1432,57 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
       author: req.userId,
       circle: circle.name,
       circleId: circle._id,
-      type: type || 'discussion',
-      tags: tags || [],
+      type: (type === 'discussion' || !type) ? 'book' : type,
+      tags: parsedTags,
       isCircleThread: true,
       isPublic: false,
-      genre: circle.genre,
-      attachments
+      genre: genre || circle.genre,
+      attachments,
+      bookReferences: parsedBookReferences
     });
 
     if (type === 'poll' && poll) {
-      // Filter poll question if present
-      if (poll.question) {
-        const pollFilterResult = await FilterService.checkOnly(poll.question);
-        if (pollFilterResult.hasViolation) {
-          poll.question = pollFilterResult.censoredText;
+      try {
+        const pollData = typeof poll === 'string' ? JSON.parse(poll) : poll;
+        // Filter poll question if present
+        if (pollData.question) {
+          const pollFilterResult = await FilterService.checkOnly(pollData.question);
+          if (pollFilterResult.hasViolation) {
+            pollData.question = pollFilterResult.censoredText;
+          }
         }
+        thread.poll = {
+          question: pollData.question,
+          options: pollData.options.map(opt => ({ 
+            text: opt, 
+            votes: [] 
+          }))
+        };
+      } catch (pollError) {
+        console.error('Error parsing poll data:', pollError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid poll data format'
+        });
       }
-      thread.poll = {
-        question: poll.question,
-        options: poll.options.map(opt => ({ 
-          text: opt, 
-          votes: [] 
-        }))
-      };
     }
 
     if (type === 'event' && event) {
-      thread.event = {
-        date: new Date(event.date),
-        duration: event.duration,
-        type: event.type,
-        attendees: []
-      };
+      try {
+        const eventData = typeof event === 'string' ? JSON.parse(event) : event;
+        thread.event = {
+          date: new Date(eventData.date),
+          duration: eventData.duration,
+          type: eventData.type,
+          attendees: []
+        };
+      } catch (eventError) {
+        console.error('Error parsing event data:', eventError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid event data format'
+        });
+      }
     }
 
     await thread.save();
@@ -1478,12 +1552,26 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
       responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
     }
     
-    res.status(201).json(responseData);
+    res.json(responseData);
   } catch (error) {
     console.error('Error creating circle thread:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error creating circle thread',
+      message: 'Error creating thread: ' + error.message,
+      error: error.message 
+    });
+  }
+});
+      responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
+      responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
+    }
+    
+    res.json(responseData);
+  } catch (error) {
+    console.error('Error creating circle thread:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creating thread: ' + error.message,
       error: error.message 
     });
   }
@@ -1690,6 +1778,77 @@ router.post('/threads/:threadId/event/rsvp', authMiddleware, async (req, res) =>
   }
 });
 
+// GET /api/discussions/recent-activity
+router.get('/recent-activity', authMiddleware, async (req, res) => {
+  try {
+    const activities = await DiscussionThread.find({ isDeleted: false })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .populate('author', 'name profilePicture')
+      .lean();
+
+    const formattedActivities = activities.map(thread => ({
+      userAvatar: thread.author?.profilePicture,
+      userName: thread.author?.name,
+      action: thread.isCircleThread ? 'posted in circle' : 'started a discussion',
+      target: thread.title,
+      targetId: thread._id,
+      targetType: 'thread',
+      timeAgo: getTimeAgo(thread.updatedAt)
+    }));
+
+    res.json({ success: true, activities: formattedActivities });
+  } catch (error) {
+    console.error('Recent activity error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching recent activity' });
+  }
+});
+
+// GET /api/discussions/community-picks
+router.get('/community-picks', authMiddleware, async (req, res) => {
+  try {
+    const threads = await DiscussionThread.find({ isDeleted: false, isCommunityPick: true })
+      .sort({ createdAt: -1 })
+      .populate('author', 'name username profilePicture')
+      .lean();
+
+    res.json({ 
+      success: true, 
+      threads: threads.map(t => normalizeThread(t)) 
+    });
+  } catch (error) {
+    console.error('Community picks error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching community picks' });
+  }
+});
+
+// PATCH /api/discussions/:id/community-pick
+router.patch('/:id/community-pick', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    const thread = await DiscussionThread.findById(req.params.id);
+    if (!thread) {
+      return res.status(404).json({ success: false, message: 'Thread not found' });
+    }
+
+    thread.isCommunityPick = !thread.isCommunityPick;
+    await thread.save();
+
+    res.json({ 
+      success: true, 
+      message: `Thread ${thread.isCommunityPick ? 'marked as' : 'removed from'} community picks`,
+      isCommunityPick: thread.isCommunityPick
+    });
+  } catch (error) {
+    console.error('Toggle community pick error:', error);
+    res.status(500).json({ success: false, message: 'Error updating community pick status' });
+  }
+});
+
 // ===== PUBLIC DISCUSSION ROUTES =====
 
 router.get('/public', authMiddleware, async (req, res) => {
@@ -1752,13 +1911,7 @@ router.get('/public', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      threads: threads.map(thread => ({
-        ...thread,
-        isPublic: true,
-        timeAgo: getTimeAgo(thread.createdAt),
-        commentCount: thread.commentCount || 0,
-        likeCount: thread.likeCount || 0
-      })),
+      threads: threads.map(thread => normalizeThread(thread)),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -1813,12 +1966,8 @@ router.get('/all', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       threads: threads.map(thread => ({
-        ...thread,
-        isCircleThread: !!thread.circleId,
-        isPublic: !thread.circleId,
-        timeAgo: getTimeAgo(thread.createdAt),
-        commentCount: thread.commentCount || 0,
-        likeCount: thread.likeCount || 0
+        ...normalizeThread(thread),
+        isPublic: !thread.circleId
       })),
       pagination: {
         page: parseInt(page),
@@ -1938,11 +2087,7 @@ router.get('/threads', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       threads: threads.map(thread => ({
-        ...thread,
-        timeAgo: getTimeAgo(thread.createdAt),
-        commentCount: thread.commentCount || 0,
-        likeCount: thread.likeCount || 0,
-        isCircleThread: !!thread.circleId,
+        ...normalizeThread(thread),
         isPublic: !thread.circleId
       })),
       highlights,
@@ -2026,9 +2171,7 @@ router.get('/threads/:threadId', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       thread: {
-        ...thread,
-        timeAgo: getTimeAgo(thread.createdAt),
-        isCircleThread: !!thread.circleId,
+        ...normalizeThread(thread),
         poll: pollResults
       },
       isLiked
@@ -2049,6 +2192,7 @@ router.post('/threads', authMiddleware, upload.array('images', 4), async (req, r
     const { 
       title, 
       content, 
+      type,
       genre, 
       tags, 
       bookReferences, 
@@ -2106,7 +2250,7 @@ router.post('/threads', authMiddleware, upload.array('images', 4), async (req, r
       const censors = censorIndices ? JSON.parse(censorIndices) : [];
       req.files.forEach((file, index) => {
         attachments.push({
-          url: `/uploads/threads/${file.filename}`,
+          url: file.path, // Full Cloudinary URL
           isCensored: censors.includes(index)
         });
       });
@@ -2116,6 +2260,7 @@ router.post('/threads', authMiddleware, upload.array('images', 4), async (req, r
       title: filteredTitle,
       content: filteredContent,
       author: req.userId,
+      type: (type === 'discussion' || !type) ? 'book' : type,
       genre: genre || 'General',
       tags: tags || [],
       bookReferences: bookReferences || [],
@@ -2185,7 +2330,7 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
     const { threadId } = req.params;
     const { title, content, genre, tags } = req.body;
 
-    const thread = await DiscussionThread.findById(threadId);
+    const thread = await DiscussionThread.findById(threadId).populate('likes', '_id');
     
     if (!thread) {
       return res.status(404).json({ 
@@ -2235,6 +2380,37 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
     thread.updatedAt = new Date();
     await thread.save();
 
+    // Notify users who liked this post
+    if (thread.likes && thread.likes.length > 0) {
+      const Notification = require('../models/Notification');
+      const notificationPromises = thread.likes.map(async (likerId) => {
+        if (likerId.toString() !== req.userId) {
+          try {
+            await Notification.createUserNotification(
+              likerId,
+              'thread_edited',
+              'Post Updated',
+              'A post you liked was edited.',
+              {
+                priority: 'low',
+                actionUrl: `/discussions/thread/${thread._id}`,
+                sourceUserId: req.userId,
+                relatedEntityId: thread._id,
+                relatedEntityType: 'Thread',
+                metadata: {
+                  threadId: thread._id,
+                  threadTitle: thread.title
+                }
+              }
+            );
+          } catch (notifError) {
+            console.error('Error sending edit notification:', notifError);
+          }
+        }
+      });
+      await Promise.allSettled(notificationPromises);
+    }
+
     res.json({
       success: true,
       message: 'Thread updated successfully',
@@ -2255,7 +2431,7 @@ router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
   try {
     const { threadId } = req.params;
 
-    const thread = await DiscussionThread.findById(threadId);
+    const thread = await DiscussionThread.findById(threadId).populate('likes', '_id');
     
     if (!thread) {
       return res.status(404).json({ 
@@ -2275,6 +2451,36 @@ router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
     thread.isDeleted = true;
     thread.deletedAt = new Date();
     await thread.save();
+
+    // Notify users who liked this post
+    if (thread.likes && thread.likes.length > 0) {
+      const Notification = require('../models/Notification');
+      const notificationPromises = thread.likes.map(async (likerId) => {
+        if (likerId.toString() !== req.userId) {
+          try {
+            await Notification.createUserNotification(
+              likerId,
+              'thread_deleted',
+              'Post Deleted',
+              'A post you liked was deleted.',
+              {
+                priority: 'low',
+                sourceUserId: req.userId,
+                relatedEntityId: thread._id,
+                relatedEntityType: 'Thread',
+                metadata: {
+                  threadId: thread._id,
+                  threadTitle: thread.title
+                }
+              }
+            );
+          } catch (notifError) {
+            console.error('Error sending delete notification:', notifError);
+          }
+        }
+      });
+      await Promise.allSettled(notificationPromises);
+    }
 
     res.json({
       success: true,
@@ -2637,12 +2843,7 @@ router.get('/user/:userId/threads', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      threads: threads.map(thread => ({
-        ...thread,
-        timeAgo: getTimeAgo(thread.createdAt),
-        commentCount: thread.commentCount || 0,
-        likeCount: thread.likeCount || 0
-      })),
+      threads: threads.map(thread => normalizeThread(thread)),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

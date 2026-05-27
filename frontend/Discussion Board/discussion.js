@@ -1,3 +1,57 @@
+function getAuthToken() {
+    // CRITICAL: Always prioritize sessionStorage for tab-specific isolation
+    // This prevents session contamination between multiple logged-in accounts
+    const sessionToken = sessionStorage.getItem('litlink_token') || sessionStorage.getItem('token');
+    if (sessionToken) return sessionToken;
+    
+    // Fallback to global auth system if available
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getToken === 'function') {
+        return window.LitlinkSessionAuth.getToken();
+    }
+    
+    // Last resort: localStorage (shared across tabs)
+    return localStorage.getItem('litlink_token') || localStorage.getItem('token');
+}
+
+function getAuthUser() {
+    // CRITICAL: Always prioritize sessionStorage for tab-specific isolation
+    try {
+        const sessionUser = sessionStorage.getItem('litlink_user') || sessionStorage.getItem('user');
+        if (sessionUser) return JSON.parse(sessionUser);
+    } catch (e) {
+        console.error('Error parsing session user:', e);
+    }
+    
+    // Fallback to global auth system
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUser === 'function') {
+        return window.LitlinkSessionAuth.getUser();
+    }
+    
+    // Last resort: localStorage
+    try {
+        const localUser = localStorage.getItem('litlink_user') || localStorage.getItem('user');
+        return localUser ? JSON.parse(localUser) : null;
+    } catch (e) {
+        console.error('Error parsing local user:', e);
+        return null;
+    }
+}
+
+function getAuthUserId() {
+    // CRITICAL: Always prioritize sessionStorage for tab-specific isolation
+    const sessionUserId = sessionStorage.getItem('litlink_userId') || sessionStorage.getItem('userId');
+    if (sessionUserId) return sessionUserId;
+    
+    // Fallback to global auth system
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUserId === 'function') {
+        return window.LitlinkSessionAuth.getUserId();
+    }
+    
+    // Extract from user object
+    const user = getAuthUser();
+    return user ? (user._id || user.id || '') : '';
+}
+
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Litlink Community Board loaded!');
@@ -7,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
     
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         console.log('No token found - user not logged in');
         showNotification('Please log in to participate in discussions', 'info');
@@ -15,6 +69,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     await initializePage();
     await loadUserCircles();
+    const requestedCircleId = query.get('circleId');
+    if (requestedCircleId) {
+        switchToCircle(requestedCircleId);
+    }
     setupEventListeners();
     await loadThreads();
     loadHighlights();
@@ -39,9 +97,10 @@ let userCircles = [];
 
 async function initializePage() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) return;
         
+        // CRITICAL: Always fetch fresh user data from server to ensure correct identity
         const response = await fetch('http://localhost:5002/api/auth/me', {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -51,8 +110,34 @@ async function initializePage() {
         if (response.ok) {
             const data = await response.json();
             currentUser = data.user;
+            
+            // CRITICAL: Store user data in sessionStorage for tab-specific isolation
+            // This prevents cross-tab contamination when multiple accounts are logged in
+            const currentId = String(currentUser?._id || currentUser?.id || '');
+            const userStr = JSON.stringify(currentUser);
+            
+            // Always update sessionStorage with fresh data
+            sessionStorage.setItem('litlink_user', userStr);
+            sessionStorage.setItem('user', userStr);
+            sessionStorage.setItem('litlink_userId', currentId);
+            sessionStorage.setItem('litlink_token', token);
+            
+            // Log warning if there was a mismatch (debugging multi-account issues)
+            const previousUserId = sessionStorage.getItem('userId');
+            if (previousUserId && previousUserId !== currentId) {
+                console.warn('[DISCUSSION] User identity changed in this tab:', {
+                    previous: previousUserId,
+                    current: currentId
+                });
+            }
+            sessionStorage.setItem('userId', currentId);
+            
             updateUserInfo();
             addMyCreatedCirclesSection();
+        } else {
+            // Token is invalid, clear session
+            console.error('Failed to authenticate user');
+            sessionStorage.clear();
         }
     } catch (error) {
         console.error('Error loading user:', error);
@@ -70,7 +155,7 @@ function updateUserInfo() {
 
 async function loadUserCircles() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) {
             const circleSelect = document.getElementById('activeCircle');
             if (circleSelect) {
@@ -175,7 +260,8 @@ function addCreateCircleButton() {
 }
 
 function setupWebSocket() {
-    const token = localStorage.getItem('litlink_token') || localStorage.getItem('token');
+    const token = getAuthToken();
+    if (!token) return;
 
     if (socket && socket.connected) {
         return;
@@ -199,7 +285,8 @@ function setupWebSocket() {
         
         socket.on('connect', () => {
             console.log('✅ WebSocket connected');
-            socket.emit('authenticate', token);
+            const activeToken = getAuthToken();
+            socket.emit('authenticate', activeToken);
         });
         
         socket.on('connect_error', (error) => {
@@ -305,7 +392,7 @@ function setupWebSocket() {
 
 async function loadRecentActivity() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) return;
         
         const response = await fetch('http://localhost:5002/api/discussions/recent-activity', {
@@ -589,7 +676,7 @@ async function loadCircleMembers(circleId) {
     membersAvatars.innerHTML = '<div class="loading-spinner-small" style="width: 20px; height: 20px; border: 2px solid rgba(232, 212, 192, 0.1); border-top: 2px solid #e8d4c0; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
     
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         const response = await fetch(`http://localhost:5002/api/discussions/circles/${circleId}/details`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -632,7 +719,7 @@ async function loadCircleMembers(circleId) {
 // ===== CIRCLE DISCOVERY FUNCTIONS =====
 
 async function showCircleDiscoveryModal() {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to discover circles', 'error');
         setTimeout(() => {
@@ -763,7 +850,7 @@ function renderCirclesList(circles) {
 }
 
 async function requestJoinCircle(circleId, circleName, button) {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to join circles', 'error');
         return;
@@ -880,7 +967,7 @@ function promptJoinMessage(circleName) {
 // ===== CIRCLE CREATION FUNCTIONS =====
 
 function showCreateCircleModal() {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to create a circle', 'error');
         setTimeout(() => {
@@ -1018,7 +1105,7 @@ function showCreateCircleModal() {
         createBtn.disabled = true;
         
         try {
-            const token = localStorage.getItem('token');
+            const token = getAuthToken();
             const response = await fetch('http://localhost:5002/api/discussions/circles/create', {
                 method: 'POST',
                 headers: {
@@ -1109,7 +1196,7 @@ function addMyCreatedCirclesSection() {
 
 async function loadMyCreatedCircles() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) return;
         
         const response = await fetch('http://localhost:5002/api/discussions/circles/my-circles', {
@@ -1174,7 +1261,7 @@ async function loadMyCreatedCircles() {
 
 async function showCircleManagement(circleId) {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         const response = await fetch(`http://localhost:5002/api/discussions/circles/${circleId}/manage`, {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -1305,7 +1392,7 @@ function renderCircleManagementModal(circle) {
             
             if (confirm(`Are you sure you want to ${action} this member?`)) {
                 try {
-                    const token = localStorage.getItem('token');
+                    const token = getAuthToken();
                     const url = action === 'promote' 
                         ? `http://localhost:5002/api/discussions/circles/${circle.circleId}/members/${userId}/promote`
                         : `http://localhost:5002/api/discussions/circles/${circle.circleId}/members/${userId}/demote`;
@@ -1340,7 +1427,7 @@ function renderCircleManagementModal(circle) {
             
             if (confirm('Are you sure you want to remove this member from the circle?')) {
                 try {
-                    const token = localStorage.getItem('token');
+                    const token = getAuthToken();
                     const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}/members/${userId}`, {
                         method: 'DELETE',
                         headers: {
@@ -1370,7 +1457,7 @@ function renderCircleManagementModal(circle) {
             const requestId = btn.dataset.requestId;
             
             try {
-                const token = localStorage.getItem('token');
+                const token = getAuthToken();
                 const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}/requests/${requestId}/approve`, {
                     method: 'POST',
                     headers: {
@@ -1412,7 +1499,7 @@ function renderCircleManagementModal(circle) {
             const requestId = btn.dataset.requestId;
             
             try {
-                const token = localStorage.getItem('token');
+                const token = getAuthToken();
                 const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}/requests/${requestId}/decline`, {
                     method: 'POST',
                     headers: {
@@ -1443,7 +1530,7 @@ function renderCircleManagementModal(circle) {
             const allowMemberPosts = modal.querySelector('#manageAllowMemberPosts').checked;
             
             try {
-                const token = localStorage.getItem('token');
+                const token = getAuthToken();
                 const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}/settings`, {
                     method: 'PUT',
                     headers: {
@@ -1477,7 +1564,7 @@ function renderCircleManagementModal(circle) {
         deleteBtn.addEventListener('click', async () => {
             if (confirm('⚠️ WARNING: This will permanently delete the circle and all its threads. This action cannot be undone. Are you absolutely sure?')) {
                 try {
-                    const token = localStorage.getItem('token');
+                    const token = getAuthToken();
                     const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}`, {
                         method: 'DELETE',
                         headers: {
@@ -1506,7 +1593,7 @@ function renderCircleManagementModal(circle) {
 
 // ===== CIRCLE-ONLY THREAD MODAL =====
 function showCircleThreadModal() {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to create a circle thread', 'error');
         setTimeout(() => {
@@ -1560,7 +1647,7 @@ function showCircleThreadModal() {
                 <div class="form-group">
                     <label for="circleThreadType">Thread Type</label>
                     <select id="circleThreadType" class="modal-select">
-                        <option value="discussion">📖 Book Discussion</option>
+                        <option value="book">📖 Book Discussion</option>
                         <option value="question">❓ Question/Help</option>
                         <option value="recommendation">📚 Recommendation Request</option>
                         <option value="poll">📊 Circle Poll</option>
@@ -1787,7 +1874,7 @@ function showCircleThreadModal() {
         postBtn.disabled = true;
         
         try {
-            const token = localStorage.getItem('token');
+            const token = getAuthToken();
             const formData = new FormData();
             formData.append('title', title);
             formData.append('content', content);
@@ -1878,7 +1965,7 @@ function showCircleThreadModal() {
 function showPublicDiscussionModal() { showNewThreadModal('public'); }
 
 function showNewThreadModal(defaultVisibility = 'public') {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to start a discussion', 'error');
         setTimeout(() => {
@@ -1925,10 +2012,11 @@ function showNewThreadModal(defaultVisibility = 'public') {
                 <div class="form-group">
                     <label for="discussionCategory">Discussion Category</label>
                     <select id="discussionCategory" class="modal-select">
-                        <option value="literary">📚 Literary Analysis</option>
+                        <option value="book">📚 Literary Analysis (Book)</option>
                         <option value="news">📰 Book News & Industry</option>
                         <option value="challenge">🎯 Reading Challenge</option>
                         <option value="recommendation">📖 Book Recommendations</option>
+                        <option value="question">❓ Question/Help</option>
                         <option value="general">💬 General Discussion</option>
                         <option value="announcement">📢 Community Announcement</option>
                     </select>
@@ -2153,6 +2241,9 @@ function showNewThreadModal(defaultVisibility = 'public') {
             formData.append('title', title);
             formData.append('content', content);
             formData.append('category', category);
+            // Map category to type for backend validation
+            const type = ['book', 'question', 'recommendation', 'poll', 'event'].includes(category) ? category : 'book';
+            formData.append('type', type);
             formData.append('isPublic', isPublic);
             formData.append('genre', selectedGenres[0] || 'General');
             formData.append('tags', modal.querySelector('#discussionTags').value.split(',').map(t => t.trim()).filter(t => t).join(','));
@@ -2326,7 +2417,7 @@ function showQuickPollModal(circleName, circleValue) {
         createBtn.disabled = true;
         
         try {
-            const token = localStorage.getItem('token');
+            const token = getAuthToken();
             const response = await fetch('http://localhost:5002/api/discussions/circles/polls', {
                 method: 'POST',
                 headers: {
@@ -2451,7 +2542,7 @@ async function loadThreads(searchTerm = null, append = false) {
     
     try {
         isLoading = true;
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         
         if (!token) {
             renderEmptyState();
@@ -2463,7 +2554,11 @@ async function loadThreads(searchTerm = null, append = false) {
         const sort = sortSelect ? sortSelect.value.toLowerCase().replace(' ', '_') : 'latest';
         
         let url;
-        if (currentFeed === 'circle') {
+        if (currentFilter === 'community_picks') {
+            url = 'http://localhost:5002/api/discussions/community-picks';
+        } else if (currentFilter === 'recent-activity') {
+            url = 'http://localhost:5002/api/discussions/recent-activity';
+        } else if (currentFeed === 'circle') {
             if (!currentCircle) {
                 renderEmptyState();
                 isLoading = false;
@@ -2492,11 +2587,9 @@ async function loadThreads(searchTerm = null, append = false) {
         
         if (currentFilter === 'my_threads' && currentUser?._id) {
             params.append('userId', currentUser._id);
-        } else if (currentFilter === 'community_picks') {
-            params.append('featured', 'true');
         }
         
-        url += `?${params.toString()}`;
+        url += url.includes('?') ? `&${params.toString()}` : `?${params.toString()}`;
         
         const response = await fetch(url, {
             headers: {
@@ -2638,13 +2731,28 @@ function createThreadCard(thread) {
             `;
         }
         
+        // Check if current user is the author
+        const isAuthor = currentUser && thread.author && (String(currentUser._id) === String(thread.author._id) || String(currentUser.id) === String(thread.author._id));
+        
         card.innerHTML = `
-            ${thread.isFeatured ? '<div class="thread-badge" style="position: absolute; top: -10px; right: 25px; background: linear-gradient(135deg, #ffd700, #ffa500); color: #2d1810; padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-crown"></i> Community Pick</div>' : ''}
+            ${thread.isCommunityPick ? '<div class="thread-badge community-pick-badge" style="position: absolute; top: -10px; right: 25px; background: linear-gradient(135deg, #ffd700, #ffa500); color: #2d1810; padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: 600; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3); z-index: 5;"><i class="fas fa-star"></i> Community Pick</div>' : ''}
             ${contextBadge}
             <div class="thread-header" style="display: flex; gap: 15px; align-items: flex-start; margin-bottom: 15px;">
                 <img src="${escapeHtml(authorImage)}" alt="${escapeHtml(authorName)}" class="avatar-img" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(232, 212, 192, 0.2); object-fit: cover;" onerror="this.src='https://api.dicebear.com/7.x/avataaars/svg?seed=default'">
                 <div class="thread-info" style="flex: 1;">
-                    <h3 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 10px; line-height: 1.4;">${escapeHtml(thread.title)}</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <h3 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 10px; line-height: 1.4; flex: 1;">${escapeHtml(thread.title)}</h3>
+                        ${isAuthor ? `
+                            <div class="thread-owner-actions" style="display: flex; gap: 8px; margin-left: 10px;">
+                                <button class="btn-edit-thread" onclick="editThread('${thread._id}'); event.stopPropagation();" style="background: rgba(139, 69, 40, 0.3); border: 1px solid rgba(232, 212, 192, 0.2); border-radius: 6px; padding: 6px 10px; color: #e8d4c0; cursor: pointer; font-size: 12px; transition: all 0.3s;" title="Edit post">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-delete-thread" onclick="deleteThread('${thread._id}'); event.stopPropagation();" style="background: rgba(139, 40, 40, 0.3); border: 1px solid rgba(232, 100, 100, 0.2); border-radius: 6px; padding: 6px 10px; color: #ff6b6b; cursor: pointer; font-size: 12px; transition: all 0.3s;" title="Delete post">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
                     <div class="thread-meta" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
                         <span class="author" style="font-size: 13px; display: flex; align-items: center; gap: 5px; color: #e8d4c0; font-weight: 500;"><i class="far fa-user"></i> ${escapeHtml(authorName)}</span>
                         <span class="time" style="font-size: 13px; display: flex; align-items: center; gap: 5px; color: #a88b76;"><i class="far fa-clock"></i> ${escapeHtml(timeAgo)}</span>
@@ -2732,7 +2840,7 @@ function createEventPreview(event) {
 
 function getTypeIcon(type) {
     const icons = {
-        discussion: 'fa-book-open',
+        book: 'fa-book',
         question: 'fa-question-circle',
         recommendation: 'fa-bookmark',
         poll: 'fa-chart-bar',
@@ -2755,7 +2863,7 @@ function renderEmptyState() {
 }
 
 async function viewThread(threadId) {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
         showNotification('Please log in to view this discussion', 'info');
         return;
@@ -3036,7 +3144,7 @@ function bindReplyButtons(modal, threadId, token) {
 
 async function loadHighlights() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) return;
         
         const response = await fetch('http://localhost:5002/api/discussions/highlights', {
@@ -3175,7 +3283,7 @@ function updateHighlightsEmpty() {
 
 async function loadGenreStats() {
     try {
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         if (!token) return;
         
         const response = await fetch('http://localhost:5002/api/discussions/stats/genres', {
@@ -3281,8 +3389,13 @@ function showContentWarningBanner(message, type) {
         setTimeout(function() { banner.remove(); }, 300);
     }, dur);
 }
-
 function showNotification(message, type = 'info') {
+    // Check global notification preference
+    if (localStorage.getItem('notificationsEnabled') === 'false') {
+        console.log('🔇 Notification suppressed (global setting OFF):', message);
+        return;
+    }
+
     const existing = document.querySelector('.notification');
     if (existing) existing.remove();
     
@@ -3364,4 +3477,487 @@ function handleAttachmentClick(element, url, isCensored) {
     } else {
         window.open(url, '_blank');
     }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDIT AND DELETE THREAD FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function editThread(threadId) {
+    const token = getAuthToken();
+    if (!token) {
+        showNotification('Please log in to edit posts', 'error');
+        return;
+    }
+
+    try {
+        // Fetch thread details
+        const response = await fetch(`http://localhost:5002/api/discussions/threads/${threadId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (!data.success || !data.thread) {
+            showNotification('Could not load thread details', 'error');
+            return;
+        }
+
+        const thread = data.thread;
+
+        // Create edit modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-edit"></i> Edit Post</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editThreadTitle">Title</label>
+                        <input type="text" id="editThreadTitle" class="modal-input" value="${escapeHtml(thread.title)}">
+                    </div>
+                    <div class="form-group">
+                        <label for="editThreadContent">Content</label>
+                        <textarea id="editThreadContent" class="modal-textarea" rows="8">${escapeHtml(thread.content)}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editThreadGenre">Genre</label>
+                        <select id="editThreadGenre" class="modal-select">
+                            <option value="General" ${thread.genre === 'General' ? 'selected' : ''}>General</option>
+                            <option value="Fantasy" ${thread.genre === 'Fantasy' ? 'selected' : ''}>Fantasy</option>
+                            <option value="Science Fiction" ${thread.genre === 'Science Fiction' ? 'selected' : ''}>Science Fiction</option>
+                            <option value="Mystery" ${thread.genre === 'Mystery' ? 'selected' : ''}>Mystery</option>
+                            <option value="Thriller" ${thread.genre === 'Thriller' ? 'selected' : ''}>Thriller</option>
+                            <option value="Romance" ${thread.genre === 'Romance' ? 'selected' : ''}>Romance</option>
+                            <option value="Horror" ${thread.genre === 'Horror' ? 'selected' : ''}>Horror</option>
+                            <option value="Historical Fiction" ${thread.genre === 'Historical Fiction' ? 'selected' : ''}>Historical Fiction</option>
+                            <option value="Literary Fiction" ${thread.genre === 'Literary Fiction' ? 'selected' : ''}>Literary Fiction</option>
+                            <option value="Contemporary" ${thread.genre === 'Contemporary' ? 'selected' : ''}>Contemporary</option>
+                            <option value="Young Adult" ${thread.genre === 'Young Adult' ? 'selected' : ''}>Young Adult</option>
+                            <option value="Children's" ${thread.genre === "Children's" ? 'selected' : ''}>Children's</option>
+                            <option value="Non-Fiction" ${thread.genre === 'Non-Fiction' ? 'selected' : ''}>Non-Fiction</option>
+                            <option value="Biography" ${thread.genre === 'Biography' ? 'selected' : ''}>Biography</option>
+                            <option value="Self-Help" ${thread.genre === 'Self-Help' ? 'selected' : ''}>Self-Help</option>
+                            <option value="Poetry" ${thread.genre === 'Poetry' ? 'selected' : ''}>Poetry</option>
+                            <option value="Classics" ${thread.genre === 'Classics' ? 'selected' : ''}>Classics</option>
+                            <option value="Graphic Novel" ${thread.genre === 'Graphic Novel' ? 'selected' : ''}>Graphic Novel</option>
+                            <option value="Manga" ${thread.genre === 'Manga' ? 'selected' : ''}>Manga</option>
+                            <option value="Dystopian" ${thread.genre === 'Dystopian' ? 'selected' : ''}>Dystopian</option>
+                            <option value="Adventure" ${thread.genre === 'Adventure' ? 'selected' : ''}>Adventure</option>
+                            <option value="Crime" ${thread.genre === 'Crime' ? 'selected' : ''}>Crime</option>
+                            <option value="Paranormal" ${thread.genre === 'Paranormal' ? 'selected' : ''}>Paranormal</option>
+                            <option value="Urban Fantasy" ${thread.genre === 'Urban Fantasy' ? 'selected' : ''}>Urban Fantasy</option>
+                            <option value="Epic Fantasy" ${thread.genre === 'Epic Fantasy' ? 'selected' : ''}>Epic Fantasy</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editThreadTags">Tags (comma separated)</label>
+                        <input type="text" id="editThreadTags" class="modal-input" value="${thread.tags ? thread.tags.join(', ') : ''}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary cancel-btn">Cancel</button>
+                    <button class="btn-primary save-btn" id="saveEditBtn">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+
+        const closeBtn = modal.querySelector('.modal-close');
+        const cancelBtn = modal.querySelector('.cancel-btn');
+        const saveBtn = modal.querySelector('#saveEditBtn');
+
+        function closeModal() {
+            modal.remove();
+            document.body.style.overflow = '';
+        }
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            const title = document.getElementById('editThreadTitle').value.trim();
+            const content = document.getElementById('editThreadContent').value.trim();
+            const genre = document.getElementById('editThreadGenre').value;
+            const tagsInput = document.getElementById('editThreadTags').value.trim();
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            if (!title || !content) {
+                showNotification('Title and content are required', 'error');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            try {
+                const updateResponse = await fetch(`http://localhost:5002/api/discussions/threads/${threadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ title, content, genre, tags })
+                });
+
+                const updateData = await updateResponse.json();
+
+                if (updateData.success) {
+                    showNotification('Post updated successfully!', 'success');
+                    closeModal();
+                    loadThreads(); // Reload threads to show updated content
+                } else {
+                    showNotification(updateData.message || 'Failed to update post', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+                }
+            } catch (error) {
+                console.error('Error updating thread:', error);
+                showNotification('Error updating post', 'error');
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            }
+        });
+
+    } catch (error) {
+        console.error('Error loading thread for edit:', error);
+        showNotification('Error loading post details', 'error');
+    }
+}
+
+async function deleteThread(threadId) {
+    const token = getAuthToken();
+    if (!token) {
+        showNotification('Please log in to delete posts', 'error');
+        return;
+    }
+
+    if (!confirm('⚠️ Are you sure you want to delete this post? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`http://localhost:5002/api/discussions/threads/${threadId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification('Post deleted successfully', 'success');
+            loadThreads(); // Reload threads to remove deleted post
+        } else {
+            showNotification(data.message || 'Failed to delete post', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting thread:', error);
+        showNotification('Error deleting post', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHEDULE EVENT AND SUGGEST BOOK FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function showQuickEventModal(circleName, circleValue) {
+    const token = getAuthToken();
+    if (!token) {
+        showNotification('Please log in to schedule events', 'error');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-alt"></i> Schedule Circle Event</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="circle-context-banner" style="background: rgba(232, 212, 192, 0.1); border-left: 4px solid #e8d4c0; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+                    <i class="fas fa-users"></i>
+                    <strong>Circle:</strong> ${escapeHtml(circleName)}
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventTitle">Event Title</label>
+                    <input type="text" id="eventTitle" class="modal-input" placeholder="e.g., Book Club Discussion: Pride and Prejudice">
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventDescription">Description</label>
+                    <textarea id="eventDescription" class="modal-textarea" rows="4" placeholder="Describe what this event is about..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventDate">Event Date & Time</label>
+                    <input type="datetime-local" id="eventDate" class="modal-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventDuration">Duration</label>
+                    <select id="eventDuration" class="modal-select">
+                        <option value="30">30 minutes</option>
+                        <option value="60" selected>1 hour</option>
+                        <option value="90">1.5 hours</option>
+                        <option value="120">2 hours</option>
+                        <option value="180">3 hours</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventType">Event Type</label>
+                    <select id="eventType" class="modal-select">
+                        <option value="voice">🎙️ Voice Chat Discussion</option>
+                        <option value="text">💬 Text Discussion</option>
+                        <option value="video">📹 Video Call</option>
+                        <option value="reading">📖 Group Reading Session</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary cancel-btn">Cancel</button>
+                <button class="btn-primary" id="createEventBtn">
+                    <i class="fas fa-calendar-check"></i> Create Event
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    const closeBtn = modal.querySelector('.modal-close');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    const createBtn = modal.querySelector('#createEventBtn');
+
+    function closeModal() {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    createBtn.addEventListener('click', async () => {
+        const title = document.getElementById('eventTitle').value.trim();
+        const description = document.getElementById('eventDescription').value.trim();
+        const eventDate = document.getElementById('eventDate').value;
+        const duration = document.getElementById('eventDuration').value;
+        const eventType = document.getElementById('eventType').value;
+
+        if (!title || !description || !eventDate) {
+            showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        try {
+            const response = await fetch('http://localhost:5002/api/discussions/circles/threads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    title,
+                    content: description,
+                    type: 'event',
+                    circleId: circleValue,
+                    circleName: circleName,
+                    event: {
+                        date: eventDate,
+                        duration: parseInt(duration),
+                        type: eventType
+                    }
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Event scheduled successfully!', 'success');
+                closeModal();
+                loadThreads();
+            } else {
+                showNotification(data.message || 'Failed to create event', 'error');
+                createBtn.disabled = false;
+                createBtn.innerHTML = '<i class="fas fa-calendar-check"></i> Create Event';
+            }
+        } catch (error) {
+            console.error('Error creating event:', error);
+            showNotification('Error creating event', 'error');
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="fas fa-calendar-check"></i> Create Event';
+        }
+    });
+}
+
+function showBookSuggestionModal(circleName, circleValue) {
+    const token = getAuthToken();
+    if (!token) {
+        showNotification('Please log in to suggest books', 'error');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> Suggest a Book</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="circle-context-banner" style="background: rgba(232, 212, 192, 0.1); border-left: 4px solid #e8d4c0; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+                    <i class="fas fa-users"></i>
+                    <strong>Suggesting to:</strong> ${escapeHtml(circleName)}
+                </div>
+                
+                <div class="form-group">
+                    <label for="bookTitle">Book Title</label>
+                    <input type="text" id="bookTitle" class="modal-input" placeholder="e.g., The Great Gatsby">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bookAuthor">Author</label>
+                    <input type="text" id="bookAuthor" class="modal-input" placeholder="e.g., F. Scott Fitzgerald">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bookGenre">Genre</label>
+                    <select id="bookGenre" class="modal-select">
+                        <option value="General">General</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="Science Fiction">Science Fiction</option>
+                        <option value="Mystery">Mystery</option>
+                        <option value="Thriller">Thriller</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Horror">Horror</option>
+                        <option value="Historical Fiction">Historical Fiction</option>
+                        <option value="Literary Fiction">Literary Fiction</option>
+                        <option value="Contemporary">Contemporary</option>
+                        <option value="Young Adult">Young Adult</option>
+                        <option value="Children's">Children's</option>
+                        <option value="Non-Fiction">Non-Fiction</option>
+                        <option value="Biography">Biography</option>
+                        <option value="Self-Help">Self-Help</option>
+                        <option value="Poetry">Poetry</option>
+                        <option value="Classics">Classics</option>
+                        <option value="Graphic Novel">Graphic Novel</option>
+                        <option value="Manga">Manga</option>
+                        <option value="Dystopian">Dystopian</option>
+                        <option value="Adventure">Adventure</option>
+                        <option value="Crime">Crime</option>
+                        <option value="Paranormal">Paranormal</option>
+                        <option value="Urban Fantasy">Urban Fantasy</option>
+                        <option value="Epic Fantasy">Epic Fantasy</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bookReason">Why do you recommend this book?</label>
+                    <textarea id="bookReason" class="modal-textarea" rows="5" placeholder="Share why you think this book would be great for the circle..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary cancel-btn">Cancel</button>
+                <button class="btn-primary" id="suggestBookBtn">
+                    <i class="fas fa-paper-plane"></i> Suggest Book
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    const closeBtn = modal.querySelector('.modal-close');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    const suggestBtn = modal.querySelector('#suggestBookBtn');
+
+    function closeModal() {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    suggestBtn.addEventListener('click', async () => {
+        const bookTitle = document.getElementById('bookTitle').value.trim();
+        const bookAuthor = document.getElementById('bookAuthor').value.trim();
+        const bookGenre = document.getElementById('bookGenre').value;
+        const bookReason = document.getElementById('bookReason').value.trim();
+
+        if (!bookTitle || !bookAuthor || !bookReason) {
+            showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        suggestBtn.disabled = true;
+        suggestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Suggesting...';
+
+        try {
+            const response = await fetch('http://localhost:5002/api/discussions/circles/threads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    title: `📚 Book Suggestion: ${bookTitle}`,
+                    content: bookReason,
+                    type: 'recommendation',
+                    circleId: circleValue,
+                    circleName: circleName,
+                    genre: bookGenre,
+                    bookReferences: [{
+                        title: bookTitle,
+                        author: bookAuthor
+                    }],
+                    tags: ['book-suggestion', bookGenre.toLowerCase()]
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Book suggestion posted successfully!', 'success');
+                closeModal();
+                loadThreads();
+            } else {
+                showNotification(data.message || 'Failed to suggest book', 'error');
+                suggestBtn.disabled = false;
+                suggestBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Suggest Book';
+            }
+        } catch (error) {
+            console.error('Error suggesting book:', error);
+            showNotification('Error suggesting book', 'error');
+            suggestBtn.disabled = false;
+            suggestBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Suggest Book';
+        }
+    });
 }

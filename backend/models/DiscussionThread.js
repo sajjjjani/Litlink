@@ -39,9 +39,11 @@ const discussionThreadSchema = new mongoose.Schema({
   },
   type: { 
     type: String, 
-    enum: ['discussion', 'question', 'recommendation', 'poll', 'event'],
-    default: 'discussion'
+    enum: ['book', 'question', 'recommendation', 'poll', 'event'],
+    required: true,
+    default: 'book'
   },
+  isCommunityPick: { type: Boolean, default: false },
   
   // Poll support
   poll: {
@@ -90,8 +92,11 @@ const discussionThreadSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// Index for search
+// Index for search and filtering
 discussionThreadSchema.index({ title: 'text', content: 'text', tags: 'text' });
+discussionThreadSchema.index({ type: 1 });
+discussionThreadSchema.index({ createdAt: -1 });
+discussionThreadSchema.index({ isCommunityPick: 1 });
 
 // Virtual for time ago
 discussionThreadSchema.virtual('timeAgo').get(function() {
