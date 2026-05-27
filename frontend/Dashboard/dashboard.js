@@ -1,13 +1,72 @@
-function checkAuth() { // Verified clean of old AI logic errors
-    const token = sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token');
-    const user = JSON.parse(sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user') || 'null');
-    
+let dashboardUserId = null;
+
+function getAuthToken() {
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getToken === 'function') {
+        return window.LitlinkSessionAuth.getToken();
+    }
+    return sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token') || sessionStorage.getItem('token') || localStorage.getItem('token');
+}
+
+function getAuthUser() {
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUser === 'function') {
+        return window.LitlinkSessionAuth.getUser();
+    }
+    try {
+        const userStr = sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user');
+        return userStr ? JSON.parse(userStr) : null;
+    } catch {
+        return null;
+    }
+}
+
+function getAuthUserId() {
+    if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUserId === 'function') {
+        return window.LitlinkSessionAuth.getUserId();
+    }
+    const user = getAuthUser();
+    return user ? (user._id || user.id || null) : null;
+}
+
+function normalizeMatchPercentage(value) {
+    if (window.LitlinkMatchUtils && typeof window.LitlinkMatchUtils.normalizePercentage === 'function') {
+        return window.LitlinkMatchUtils.normalizePercentage(value);
+    }
+    const score = Number(value);
+    return Number.isFinite(score) ? Math.max(0, Math.round(score)) : 0;
+}
+
+function getAiIntroSessionKey(userId) {
+    return `litlink_dashboard_ai_intro_done_${userId}`;
+}
+
+function shouldPlayAiIntro(userId) {
+    if (!userId) return false;
+    return sessionStorage.getItem(getAiIntroSessionKey(userId)) !== '1';
+}
+
+function markAiIntroComplete(userId) {
+    if (!userId) return;
+    sessionStorage.setItem(getAiIntroSessionKey(userId), '1');
+}
+
+function checkAuth() {
+    const token = getAuthToken();
+    const user = getAuthUser();
+
     if (!token || !user) {
-        console.log('❌ No authentication found, redirecting to login...');
+        console.warn('❌ No authentication found, redirecting to login...');
+        
+        // GUARD: Don't redirect if we are already at the homepage
+        if (window.location.pathname.includes('index.html')) {
+            console.log('🛡️ Guard: Already at homepage, skipping redirect');
+            return null;
+        }
+
+        console.trace('↪️ Dashboard auth check fail redirect');
         window.location.href = '../Homepage/index.html';
         return null;
     }
-    
+
     console.log('✅ User authenticated:', user.name || user.email);
     return { token, user };
 }
@@ -25,7 +84,7 @@ function toggleDarkMode() {
     if (toggle) {
         localStorage.setItem('darkMode', toggle.checked);
         console.log('Dark mode:', toggle.checked ? 'enabled' : 'disabled');
-        
+
         if (toggle.checked) {
             document.body.classList.add('dark-mode');
         } else {
@@ -37,7 +96,7 @@ function toggleDarkMode() {
 function loadDarkModePreference() {
     const darkMode = localStorage.getItem('darkMode') === 'true';
     const toggle = document.getElementById('darkModeToggle');
-    
+
     if (toggle) {
         toggle.checked = darkMode;
         if (darkMode) {
@@ -58,38 +117,71 @@ function toggleNotifications() {
 
 function applyNotificationSetting(isEnabled) {
     console.log('🔔 Notifications:', isEnabled ? 'Enabled' : 'Disabled');
-    
+
     const notificationBtn = document.querySelector('.notifications-btn');
     const notificationBadge = document.getElementById('notificationBadge');
+    const toggle = document.getElementById('notificationsToggle');
     
+    // Sync the toggle UI if it exists (for cross-tab sync)
+    if (toggle && toggle.checked !== isEnabled) {
+        toggle.checked = isEnabled;
+    }
+
     if (!isEnabled) {
         if (notificationBtn) {
             notificationBtn.style.opacity = '0.5';
             notificationBtn.style.cursor = 'not-allowed';
-            notificationBtn.onclick = function(e) {
+            notificationBtn.onclick = function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 showNotification('Notifications are disabled', 'warning');
                 return false;
             };
         }
-        
+
         if (notificationBadge) {
             notificationBadge.style.display = 'none';
         }
-        
-        stopNotificationPolling();
+
+        if (typeof stopNotificationPolling === 'function') {
+            stopNotificationPolling();
+        }
     } else {
         if (notificationBtn) {
             notificationBtn.style.opacity = '1';
             notificationBtn.style.cursor = 'pointer';
             notificationBtn.onclick = toggleNotificationsDropdown;
         }
-        
-        startNotificationPolling();
-        loadNotifications();
+
+        if (typeof startNotificationPolling === 'function') {
+            startNotificationPolling();
+        }
+        if (typeof loadNotifications === 'function') {
+            loadNotifications();
+        }
+    }
+
+    // Update real-time client state if it exists
+    if (typeof _notifClient !== 'undefined' && _notifClient) {
+        _notifClient.showToasts = isEnabled;
+        if (!isEnabled && _notifClient.socket) {
+            console.log('🔌 Disconnecting NotificationClient due to user preference');
+            _notifClient.disconnect();
+        } else if (isEnabled && (!_notifClient.socket || !_notifClient.socket.connected)) {
+            console.log('🔌 Reconnecting NotificationClient due to user preference');
+            const token = getAuthToken();
+            if (token) _notifClient.connect();
+        }
     }
 }
+
+// Global cross-tab synchronization
+window.addEventListener('storage', (e) => {
+    if (e.key === 'notificationsEnabled') {
+        const isEnabled = e.newValue === 'true';
+        applyNotificationSetting(isEnabled);
+    }
+});
 
 function toggleMobileMenu() {
     const navLinks = document.querySelector('.nav-links');
@@ -100,8 +192,14 @@ function toggleMobileMenu() {
 
 function logout() {
     const performLogout = () => {
-        localStorage.clear();
-        sessionStorage.clear();
+        if (window.AuthState) {
+            AuthState.clearAuth();
+        } else {
+            localStorage.clear();
+            sessionStorage.clear();
+        }
+        
+        console.trace('↪️ Dashboard manual logout redirect');
         window.location.href = '../Homepage/index.html';
     };
 
@@ -128,7 +226,7 @@ function startDiscussion() {
 }
 
 function browseBooks() {
-    window.location.href = '../Browse/browse.html';
+    window.location.href = 'dashexplore.html';
 }
 
 function joinVoiceRoom() {
@@ -139,18 +237,18 @@ function editProfile() {
     window.location.href = '../Profile/profile.html';
 }
 
-document.addEventListener('click', function(event) {
+document.addEventListener('click', function (event) {
     const settingsDropdown = document.querySelector('.settings-dropdown');
     const settingsMenu = document.getElementById('settingsMenu');
     const notificationsDropdown = document.querySelector('.notifications-dropdown');
     const notificationsMenu = document.getElementById('notificationsMenu');
-    
+
     if (settingsDropdown && !settingsDropdown.contains(event.target)) {
         if (settingsMenu) {
             settingsMenu.classList.remove('active');
         }
     }
-    
+
     if (notificationsDropdown && !notificationsDropdown.contains(event.target)) {
         if (notificationsMenu) {
             notificationsMenu.classList.remove('active');
@@ -177,7 +275,7 @@ function initNotifications() {
         `;
         document.body.appendChild(notificationContainer);
     }
-    
+
     loadNotificationSettings();
     loadDarkModePreference();
 }
@@ -185,7 +283,7 @@ function initNotifications() {
 function loadNotificationSettings() {
     const notificationsEnabled = localStorage.getItem('notificationsEnabled');
     const notificationsToggle = document.getElementById('notificationsToggle');
-    
+
     if (notificationsToggle) {
         const isEnabled = notificationsEnabled === null ? true : notificationsEnabled === 'true';
         notificationsToggle.checked = isEnabled;
@@ -198,14 +296,14 @@ function toggleNotificationsDropdown(e) {
         e.preventDefault();
         e.stopPropagation();
     }
-    
+
     const menu = document.getElementById('notificationsMenu');
     if (menu) {
         menu.classList.toggle('active');
-        
+
         const settingsMenu = document.getElementById('settingsMenu');
         if (settingsMenu) settingsMenu.classList.remove('active');
-        
+
         if (menu.classList.contains('active')) {
             loadNotifications();
         }
@@ -219,10 +317,10 @@ async function loadNotifications() {
             populateNotifications([], 0);
             return;
         }
-        
-        const token = localStorage.getItem('litlink_token');
+
+        const token = getAuthToken();
         if (!token) return;
-        
+
         const response = await fetch('http://localhost:5002/api/notifications', {
             method: 'GET',
             headers: {
@@ -230,13 +328,13 @@ async function loadNotifications() {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             populateNotifications(data.notifications || [], data.unreadCount || 0);
         } else {
@@ -252,12 +350,12 @@ async function loadNotifications() {
 function populateNotifications(notifications, unreadCount) {
     const notificationsList = document.getElementById('notificationsList');
     const notificationBadge = document.getElementById('notificationBadge');
-    
+
     if (!notificationsList) return;
-    
+
     const notificationsEnabled = localStorage.getItem('notificationsEnabled');
     const isEnabled = notificationsEnabled === null ? true : notificationsEnabled === 'true';
-    
+
     if (notificationBadge) {
         if (isEnabled && unreadCount > 0) {
             notificationBadge.textContent = unreadCount > 9 ? '9+' : unreadCount;
@@ -266,43 +364,43 @@ function populateNotifications(notifications, unreadCount) {
             notificationBadge.style.display = 'none';
         }
     }
-    
+
     notificationsList.innerHTML = '';
-    
+
     if (notifications && notifications.length > 0) {
         notifications.forEach(notif => {
             const notificationItem = document.createElement('div');
             notificationItem.className = `notification-item ${notif.read ? '' : 'unread'}`;
             notificationItem.dataset.notificationId = notif.id;
             notificationItem.dataset.type = notif.type;
-            
+
             const iconColors = {
-                'follow':              'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
-                'unfollow':            'linear-gradient(135deg, #64748b 0%, #475569 100%)',
-                'thread_create':       'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                'like':                'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
-                'comment':             'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                'circle_request':      'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-                'circle_accept':       'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                'thread_liked':        'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
-                'thread_commented':    'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                'circle_new_thread':   'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'follow': 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+                'unfollow': 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                'thread_create': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'like': 'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+                'comment': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                'circle_request': 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                'circle_accept': 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                'thread_liked': 'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+                'thread_commented': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                'circle_new_thread': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                 'circle_join_request': 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-                'circle_accepted':     'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                'match':        'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
-                'message':      'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
-                'board':        'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-                'voice':        'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
-                'achievement':  'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
-                'warning':      'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-                'info':         'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
-                'success':      'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                'error':        'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-                'system':       'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
+                'circle_accepted': 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                'match': 'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
+                'message': 'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
+                'board': 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+                'voice': 'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
+                'achievement': 'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
+                'warning': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                'info': 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
+                'success': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                'error': 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                'system': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
             };
-            
+
             const iconColor = iconColors[notif.type] || iconColors.info;
-            
+
             notificationItem.innerHTML = `
                 <div class="notification-icon" style="background: ${iconColor}">
                     ${notif.icon || '🔔'}
@@ -316,11 +414,11 @@ function populateNotifications(notifications, unreadCount) {
                 </div>
                 ${!notif.read ? '<div class="notification-dot"></div>' : ''}
             `;
-            
-            notificationItem.addEventListener('click', function() {
+
+            notificationItem.addEventListener('click', function () {
                 handleNotificationClick(notif);
             });
-            
+
             notificationsList.appendChild(notificationItem);
         });
     } else {
@@ -434,8 +532,8 @@ async function handleNotificationClick(notification) {
         const notificationId = notification.id;
         const notificationsEnabled = localStorage.getItem('notificationsEnabled');
         if (notificationsEnabled !== 'false') {
-            const token = localStorage.getItem('litlink_token');
-            
+            const token = getAuthToken();
+
             await fetch(`http://localhost:5002/api/notifications/read/${notificationId}`, {
                 method: 'POST',
                 headers: {
@@ -443,7 +541,7 @@ async function handleNotificationClick(notification) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
             if (notificationItem) {
                 notificationItem.classList.remove('unread');
@@ -452,7 +550,7 @@ async function handleNotificationClick(notification) {
                 updateNotificationBadge(-1);
             }
         }
-        
+
         const targetPath = resolveNotificationPath(notification);
         if (targetPath) {
             if (targetPath.startsWith('/')) {
@@ -465,10 +563,10 @@ async function handleNotificationClick(notification) {
         } else {
             showNotification('This notification has no destination yet.', 'info');
         }
-        
+
         const menu = document.getElementById('notificationsMenu');
         if (menu) menu.classList.remove('active');
-        
+
     } catch (error) {
         console.error('Error handling notification:', error);
         showNotification('Error opening notification', 'error');
@@ -482,8 +580,8 @@ async function markAllAsRead() {
             showNotification('Notifications are disabled', 'warning');
             return;
         }
-        
-        const token = localStorage.getItem('litlink_token');
+
+        const token = getAuthToken();
         const response = await fetch('http://localhost:5002/api/notifications/read-all', {
             method: 'POST',
             headers: {
@@ -491,16 +589,16 @@ async function markAllAsRead() {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             document.querySelectorAll('.notification-item').forEach(item => {
                 item.classList.remove('unread');
                 const dot = item.querySelector('.notification-dot');
                 if (dot) dot.remove();
             });
-            
+
             updateNotificationBadge(0, true);
             showNotification('All notifications marked as read', 'success');
         }
@@ -513,7 +611,7 @@ async function markAllAsRead() {
 function updateNotificationBadge(change, setToZero = false) {
     const notificationsEnabled = localStorage.getItem('notificationsEnabled');
     if (notificationsEnabled === 'false') return;
-    
+
     const badge = document.getElementById('notificationBadge');
     if (badge) {
         if (setToZero) {
@@ -554,7 +652,7 @@ function startNotificationPolling() {
     if (pollingInterval) {
         clearInterval(pollingInterval);
     }
-    
+
     pollingInterval = setInterval(async () => {
         try {
             const notificationsEnabled = localStorage.getItem('notificationsEnabled');
@@ -562,10 +660,10 @@ function startNotificationPolling() {
                 clearInterval(pollingInterval);
                 return;
             }
-            
-            const token = localStorage.getItem('litlink_token');
+
+            const token = getAuthToken();
             if (!token) return;
-            
+
             const response = await fetch('http://localhost:5002/api/notifications/unread-count', {
                 method: 'GET',
                 headers: {
@@ -573,15 +671,15 @@ function startNotificationPolling() {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (!response.ok) return;
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 const badge = document.getElementById('notificationBadge');
                 const currentCount = badge ? parseInt(badge.textContent) || 0 : 0;
-                
+
                 if (data.unreadCount !== currentCount) {
                     updateNotificationBadge(data.unreadCount - currentCount);
                 }
@@ -601,7 +699,7 @@ function stopNotificationPolling() {
 
 function getMockNotifications() {
     return [
-        { 
+        {
             id: 'notif1',
             type: 'match',
             title: 'New Reader Match',
@@ -611,7 +709,7 @@ function getMockNotifications() {
             icon: '🔗',
             actionUrl: '/Chat/chat.html'
         },
-        { 
+        {
             id: 'notif2',
             type: 'message',
             title: 'New Message',
@@ -621,7 +719,7 @@ function getMockNotifications() {
             icon: '💬',
             actionUrl: '/Chat/chat.html'
         },
-        { 
+        {
             id: 'notif3',
             type: 'board',
             title: 'Board Update',
@@ -651,11 +749,17 @@ function initUserWebSocket(token) {
     }
 
     _notifClient = new NotificationClient({
-        serverUrl:  'http://localhost:5002',
-        token:      token,
-        isAdmin:    false,
-        showToasts: true   // use NotificationClient's own toast system for real-time events
+        serverUrl: 'http://localhost:5002',
+        token: token,
+        isAdmin: false,
+        showToasts: localStorage.getItem('notificationsEnabled') !== 'false'
     });
+
+    if (localStorage.getItem('notificationsEnabled') !== 'false') {
+        _notifClient.connect();
+    } else {
+        console.log('ℹ️ Notifications disabled — skipping real-time connection');
+    }
 
     // ── Generic fallback: any notification type not handled below ─────────
     _notifClient.on('notification', (data) => {
@@ -668,13 +772,13 @@ function initUserWebSocket(token) {
         }
         // Optimistic insert into dropdown
         _prependNotificationItem({
-            id:        data.id || ('rt_' + Date.now()),
-            type:      data.type,
-            title:     data.title,
-            message:   data.message,
+            id: data.id || ('rt_' + Date.now()),
+            type: data.type,
+            title: data.title,
+            message: data.message,
             timestamp: 'Just now',
-            read:      false,
-            icon:      data.icon || '🔔',
+            read: false,
+            icon: data.icon || '🔔',
             actionUrl: data.actionUrl || _defaultActionUrl(data.type, data.metadata)
         });
     });
@@ -823,24 +927,24 @@ function _prependNotificationItem(notif) {
     if (empty) empty.remove();
 
     const iconColors = {
-        follow:              'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
-        thread_liked:        'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
-        thread_commented:    'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-        thread_create:       'linear-gradient(135deg, #059669 0%, #047857 100%)',
-        like:                'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
-        comment:             'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-        circle_new_thread:   'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        follow: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+        thread_liked: 'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+        thread_commented: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        thread_create: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        like: 'linear-gradient(135deg, #be185d 0%, #9d174d 100%)',
+        comment: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        circle_new_thread: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
         circle_join_request: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-        circle_accepted:     'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-        circle_request:      'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-        circle_accept:       'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-        unfollow:            'linear-gradient(135deg, #64748b 0%, #475569 100%)',
-        match:               'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
-        message:             'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
-        board:               'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-        voice:               'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
-        system:              'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-        info:                'linear-gradient(135deg, #4b5563 0%, #374151 100%)'
+        circle_accepted: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+        circle_request: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+        circle_accept: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+        unfollow: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+        match: 'linear-gradient(135deg, #5c3a28 0%, #3d2417 100%)',
+        message: 'linear-gradient(135deg, #3d2617 0%, #2c1810 100%)',
+        board: 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+        voice: 'linear-gradient(135deg, #a16207 0%, #854d0e 100%)',
+        system: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        info: 'linear-gradient(135deg, #4b5563 0%, #374151 100%)'
     };
 
     const item = document.createElement('div');
@@ -871,120 +975,178 @@ function _prependNotificationItem(notif) {
 
 // ===== MAIN DASHBOARD LOADING =====
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     console.log('📚 Dashboard loading with real data...');
-    
+
     const auth = checkAuth();
     if (!auth) return;
-    
+
     const { token, user } = auth;
-    
+
+    dashboardUserId = user._id || user.id;
     console.log('✅ Authenticated user:', user.name);
-    
+
     initNotifications();
     initUserWebSocket(token);
     updateWelcomeCard(user);
-    
+
+    // Gating Check: Profile Completion (Must be >= 20%)
+    try {
+        const dashboardResponse = await fetch(`http://localhost:5002/api/dashboard/${dashboardUserId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (dashboardResponse.ok) {
+            const dashboardData = await dashboardResponse.json();
+            if (dashboardData.success && dashboardData.dashboard && dashboardData.dashboard.user) {
+                const completion = dashboardData.dashboard.user.completionPercentage || 0;
+                if (completion < 20) {
+                    console.warn('⚠️ Profile completion too low:', completion + '%');
+                    if (typeof showMessageModal === 'function') {
+                        showMessageModal('Profile Incomplete', 'Please complete at least 20% of your profile to access the dashboard.', 'info');
+                    } else {
+                        alert('Please complete at least 20% of your profile to access the dashboard.');
+                    }
+                    setTimeout(() => {
+                        window.location.href = '../Profile/profile.html?incomplete=true';
+                    }, 2000);
+                    return;
+                }
+            }
+        }
+    } catch (gatingError) {
+        console.error('Error during gating check:', gatingError);
+    }
+
     try {
         showLoadingState();
-        
+
         // Load real data from multiple endpoints
         await Promise.all([
-            loadTopMatches(token, (user._id || user.id)),
-            loadTrendingBoards(), // Keeping original discussion board
+            loadTopMatches(token),
+            loadTrendingBoards(token, dashboardUserId),
             loadActiveChats(token),
             loadRecentActivity(token),
             loadVoiceRooms(token),
             loadSuggestedReaders(token)
         ]);
-        
+
         hideLoadingState();
-        
+
     } catch (error) {
         console.error('❌ Error loading dashboard:', error);
         showNotification('Connection error. Using offline data.', 'warning');
         loadFallbackData(user);
         hideLoadingState();
     }
-    
+
     const exploreBtn = document.querySelector('.explore-btn');
     if (exploreBtn) {
-        exploreBtn.addEventListener('click', function(e) {
+        exploreBtn.addEventListener('click', function (e) {
             e.preventDefault();
             window.location.href = 'dashexplore.html';
         });
     }
-    
+
     const moreBtn = document.querySelector('.more-btn');
     if (moreBtn) {
-        moreBtn.addEventListener('click', function() {
+        moreBtn.addEventListener('click', function () {
             window.location.href = '../Chat/chat.html';
         });
     }
-    
+
     const viewMessagesBtn = document.querySelector('.view-messages-btn');
     if (viewMessagesBtn) {
-        viewMessagesBtn.addEventListener('click', function() {
+        viewMessagesBtn.addEventListener('click', function () {
             window.location.href = '../Chat/chat.html';
         });
     }
-    
+
     const viewMoreBtn = document.querySelector('.view-more');
     if (viewMoreBtn) {
-        viewMoreBtn.addEventListener('click', function() {
+        viewMoreBtn.addEventListener('click', function () {
             window.location.href = '../Voice Room/voice-rooms.html';
         });
     }
 });
 
 // ===== LOAD REAL DATA FROM API ENDPOINTS =====
-async function loadTopMatches(token, userId) {
+async function loadTopMatches(token) {
     try {
-        // Fetch AI matches directly for higher quality "real" matches
-        const response = await fetch(`http://localhost:5002/api/matches/${userId}`, {
+        const response = await fetch('http://localhost:5002/api/chat/matches?source=dashboard&t=' + Date.now(), {
+            cache: 'no-store',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
-            console.log('📊 AI Matches loaded:', data);
-            
             if (data.success && data.matches) {
-                // Filter out system admin and any non-real users
                 const filteredMatches = data.matches.filter(m => {
                     const d = m.userDetails || m;
-                    return d.name !== 'System Admin' && 
-                           d.name !== 'Admin' && 
-                           !d.isSystem &&
-                           d.role !== 'admin';
+                    return d.name !== 'System Admin' &&
+                        d.name !== 'Admin' &&
+                        !d.isSystem &&
+                        d.role !== 'admin';
                 });
-                populateTopMatches(filteredMatches);
+
+                const normalizedMatches = filteredMatches
+                    .map(match => ({
+                        ...match,
+                        compatibility: normalizeMatchPercentage(match.compatibility)
+                    }))
+                    .sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
+
+                const playIntro = shouldPlayAiIntro(dashboardUserId);
+                await populateTopMatches(normalizedMatches, { playIntro });
+                markAiIntroComplete(dashboardUserId);
             } else {
-                populateTopMatches([]);
+                await populateTopMatches([], { playIntro: false });
             }
         } else {
-            console.error('Failed to load AI matches:', response.status);
-            populateTopMatches([]);
+            await populateTopMatches([], { playIntro: false });
         }
     } catch (error) {
-        console.error('Error loading AI matches:', error);
-        populateTopMatches([]);
+        console.error('Error loading top matches:', error);
+        await populateTopMatches([], { playIntro: false });
     }
 }
 
-// KEEPING ORIGINAL DISCUSSION BOARD - NO CHANGES HERE
-function loadTrendingBoards() {
-    // Original discussion board data - unchanged
-    const boards = [
-        { id: '1', name: 'Fantasy Worlds', icon: '✨', color: 'purple', activeUsers: 15000 },
-        { id: '2', name: 'Modern Romance', icon: '💕', color: 'pink', activeUsers: 9000 },
-        { id: '3', name: 'Mystery & Thriller', icon: '👑', color: 'blue', activeUsers: 21000 },
-        { id: '4', name: 'Literary Fiction', icon: '✒️', color: 'brown', activeUsers: 6000 },
-        { id: '5', name: 'Young Adult', icon: '🌹', color: 'teal', activeUsers: 12000 },
-        { id: '6', name: 'Sci-Fi Classics', icon: '🚀', color: 'indigo', activeUsers: 8000 }
-    ];
-    
-    populateTrendingBoards(boards);
+// Trending circles from real backend activity (no mock fallback)
+async function loadTrendingBoards(token, userId) {
+    const boardsGrid = document.getElementById('boardsGrid');
+    if (boardsGrid) {
+        boardsGrid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 24px;">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p style="margin-top: 10px; color: #d4b5a0;">Loading trending circles...</p>
+            </div>
+        `;
+    }
+
+    if (!token || !userId) {
+        populateTrendingCircles([], { mode: 'unauthorized' });
+        return;
+    }
+
+    try {
+        const response = await fetch(`http://localhost:5002/api/dashboard/${userId}?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const circles = data?.dashboard?.trendingCircles || data?.dashboard?.trendingBoards || [];
+            if (data.success && Array.isArray(circles)) {
+                populateTrendingCircles(circles);
+                return;
+            }
+        }
+        populateTrendingCircles([], { mode: 'empty' });
+    } catch (error) {
+        console.error('Error loading trending circles:', error);
+        populateTrendingCircles([], { mode: 'error' });
+    }
 }
 
 async function loadActiveChats(token) {
@@ -992,23 +1154,25 @@ async function loadActiveChats(token) {
         // /api/chat/conversations does not exist — use /api/chat/matches which
         // returns the list of users you have conversations with
         const response = await fetch('http://localhost:5002/api/chat/matches', {
+            cache: 'no-store',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
-            // Shape: { success, matches: [{ userId, name, profilePicture,
-            //   lastMessage, unreadCount, … }] }
             if (data.success && data.matches && data.matches.length > 0) {
-                // Adapt to the format populateActiveChats expects
-                const conversations = data.matches.map(m => ({
-                    id:          m.userId || m._id,
-                    name:        m.name,
-                    avatar:      m.profilePicture || null,
-                    lastMessage: m.lastMessage || '',
+                // Filter only active conversations (ones that actually have a last message time or preview isn't the empty default)
+                const activeMatches = data.matches.filter(m => m.preview !== 'No messages yet' || m.lastMessageTime);
+                const conversations = activeMatches.map(m => ({
+                    id: m.userId || m._id,
+                    name: m.name,
+                    avatar: m.profilePicture || null,
+                    lastMessage: m.preview || '',
                     unreadCount: m.unreadCount || 0,
-                    updatedAt:   m.lastMessageAt || new Date()
+                    updatedAt: m.lastMessageTime ? new Date(m.lastMessageTime) : new Date(0)
                 }));
+                // Sort by latest activity (newest first)
+                conversations.sort((a, b) => b.updatedAt - a.updatedAt);
                 populateActiveChats(conversations);
             } else {
                 populateActiveChats([]);
@@ -1030,16 +1194,16 @@ async function loadRecentActivity(token) {
         const response = await fetch('http://localhost:5002/api/notifications?limit=5&sort=-createdAt', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.notifications && data.notifications.length > 0) {
                 // Map notification shape → activity shape
                 const activities = data.notifications.map(n => ({
-                    icon:        n.icon || '🔔',
+                    icon: n.icon || '🔔',
                     description: n.message || n.title,
-                    timestamp:   n.createdAt ? new Date(n.createdAt) : new Date(),
-                    actionUrl:   n.actionUrl || null
+                    timestamp: n.createdAt ? new Date(n.createdAt) : new Date(),
+                    actionUrl: n.actionUrl || null
                 }));
                 populateRecentActivity(activities);
             } else {
@@ -1059,7 +1223,7 @@ async function loadVoiceRooms(token) {
         const response = await fetch('http://localhost:5002/api/voice-rooms/rooms/live', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.rooms) {
@@ -1092,7 +1256,7 @@ async function loadSuggestedReaders(token) {
         const response = await fetch('http://localhost:5002/api/matches/match-suggestions?limit=5', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             // Shape: { success, suggestions: [{ userId, name, profilePicture,
@@ -1125,7 +1289,7 @@ function updateWelcomeCard(user) {
     if (userNameElement && user.name) {
         userNameElement.textContent = user.name;
     }
-    
+
     const userGenreElement = document.getElementById('userGenre');
     if (userGenreElement) {
         if (user.favoriteGenres && user.favoriteGenres.length > 0) {
@@ -1134,7 +1298,7 @@ function updateWelcomeCard(user) {
             userGenreElement.textContent = 'Reading';
         }
     }
-    
+
     const userAvatarElement = document.getElementById('userAvatar');
     if (userAvatarElement) {
         if (user.profilePicture && user.profilePicture !== 'null' && user.profilePicture !== 'undefined') {
@@ -1145,7 +1309,7 @@ function updateWelcomeCard(user) {
         }
         userAvatarElement.alt = user.name || 'User';
     }
-    
+
     const matchCountElement = document.getElementById('matchCount');
     if (matchCountElement) {
         matchCountElement.textContent = 'Find new matches';
@@ -1155,57 +1319,53 @@ function updateWelcomeCard(user) {
 /**
  * Enhanced populateTopMatches with structured AI reasoning and animations.
  */
-async function populateTopMatches(matches) {
+async function populateTopMatches(matches, options = {}) {
     const matchesGrid = document.getElementById('matchesGrid');
     if (!matchesGrid) return;
-    
-    // 1. Initial State: AI activation sequence
+    const playIntro = options.playIntro === true;
+
     if (matches && matches.length > 0) {
         matchesGrid.innerHTML = '';
-        const statusContainer = document.createElement('div');
-        statusContainer.className = 'ai-status-container';
-        matchesGrid.appendChild(statusContainer);
-        
-        const messages = ["Analyzing your profile", "Finding compatible readers", "Calculating match scores"];
-        
-        // Show AI Greeting with personality
-        const greetingEl = document.getElementById('aiGreeting');
-        if (greetingEl) {
-            greetingEl.classList.remove('visible');
-            setTimeout(() => {
-                const greetings = [
-                    "Found some readers that match your vibe.",
-                    "These matches look promising based on your preferences.",
-                    "You might enjoy connecting with these readers.",
-                    "Analyzing your literary profile... here are your top matches.",
-                    "Discovered some fellow readers who share your interests."
-                ];
-                greetingEl.textContent = greetings[Math.floor(Math.random() * greetings.length)];
-                greetingEl.classList.add('visible');
-            }, 500);
-        }
+        if (playIntro) {
+            const statusContainer = document.createElement('div');
+            statusContainer.className = 'ai-status-container';
+            matchesGrid.appendChild(statusContainer);
 
-        // Sequential message display
-        for (const msg of messages) {
-            const messageEl = document.createElement('div');
-            messageEl.className = 'status-message';
-            messageEl.innerHTML = `${msg}<span class="dots"></span>`;
-            statusContainer.appendChild(messageEl);
-            await new Promise(r => setTimeout(r, 50));
-            messageEl.classList.add('visible');
-            await new Promise(r => setTimeout(r, 450));
-            messageEl.classList.add('fade-out');
-            await new Promise(r => setTimeout(r, 200));
-            messageEl.remove();
+            const messages = ["Analyzing your profile", "Finding your matches", "Calculating match scores"];
+            const greetingEl = document.getElementById('aiGreeting');
+            if (greetingEl) {
+                greetingEl.classList.remove('visible');
+                setTimeout(() => {
+                    const greetings = [
+                        "Found some readers that match your vibe.",
+                        "These matches look promising based on your preferences.",
+                        "You might enjoy connecting with these readers.",
+                        "Analyzing your literary profile... here are your top matches.",
+                        "Discovered some fellow readers who share your interests."
+                    ];
+                    greetingEl.textContent = greetings[Math.floor(Math.random() * greetings.length)];
+                    greetingEl.classList.add('visible');
+                }, 500);
+            }
+
+            for (const msg of messages) {
+                const messageEl = document.createElement('div');
+                messageEl.className = 'status-message';
+                messageEl.innerHTML = `${msg}<span class="dots"></span>`;
+                statusContainer.appendChild(messageEl);
+                await new Promise(r => setTimeout(r, 50));
+                messageEl.classList.add('visible');
+                await new Promise(r => setTimeout(r, 450));
+                messageEl.classList.add('fade-out');
+                await new Promise(r => setTimeout(r, 200));
+                messageEl.remove();
+            }
+
+            statusContainer.remove();
+            matchesGrid.classList.remove('pulse-active');
+            void matchesGrid.offsetWidth;
+            matchesGrid.classList.add('pulse-active');
         }
-        
-        // Remove container before showing cards
-        statusContainer.remove();
-        
-        // Add subtle AI pulse to the grid
-        matchesGrid.classList.remove('pulse-active');
-        void matchesGrid.offsetWidth; // Trigger reflow
-        matchesGrid.classList.add('pulse-active');
     } else {
         matchesGrid.innerHTML = `
             <div class="ai-empty-state">
@@ -1218,7 +1378,7 @@ async function populateTopMatches(matches) {
         `;
         return;
     }
-    
+
     // 2. Render Enhanced Match Cards
     const cardsToRender = matches.slice(0, 6);
     cardsToRender.forEach((match, index) => {
@@ -1226,25 +1386,23 @@ async function populateTopMatches(matches) {
         matchCard.className = 'match-card';
         const uId = match.userId || match._id || match.id;
         matchCard.dataset.userId = uId;
-        
+
         const details = match.userDetails || match;
         const matchName = details.name || 'User';
-        const profileImage = details.profilePicture && details.profilePicture !== 'null' 
-            ? details.profilePicture 
+        const profileImage = details.profilePicture && details.profilePicture !== 'null'
+            ? details.profilePicture
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(matchName)}&background=E0B973&color=3B1D14&size=80`;
-        
-        const genres = details.favoriteGenres || details.tags || ['Reader'];
+
+        const genres = Array.isArray(details.favoriteGenres)
+            ? details.favoriteGenres
+            : Array.isArray(details.tags)
+                ? details.tags
+                : [details.genre || 'Reader'];
         const points = getStructuredReasoning(match);
         const detailedExplanation = getDetailedExplanation(match);
-        
-        // Match Confidence Score Logic
-        let rawScore = match.score || match.similarity || (0.96 - (index * 0.04));
-        
-        // Handle cases where score might be 0-100 instead of 0-1
-        if (rawScore > 1) rawScore = rawScore / 100;
-        
-        const percentage = Math.min(100, Math.round(rawScore * 100));
-        
+
+        const percentage = normalizeMatchPercentage(match.compatibility);
+
         let confidenceLabel = "Good Match";
         if (percentage >= 85) confidenceLabel = "Highly Compatible";
         else if (percentage >= 70) confidenceLabel = "Strong Match";
@@ -1252,7 +1410,7 @@ async function populateTopMatches(matches) {
 
         const radius = 45;
         const circumference = 2 * Math.PI * radius;
-        
+
         matchCard.innerHTML = `
             ${index === 0 ? '<div class="best-match-label">✨ Best Match</div>' : ''}
             <div class="ai-match-badge">AI Match</div>
@@ -1296,17 +1454,17 @@ async function populateTopMatches(matches) {
                 <i class="fas fa-comments"></i> Start Chat
             </button>
         `;
-        
+
         matchCard.addEventListener('click', () => {
             window.location.href = `../Profile/view-profile.html?id=${uId}`;
         });
-        
+
         matchesGrid.appendChild(matchCard);
-        
+
         // 3. Staggered Card Reveal
         setTimeout(() => {
             matchCard.classList.add('reveal');
-            
+
             // 4. Animate Match Score & Ring
             const circle = matchCard.querySelector('.progress-ring__circle');
             const scoreVal = document.getElementById(`score-val-${uId}`);
@@ -1314,14 +1472,14 @@ async function populateTopMatches(matches) {
                 const radius = 45;
                 const circumference = 2 * Math.PI * radius;
                 const offset = circumference - (percentage / 100) * circumference;
-                
+
                 // Start animation slightly after card appears
                 setTimeout(() => {
                     circle.style.strokeDashoffset = offset;
                     animateScoreCounter(scoreVal, percentage, 800);
                 }, 400);
             }
-            
+
             // 5. Staggered Reasoning Point Reveal
             const pointsList = matchCard.querySelectorAll('.reasoning-point');
             pointsList.forEach((point, pIndex) => {
@@ -1329,44 +1487,76 @@ async function populateTopMatches(matches) {
                     point.classList.add('reveal');
                 }, 600 + (pIndex * 150));
             });
-            
+
         }, index * 100);
     });
 }
 
-// ORIGINAL POPULATE TRENDING BOARDS - UNCHANGED
-function populateTrendingBoards(boards) {
+function populateTrendingCircles(circles, options = {}) {
     const boardsGrid = document.getElementById('boardsGrid');
     if (!boardsGrid) return;
-    
+
+    const mode = options.mode || 'ok';
+    const safeCircles = Array.isArray(circles) ? circles : [];
+
+    if (safeCircles.length === 0) {
+        let message = 'No trending circles yet. Start a discussion to spark activity.';
+        if (mode === 'error') {
+            message = 'Unable to load trending circles right now.';
+        } else if (mode === 'unauthorized') {
+            message = 'Please sign in to view trending circles.';
+        }
+
+        boardsGrid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 24px;">
+                <i class="fas fa-users"></i>
+                <p style="margin-top: 10px; color: #d4b5a0;">${message}</p>
+            </div>
+        `;
+        return;
+    }
+
     boardsGrid.innerHTML = '';
-    
-    boards.forEach(board => {
+
+    safeCircles.forEach(circle => {
+        const circleId = circle.circleId || circle.id;
+        const memberCount = circle.memberCount || 0;
+        const activeDiscussions = circle.activeDiscussions || circle.threadCount || 0;
+        const recentEngagement = circle.recentEngagement || 0;
+        const latestPosts = circle.latestPosts || 0;
+        const lastActivityAt = circle.lastActivityAt ? timeAgo(new Date(circle.lastActivityAt)) : 'No recent activity';
+
         const boardCard = document.createElement('div');
         boardCard.className = 'board-card';
-        boardCard.dataset.boardId = board.id;
-        
+        boardCard.dataset.boardId = circleId;
+
         boardCard.innerHTML = `
-            <div class="board-icon ${board.color}">${board.icon}</div>
-            <h3>${board.name}</h3>
-            <p class="board-active">🟢 ${formatNumber(board.activeUsers)} active</p>
-            <button class="join-btn" onclick="event.stopPropagation(); joinBoard('${board.id}', this)">
-                Join Board →
+            <div class="board-icon">${circle.icon || '📚'}</div>
+            <h3>${escapeHtml(circle.name || 'Circle')}</h3>
+            <p class="board-active">🟢 ${formatNumber(memberCount)} members · ${activeDiscussions} active discussions</p>
+            <p class="board-active">⚡ ${formatNumber(recentEngagement)} engagement · ${latestPosts} new posts</p>
+            <p class="board-active">🕒 ${lastActivityAt}</p>
+            <button class="join-btn" onclick="event.stopPropagation(); joinBoard('${circleId}', this)">
+                Open Circle →
             </button>
         `;
-        
+
         boardCard.addEventListener('click', () => {
-            window.location.href = `../Discussion Board/board.html?id=${board.id}`;
+            window.location.href = `../Discussion Board/discussion.html?circleId=${encodeURIComponent(circleId)}`;
         });
-        
+
         boardsGrid.appendChild(boardCard);
     });
+}
+
+function populateTrendingBoards(boards, options) {
+    populateTrendingCircles(boards, options);
 }
 
 function populateActiveChats(chats) {
     const chatList = document.getElementById('chatList');
     if (!chatList) return;
-    
+
     if (!chats || chats.length === 0) {
         chatList.innerHTML = `
             <div class="empty-state" style="text-align: center; padding: 20px;">
@@ -1375,23 +1565,23 @@ function populateActiveChats(chats) {
         `;
         return;
     }
-    
+
     chatList.innerHTML = '';
-    
+
     chats.slice(0, 3).forEach(chat => {
         const chatItem = document.createElement('div');
         chatItem.className = 'chat-item';
         chatItem.dataset.chatId = chat._id || chat.id;
-        
+
         const otherParticipant = chat.participants?.find(p => p._id !== getCurrentUserId()) || {};
         const name = chat.name || otherParticipant.name || 'Chat';
-        const avatar = chat.avatar || otherParticipant.profilePicture || 
+        const avatar = chat.avatar || otherParticipant.profilePicture ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E0B973&color=3B1D14&size=48`;
-        
+
         const lastMessage = chat.lastMessage?.content || 'No messages yet';
         const timestamp = chat.lastMessage?.createdAt ? timeAgo(new Date(chat.lastMessage.createdAt)) : 'Just now';
         const unreadCount = chat.unreadCount || 0;
-        
+
         chatItem.innerHTML = `
             <img src="${avatar}" alt="${name}" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E0B973&color=3B1D14&size=48'">
             <div class="chat-content">
@@ -1402,11 +1592,11 @@ function populateActiveChats(chats) {
             <span class="chat-icon">💬</span>
             ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
         `;
-        
+
         chatItem.addEventListener('click', () => {
             window.location.href = `../Chat/chat.html?id=${chat._id || chat.id}`;
         });
-        
+
         chatList.appendChild(chatItem);
     });
 }
@@ -1414,7 +1604,7 @@ function populateActiveChats(chats) {
 function populateRecentActivity(activities) {
     const activityList = document.getElementById('activityList');
     if (!activityList) return;
-    
+
     if (!activities || activities.length === 0) {
         activityList.innerHTML = `
             <div class="empty-state" style="text-align: center; padding: 20px;">
@@ -1423,17 +1613,17 @@ function populateRecentActivity(activities) {
         `;
         return;
     }
-    
+
     activityList.innerHTML = '';
-    
+
     activities.slice(0, 3).forEach(activity => {
         const activityItem = document.createElement('div');
         activityItem.className = 'activity-item';
-        
+
         const icon = activity.icon || '📚';
         const description = activity.description || 'Activity';
         const timestamp = activity.timestamp ? timeAgo(new Date(activity.timestamp)) : 'Just now';
-        
+
         activityItem.innerHTML = `
             <span>${icon}</span>
             <div>
@@ -1441,7 +1631,7 @@ function populateRecentActivity(activities) {
                 <span class="time">${timestamp}</span>
             </div>
         `;
-        
+
         activityList.appendChild(activityItem);
     });
 }
@@ -1449,25 +1639,25 @@ function populateRecentActivity(activities) {
 function populateVoiceRooms(rooms) {
     const voiceRoomsContainer = document.getElementById('voiceRooms');
     if (!voiceRoomsContainer) return;
-    
+
     if (!rooms || rooms.length === 0) {
         showEmptyVoiceRooms();
         return;
     }
-    
+
     voiceRoomsContainer.innerHTML = '';
-    
+
     rooms.slice(0, 3).forEach(room => {
         const voiceRoom = document.createElement('div');
         voiceRoom.className = 'voice-room';
         voiceRoom.dataset.roomId = room._id || room.id;
-        
-        const hostImage = room.host?.profilePicture || 
+
+        const hostImage = room.host?.profilePicture ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(room.host?.name || 'Host')}&background=E0B973&color=3B1D14&size=28`;
-        
+
         const tags = room.tags || room.genres || ['Discussion'];
         const participants = room.participants?.length || room.listeners || 0;
-        
+
         voiceRoom.innerHTML = `
             <div class="room-header">
                 <h3>${room.name}</h3>
@@ -1480,15 +1670,15 @@ function populateVoiceRooms(rooms) {
             <div class="room-tags">
                 ${tags.slice(0, 2).map(tag => `<span class="room-tag">${tag}</span>`).join('')}
             </div>
-            <button class="join-room-btn" onclick="event.stopPropagation(); joinVoiceRoom('${room._id || room.id}', this)">
+            <button class="join-room-btn" onclick="event.stopPropagation(); joinLiveVoiceRoom('${room._id || room.id}', this)">
                 Join
             </button>
         `;
-        
+
         voiceRoom.addEventListener('click', () => {
             window.location.href = `../Voice Room/room.html?id=${room._id || room.id}`;
         });
-        
+
         voiceRoomsContainer.appendChild(voiceRoom);
     });
 }
@@ -1511,7 +1701,7 @@ function showEmptyVoiceRooms() {
 function populateSuggestedReaders(users) {
     const suggestedList = document.getElementById('suggestedList');
     if (!suggestedList) return;
-    
+
     if (!users || users.length === 0) {
         suggestedList.innerHTML = `
             <div class="empty-state" style="text-align: center; padding: 20px;">
@@ -1520,20 +1710,20 @@ function populateSuggestedReaders(users) {
         `;
         return;
     }
-    
+
     suggestedList.innerHTML = '';
-    
+
     users.slice(0, 3).forEach(reader => {
         const suggestedItem = document.createElement('div');
         suggestedItem.className = 'suggested-item';
         suggestedItem.dataset.userId = reader._id || reader.id;
-        
+
         const profileImage = reader.profilePicture && reader.profilePicture !== 'null'
             ? reader.profilePicture
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(reader.name)}&background=E0B973&color=3B1D14&size=50`;
-        
+
         const genres = reader.favoriteGenres || reader.tags || ['Reader'];
-        
+
         suggestedItem.innerHTML = `
             <img src="${profileImage}" alt="${reader.name}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(reader.name)}&background=E0B973&color=3B1D14&size=50'">
             <div>
@@ -1542,30 +1732,25 @@ function populateSuggestedReaders(users) {
             </div>
             <button class="star-btn" onclick="event.stopPropagation(); toggleFavorite('${reader._id || reader.id}', this)">${reader.isFavorited ? '✓' : '⭐'}</button>
         `;
-        
+
         suggestedItem.addEventListener('click', () => {
             window.location.href = `../Profile/view-profile.html?id=${reader._id || reader.id}`;
         });
-        
+
         suggestedList.appendChild(suggestedItem);
     });
 }
 
 function getCurrentUserId() {
-    try {
-        const user = JSON.parse(localStorage.getItem('litlink_user') || '{}');
-        return user._id || user.id;
-    } catch {
-        return null;
-    }
+    return getAuthUserId();
 }
 
 // ===== INTERACTIVE FEATURES =====
 
 async function connectToUser(userId, button) {
     try {
-        const token = localStorage.getItem('litlink_token');
-        
+        const token = getAuthToken();
+
         if (button.textContent.includes('Connected')) {
             const response = await fetch(`http://localhost:5002/api/users/disconnect/${userId}`, {
                 method: 'POST',
@@ -1574,9 +1759,9 @@ async function connectToUser(userId, button) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 button.textContent = '🔗 Connect';
                 button.classList.remove('connected');
@@ -1591,9 +1776,9 @@ async function connectToUser(userId, button) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 button.textContent = '✓ Connected';
                 button.classList.add('connected');
@@ -1609,19 +1794,18 @@ async function connectToUser(userId, button) {
 
 async function joinBoard(boardId, button) {
     try {
-        const token = localStorage.getItem('litlink_token');
-        
-        window.location.href = `../Discussion Board/board.html?id=${boardId}`;
+        if (!boardId) return;
+        window.location.href = `../Discussion Board/discussion.html?circleId=${encodeURIComponent(boardId)}`;
     } catch (error) {
         console.error('Join board error:', error);
         showNotification('Failed to join board', 'error');
     }
 }
 
-async function joinVoiceRoom(roomId, button) {
+async function joinLiveVoiceRoom(roomId, button) {
     try {
-        const token = localStorage.getItem('litlink_token');
-        
+        const token = getAuthToken();
+
         const response = await fetch(`http://localhost:5002/api/voice-rooms/rooms/${roomId}/join`, {
             method: 'POST',
             headers: {
@@ -1629,14 +1813,14 @@ async function joinVoiceRoom(roomId, button) {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             button.textContent = '🎙️ Joined';
             button.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
             showNotification('Joined voice room', 'success');
-            
+
             const countElement = button.closest('.voice-room').querySelector('.participant-count');
             const currentCount = parseInt(countElement.textContent.match(/\d+/)[0]);
             countElement.textContent = `👥 ${currentCount + 1}`;
@@ -1651,8 +1835,8 @@ async function joinVoiceRoom(roomId, button) {
 
 async function toggleFavorite(userId, button) {
     try {
-        const token = localStorage.getItem('litlink_token');
-        
+        const token = getAuthToken();
+
         if (button.textContent === '⭐') {
             const response = await fetch(`http://localhost:5002/api/users/favorite/${userId}`, {
                 method: 'POST',
@@ -1661,9 +1845,9 @@ async function toggleFavorite(userId, button) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 button.textContent = '✓';
                 button.style.color = '#059669';
@@ -1677,9 +1861,9 @@ async function toggleFavorite(userId, button) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 button.textContent = '⭐';
                 button.style.color = 'inherit';
@@ -1696,24 +1880,24 @@ async function toggleFavorite(userId, button) {
 
 function loadFallbackData(user) {
     console.log('📦 Loading fallback data...');
-    
+
     updateWelcomeCard(user);
-    
+
     const fallbackMatches = [
         { id: '1', name: 'Elena R.', favoriteGenres: ['Fantasy', 'Sci-Fi'], sharedBooks: 32, isConnected: false },
         { id: '2', name: 'Marcus Chen', favoriteGenres: ['Mystery', 'Thriller'], sharedBooks: 28, isConnected: false }
     ];
-    
+
     const fallbackChats = [
-        { id: '1', name: 'The Midnight Library Club', lastMessage: 'Has anyone finished chapter 5 yet? That twist!', lastMessage: { createdAt: new Date(Date.now() - 2*60000) }, unreadCount: 3 }
+        { id: '1', name: 'The Midnight Library Club', lastMessage: 'Has anyone finished chapter 5 yet? That twist!', lastMessage: { createdAt: new Date(Date.now() - 2 * 60000) }, unreadCount: 3 }
     ];
-    
+
     const fallbackActivity = [
-        { icon: '📚', description: 'Sarah posted in Fantasy Board', timestamp: new Date(Date.now() - 3*60*60000) }
+        { icon: '📚', description: 'Sarah posted in Fantasy Board', timestamp: new Date(Date.now() - 3 * 60 * 60000) }
     ];
-    
-    populateTopMatches(fallbackMatches);
-    loadTrendingBoards(); // Load original boards
+
+    populateTopMatches(fallbackMatches, { playIntro: false });
+    populateTrendingCircles([], { mode: 'error' });
     populateActiveChats(fallbackChats);
     populateRecentActivity(fallbackActivity);
     showEmptyVoiceRooms();
@@ -1737,7 +1921,7 @@ function formatNumber(num) {
 
 function timeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
-    
+
     if (seconds < 60) return 'Just now';
     if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
     if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
@@ -1756,30 +1940,30 @@ function hideLoadingState() {
 function showNotification(message, type = 'info') {
     const existingNotifications = document.querySelectorAll('.notification');
     existingNotifications.forEach(n => n.remove());
-    
+
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
+
     const icons = {
         success: '✓',
         info: 'ℹ️',
         warning: '⚠️',
         error: '✕'
     };
-    
+
     notification.innerHTML = `
         <span class="notification-icon">${icons[type]}</span>
         <span class="notification-message">${message}</span>
     `;
-    
+
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        background: ${type === 'success' ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : 
-                     type === 'warning' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
-                     type === 'error' ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' :
-                     'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
+        background: ${type === 'success' ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' :
+            type === 'warning' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
+                type === 'error' ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' :
+                    'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
         color: white;
         padding: 16px 20px;
         border-radius: 12px;
@@ -1794,11 +1978,11 @@ function showNotification(message, type = 'info') {
         max-width: 350px;
         pointer-events: auto;
     `;
-    
+
     const container = document.getElementById('notification-container');
     if (container) {
         container.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.style.animation = 'slideOut 0.3s ease-out';
             setTimeout(() => {
@@ -1806,7 +1990,7 @@ function showNotification(message, type = 'info') {
             }, 300);
         }, 3000);
     }
-    
+
     if (!document.getElementById('notification-styles')) {
         const style = document.createElement('style');
         style.id = 'notification-styles';
@@ -1829,27 +2013,27 @@ function getStructuredReasoning(match) {
     const details = match.userDetails || match;
     const genres = details.favoriteGenres || details.tags || [];
     const explanation = match.explanation || '';
-    
+
     const points = [];
-    
+
     // 1. Shared Genres
     const genreVal = genres.length > 0 ? genres.slice(0, 1)[0] : 'Literature';
     points.push({ label: 'Shared genres', value: genreVal });
-    
+
     // 2. Discussion Style (Inferred from profile/explanation)
     let style = 'Deep analyzer';
     if (explanation.toLowerCase().includes('fantasy')) style = 'World builder';
     if (explanation.toLowerCase().includes('mystery')) style = 'Puzzle solver';
     if (explanation.toLowerCase().includes('romance')) style = 'Empathy focused';
     points.push({ label: 'Discussion style', value: style });
-    
+
     // 3. Interaction Patterns
     let interaction = 'Voice explorer';
     if (explanation.toLowerCase().includes('daily') || details.activityScore > 80) interaction = 'Daily active';
     else if (Math.random() > 0.5) interaction = 'Discussion regular';
-    
+
     points.push({ label: 'Interaction', value: interaction });
-    
+
     return points;
 }
 
@@ -1857,7 +2041,7 @@ function getDetailedExplanation(match) {
     const details = match.userDetails || match;
     const name = details.name || 'this reader';
     const explanation = match.explanation || 'You have similar reading interests.';
-    
+
     return `The AI analyzed your profiles and found that you and ${name} both prioritize ${explanation.toLowerCase()}. This shared passion, combined with similar interaction patterns, makes you an excellent match for meaningful literary discussions.`;
 }
 
@@ -1873,24 +2057,24 @@ window.toggleWhy = toggleWhy;
 function animateScoreCounter(element, target, duration) {
     let start = 0;
     const startTime = performance.now();
-    
+
     function update(currentTime) {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        
+
         // Ease out quadratic
         const easeProgress = progress * (2 - progress);
         const currentVal = Math.floor(easeProgress * target);
-        
+
         element.textContent = `${currentVal}%`;
-        
+
         if (progress < 1) {
             requestAnimationFrame(update);
         } else {
             element.textContent = `${target}%`;
         }
     }
-    
+
     requestAnimationFrame(update);
 }
 
@@ -1898,12 +2082,12 @@ function animateScoreCounter(element, target, duration) {
  * Re-triggers the AI matching sequence without a full page reload.
  */
 async function refreshMatches() {
-    const token = localStorage.getItem('litlink_token') || sessionStorage.getItem('litlink_token');
-    const user = JSON.parse(localStorage.getItem('litlink_user') || sessionStorage.getItem('litlink_user') || 'null');
-    
+    const token = getAuthToken();
+    const user = getAuthUser();
+
     if (token && user) {
         console.log('🔄 Refreshing matches...');
-        loadTopMatches(token, user.id || user._id);
+        loadTopMatches(token);
     }
 }
 window.refreshMatches = refreshMatches;

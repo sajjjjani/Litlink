@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Litlink - Book Community</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
     <link rel="stylesheet" href="../Homepage/style.css">
@@ -70,15 +72,7 @@
                         <i class="fas fa-cog"></i>
                     </button>
                     <div class="settings-menu" id="settingsMenu">
-                        <div class="settings-item">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
-                                <span class="slider"></span>
-                            </label>
-                            <span class="settings-label">
-                                <i class="fas fa-moon"></i> Dark Mode
-                            </span>
-                        </div>
+
                         <div class="settings-item">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
@@ -87,6 +81,17 @@
                             <span class="settings-label">
                                 <i class="fas fa-bell"></i> Notifications
                             </span>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                            <span class="settings-label">
+                                <i class="fas fa-font"></i> Text Size
+                            </span>
+                            <div class="text-size-controls">
+                                <button class="size-btn" data-size="small" onclick="setTextSize('small')">A-</button>
+                                <button class="size-btn active" data-size="default" onclick="setTextSize('default')">A</button>
+                                <button class="size-btn" data-size="large" onclick="setTextSize('large')">A+</button>
+                            </div>
                         </div>
                         <div class="settings-divider"></div>
                         <div class="settings-item clickable" onclick="window.location.href='../Profile/profile.html#settings'">
@@ -142,11 +147,11 @@
             </div>
         </section>
 
-        <!-- Trending Boards Section -->
+        <!-- Trending Circles Section -->
         <section class="section">
             <div class="section-header">
-                <h2>📌 Trending Boards</h2>
-                <a href="#" class="view-all">Browse all</a>
+                <h2>📌 Trending Circles</h2>
+                <a href="../Discussion Board/discussion.html" class="view-all">Browse all</a>
             </div>
             <div class="boards-grid" id="boardsGrid">
                 <!-- Boards will be loaded dynamically -->
@@ -222,10 +227,10 @@
         <!-- Footer -->
         <footer>
             <div class="footer-links">
-                <a href="#">About Us</a>
-                <a href="#">Help Center</a>
-                <a href="#">FAQ</a>
-                <a href="#">Terms & Privacy</a>
+                <a href="../homepage/about.html">About</a>
+                <a href="../homepage/help.html">Help</a>
+                <a href="../homepage/faq.html">FAQ</a>
+                <a href="../homepage/faq.html#privacy">Terms & Privacy</a>
             </div>
             <p>© 2024 Litlink. All rights reserved.</p>
         </footer>
@@ -260,5 +265,6 @@
     });
     </script>
     <script src="../utils/modal.js"></script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

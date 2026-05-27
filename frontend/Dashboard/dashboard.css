@@ -1,3 +1,11 @@
+:root {
+    --font-scale: 1;
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
+}
+
 * {
     margin: 0;
     padding: 0;
