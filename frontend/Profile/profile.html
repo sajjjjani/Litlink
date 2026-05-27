@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile - Litlink</title>
     <link rel="stylesheet" href="../Homepage/style.css">
     <link rel="stylesheet" href="profile.css">
@@ -50,15 +52,7 @@
                         <i class="fas fa-cog"></i>
                     </button>
                     <div class="settings-menu" id="settingsMenu">
-                        <div class="settings-item">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
-                                <span class="slider"></span>
-                            </label>
-                            <span class="settings-label">
-                                <i class="fas fa-moon"></i> Dark Mode
-                            </span>
-                        </div>
+
                         <div class="settings-item">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
@@ -547,5 +541,6 @@
         }
     });
     </script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

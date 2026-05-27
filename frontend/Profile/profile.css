@@ -1,5 +1,6 @@
 /* ==================== GLOBAL ==================== */
 :root {
+    --font-scale: 1;
     --primary-dark: #2c1810;
     --primary-darker: #1a0f0a;
     --primary-medium: #3d2617;
@@ -7,6 +8,10 @@
     --text-medium: #d4b5a0;
     --shadow: rgba(0, 0, 0, 0.3);
     --transition: all 0.3s ease;
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
 }
 
 body {

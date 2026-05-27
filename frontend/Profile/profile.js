@@ -8,24 +8,35 @@
             return `https://placehold.co/${width}x${height}/3d2617/f5e6d3?text=${safeText}&font=montserrat`;
         }
 
-        // ===== FIXED HELPER FUNCTIONS =====
-        function getToken() {
-            const token = sessionStorage.getItem('litlink_token') || 
-                          localStorage.getItem('litlink_token') || 
-                          sessionStorage.getItem('authToken') || 
-                          localStorage.getItem('authToken') || 
-                          sessionStorage.getItem('token') || 
-                          localStorage.getItem('token');
-            
-            console.log('🔑 Token check:', token ? 'Found ✓' : 'Not found ✗');
-            return token;
-        }
+	        // ===== FIXED HELPER FUNCTIONS =====
+	        function getToken() {
+	            if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getToken === 'function') {
+	                const token = window.LitlinkSessionAuth.getToken();
+	                console.log('🔑 Token check:', token ? 'Found ✓' : 'Not found ✗');
+	                return token;
+	            }
 
-        function getUserId() {
-            let userId = sessionStorage.getItem('litlink_userId') || 
-                         localStorage.getItem('litlink_userId') || 
-                         sessionStorage.getItem('userId') || 
-                         localStorage.getItem('userId');
+	            const token = sessionStorage.getItem('litlink_token') || 
+	                          localStorage.getItem('litlink_token') || 
+	                          sessionStorage.getItem('authToken') || 
+	                          localStorage.getItem('authToken') || 
+	                          sessionStorage.getItem('token') || 
+	                          localStorage.getItem('token');
+	            
+	            console.log('🔑 Token check:', token ? 'Found ✓' : 'Not found ✗');
+	            return token;
+	        }
+
+	        function getUserId() {
+	            if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUserId === 'function') {
+	                const sessionId = window.LitlinkSessionAuth.getUserId();
+	                if (sessionId) return sessionId;
+	            }
+
+	            let userId = sessionStorage.getItem('litlink_userId') || 
+	                         localStorage.getItem('litlink_userId') || 
+	                         sessionStorage.getItem('userId') || 
+	                         localStorage.getItem('userId');
             
             if (userId) {
                 console.log('🆔 UserId from storage:', userId);
@@ -51,38 +62,71 @@
                 }
             }
             
-            console.error('❌ No userId found!');
-            return null;
-        }
+	            console.error('❌ No userId found!');
+	            return null;
+	        }
 
-        function getCurrentUserFromStorage() {
-            try {
-                let userStr = sessionStorage.getItem('litlink_user') || 
-                              localStorage.getItem('litlink_user') || 
-                              sessionStorage.getItem('user') || 
-                              localStorage.getItem('user');
+	        function persistUserToStorage(user) {
+	            if (!user || typeof user !== 'object') return;
+
+	            const normalized = { ...user };
+	            if (!normalized.id && normalized._id) normalized.id = normalized._id;
+	            const userStr = JSON.stringify(normalized);
+	            const uid = normalized.id || normalized._id;
+
+	            try {
+	                ['litlink_user', 'user'].forEach(key => {
+	                    sessionStorage.setItem(key, userStr);
+	                    localStorage.setItem(key, userStr);
+	                });
+	                if (uid) {
+	                    ['litlink_userId', 'userId'].forEach(key => {
+	                        sessionStorage.setItem(key, String(uid));
+	                        localStorage.setItem(key, String(uid));
+	                    });
+	                }
+	            } catch (e) {
+	                console.error('Error persisting user to storage:', e);
+	            }
+	        }
+
+	        function getCurrentUserFromStorage() {
+	            try {
+	                if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUser === 'function') {
+	                    const sessionUser = window.LitlinkSessionAuth.getUser();
+	                    if (sessionUser) {
+	                        const normalized = { ...sessionUser };
+	                        if (!normalized.id && normalized._id) normalized.id = normalized._id;
+	                        return normalized;
+	                    }
+	                }
+
+	                let userStr = sessionStorage.getItem('litlink_user') || 
+	                              localStorage.getItem('litlink_user') || 
+	                              sessionStorage.getItem('user') || 
+	                              localStorage.getItem('user');
                 
                 if (!userStr) {
                     console.error('❌ No user found in storage!');
                     throw new Error('No user data found');
                 }
+	                
+	                const user = JSON.parse(userStr);
                 
-                const user = JSON.parse(userStr);
-                
-                if (!user.id && user._id) {
-                    user.id = user._id;
-                    sessionStorage.setItem('litlink_user', JSON.stringify(user));
-                }
-                
-                if (!user.createdAt) {
-                    user.createdAt = new Date().toISOString();
-                    sessionStorage.setItem('litlink_user', JSON.stringify(user));
-                }
+	                if (!user.id && user._id) {
+	                    user.id = user._id;
+	                    persistUserToStorage(user);
+	                }
+	                
+	                if (!user.createdAt) {
+	                    user.createdAt = new Date().toISOString();
+	                    persistUserToStorage(user);
+	                }
                 
                 console.log('✅ Retrieved user from storage:', user.name || user.email);
                 console.log('User ID:', user.id || user._id);
                 
-                return user;
+	                return user;
                 
             } catch (e) {
                 console.error('❌ Error getting user from storage:', e);
@@ -113,8 +157,8 @@
                     profilePicture: '',
                     createdAt: new Date().toISOString()
                 };
-            }
-        }
+	            }
+	        }
 
         async function getCurrentUser() {
             try {
@@ -146,21 +190,15 @@
                 
                 const data = await response.json();
                 
-                if (data.success && data.user) {
-                    const mergedUser = { ...cachedUser, ...data.user };
-                    
-                    sessionStorage.setItem('litlink_user', JSON.stringify(mergedUser));
-                    
-                    if (mergedUser.id || mergedUser._id) {
-                        const uid = mergedUser.id || mergedUser._id;
-                        sessionStorage.setItem('litlink_userId', uid);
-                    }
-                    
-                    console.log('✅ Updated user from API');
-                    return mergedUser;
-                } else {
-                    throw new Error(data.message || 'Failed to get user');
-                }
+	                if (data.success && data.user) {
+	                    const mergedUser = { ...cachedUser, ...data.user };
+	                    persistUserToStorage(mergedUser);
+	                    
+	                    console.log('✅ Updated user from API');
+	                    return mergedUser;
+	                } else {
+	                    throw new Error(data.message || 'Failed to get user');
+	                }
                 
             } catch (error) {
                 console.error('Error getting fresh user:', error);
@@ -419,9 +457,16 @@
                     
                     const cover = document.createElement('div');
                     cover.className = 'book-cover';
-                    if (book.cover || book.bookId || book.id) {
+                    
+                    let coverUrl = '';
+                    if (book.cover) {
+                        coverUrl = book.cover;
+                    } else if (book.bookId || book.id) {
                         const targetId = book.bookId || book.id;
-                        const coverUrl = `https://covers.openlibrary.org/b/olid/${targetId}-M.jpg`;
+                        coverUrl = `https://covers.openlibrary.org/b/olid/${targetId}-M.jpg`;
+                    }
+
+                    if (coverUrl) {
                         cover.innerHTML = `<img src="${coverUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><i class="fas fa-book" style="display:none; font-size:24px; color:#8b6f47;"></i>`;
                     } else {
                         cover.innerHTML = '<i class="fas fa-book"></i>';
@@ -488,22 +533,26 @@
             }
         }
 
-        function updateProfileCompleteness(user) {
-            let completed = 0;
-            let total = 10;
-            
-            if (user.name && user.name.trim()) completed++;
-            if (user.bio && user.bio.trim()) completed++;
-            if (user.location && user.location.trim()) completed++;
-            if (user.pronouns && user.pronouns.trim()) completed++;
-            if (user.profilePicture && user.profilePicture.trim()) completed++;
-            if (user.favoriteGenres && user.favoriteGenres.length > 0) completed++;
-            if (user.favoriteAuthors && user.favoriteAuthors.length > 0) completed++;
-            if (user.favoriteBooks && user.favoriteBooks.length > 0) completed++;
-            if (user.readingHabit && user.readingHabit.trim()) completed++;
-            if (user.readingGoal && user.readingGoal > 0) completed++;
-            
-            const percentage = Math.round((completed / total) * 100);
+	        function updateProfileCompleteness(user) {
+	            const checks = [
+	                { key: 'name', ok: !!(user.name && String(user.name).trim()) },
+	                { key: 'bio', ok: !!(user.bio && String(user.bio).trim()) },
+	                { key: 'location', ok: !!(user.location && String(user.location).trim()) },
+	                { key: 'pronouns', ok: !!(user.pronouns && String(user.pronouns).trim()) },
+	                { key: 'profilePicture', ok: !!(user.profilePicture && String(user.profilePicture).trim()) },
+	                { key: 'favoriteGenres', ok: Array.isArray(user.favoriteGenres) && user.favoriteGenres.length > 0 },
+	                { key: 'favoriteAuthors', ok: Array.isArray(user.favoriteAuthors) && user.favoriteAuthors.length > 0 },
+	                { key: 'favoriteBooks', ok: Array.isArray(user.favoriteBooks) && user.favoriteBooks.length > 0 },
+	                { key: 'readingHabit', ok: !!(user.readingHabit && String(user.readingHabit).trim()) && String(user.readingHabit).trim().toLowerCase() !== 'not set' },
+	                { key: 'readingGoal', ok: Number(user.readingGoal) > 0 }
+	            ];
+
+	            const total = checks.length;
+	            const completed = checks.filter(c => c.ok).length;
+
+	            let percentage = Math.round((completed / total) * 100);
+	            if (completed === total) percentage = 100;
+	            percentage = Math.max(0, Math.min(100, percentage));
             
             const percentageEl = document.getElementById('completenessPercentage');
             const fillEl = document.getElementById('completenessFill');
@@ -1142,11 +1191,10 @@
               // Update the "Books Read" stat
               document.getElementById('statBooks').textContent = data.total;
               
-              // Update stats in user object
-              const user = getCurrentUserFromStorage();
-              user.booksRead = data.books;
-              localStorage.setItem('litlink_user', JSON.stringify(user));
-              localStorage.setItem('user', JSON.stringify(user));
+	              // Update stats in user object
+	              const user = getCurrentUserFromStorage();
+	              user.booksRead = data.books;
+	              persistUserToStorage(user);
               
               console.log(`✅ Loaded ${data.total} books with covers`);
               
@@ -1193,27 +1241,93 @@
           }
         }
 
-        // ===== GLOBAL FUNCTIONS =====
-        window.toggleSettings = function() {
-            const settingsMenu = document.getElementById('settingsMenu');
-            if (settingsMenu) {
-                settingsMenu.classList.toggle('active');
-            }
-        };
+	        // ===== GLOBAL FUNCTIONS =====
+	        window.toggleSettings = function() {
+	            const settingsMenu = document.getElementById('settingsMenu');
+	            if (settingsMenu) {
+	                settingsMenu.classList.toggle('active');
+	            }
+	        };
 
-        window.toggleDarkMode = function() {
-            const toggle = document.getElementById('darkModeToggle');
-            if (toggle.checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
-            }
-        };
+	        window.toggleDarkMode = function() {
+	            const toggle = document.getElementById('darkModeToggle');
+	            if (!toggle) return;
+
+	            localStorage.setItem('darkMode', toggle.checked);
+	            if (toggle.checked) {
+	                document.body.classList.add('dark-mode');
+	            } else {
+	                document.body.classList.remove('dark-mode');
+	            }
+	        };
+
+	        function loadDarkModePreference() {
+	            const darkMode = localStorage.getItem('darkMode') === 'true';
+	            const toggle = document.getElementById('darkModeToggle');
+
+	            if (toggle) {
+	                toggle.checked = darkMode;
+	            }
+	            if (darkMode) {
+	                document.body.classList.add('dark-mode');
+	            } else {
+	                document.body.classList.remove('dark-mode');
+	            }
+	        }
 
         window.toggleNotifications = function() {
             const toggle = document.getElementById('notificationsToggle');
-            console.log('Notifications:', toggle.checked ? 'Enabled' : 'Disabled');
+            if (toggle) {
+                const isEnabled = toggle.checked;
+                localStorage.setItem('notificationsEnabled', isEnabled);
+                applyNotificationSetting(isEnabled);
+                if (typeof showMessage === 'function') {
+                    showMessage(`Notifications ${isEnabled ? 'enabled' : 'disabled'}`, isEnabled ? 'success' : 'info');
+                }
+            }
         };
+
+        function applyNotificationSetting(isEnabled) {
+            console.log('🔔 Notifications:', isEnabled ? 'Enabled' : 'Disabled');
+            const toggle = document.getElementById('notificationsToggle');
+            
+            // Sync toggle UI
+            if (toggle && toggle.checked !== isEnabled) {
+                toggle.checked = isEnabled;
+            }
+
+            // Update real-time client state if it exists on this page
+            if (typeof _notifClient !== 'undefined' && _notifClient) {
+                _notifClient.showToasts = isEnabled;
+                if (!isEnabled && _notifClient.socket) {
+                    _notifClient.disconnect();
+                } else if (isEnabled && (!_notifClient.socket || !_notifClient.socket.connected)) {
+                    const token = getToken();
+                    if (token) _notifClient.connect();
+                }
+            }
+        }
+
+	        function loadNotificationSettings() {
+	            const notificationsEnabled = localStorage.getItem('notificationsEnabled');
+	            const toggle = document.getElementById('notificationsToggle');
+	            if (toggle) {
+	                const isEnabled = notificationsEnabled === null ? true : notificationsEnabled === 'true';
+	                toggle.checked = isEnabled;
+	                applyNotificationSetting(isEnabled);
+	            }
+	        }
+
+	        // Global cross-tab synchronization
+	        window.addEventListener('storage', (e) => {
+	            if (e.key === 'notificationsEnabled') {
+	                const isEnabled = e.newValue === 'true';
+	                applyNotificationSetting(isEnabled);
+	            }
+	            if (e.key === 'darkMode') {
+	                loadDarkModePreference();
+	            }
+	        });
 
         window.toggleMobileMenu = function() {
             const navLinks = document.querySelector('.nav-links');
@@ -1354,12 +1468,11 @@
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Update local storage
-                    const user = getCurrentUserFromStorage();
-                    const updatedUser = { ...user, ...updateData };
-                    localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
+	                if (data.success) {
+	                    // Update local storage
+	                    const user = getCurrentUserFromStorage();
+	                    const updatedUser = { ...user, ...updateData };
+	                    persistUserToStorage(updatedUser);
                     
                     // Update UI
                     updateProfileUI(updatedUser);
@@ -1409,12 +1522,11 @@
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Update local storage
-                    const user = getCurrentUserFromStorage();
-                    const updatedUser = { ...user, ...updateData };
-                    localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
+	                if (data.success) {
+	                    // Update local storage
+	                    const user = getCurrentUserFromStorage();
+	                    const updatedUser = { ...user, ...updateData };
+	                    persistUserToStorage(updatedUser);
                     
                     // Update UI
                     updateProfileUI(updatedUser);
@@ -1478,12 +1590,11 @@
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Update local storage
-                    const user = getCurrentUserFromStorage();
-                    const updatedUser = { ...user, ...updateData };
-                    localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
+	                if (data.success) {
+	                    // Update local storage
+	                    const user = getCurrentUserFromStorage();
+	                    const updatedUser = { ...user, ...updateData };
+	                    persistUserToStorage(updatedUser);
                     
                     // Update UI
                     updateProfileUI(updatedUser);
@@ -1605,13 +1716,12 @@
                 
                 const updateDataResult = await updateResponse.json();
                 
-                if (updateDataResult.success) {
-                    const user = getCurrentUserFromStorage();
-                    const updatedUser = { ...user, [fieldName]: items };
-                    
-                    // Save to ALL storage locations
-                    localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
+	                if (updateDataResult.success) {
+	                    const user = getCurrentUserFromStorage();
+	                    const updatedUser = { ...user, [fieldName]: items };
+	                    
+	                    // Save to ALL storage locations
+	                    persistUserToStorage(updatedUser);
                     
                     if (fieldName === 'favoriteBooks') {
                         updateBooksSection(items);
@@ -1676,13 +1786,12 @@
                 
                 const updateDataResult = await updateResponse.json();
                 
-                if (updateDataResult.success) {
-                    const user = getCurrentUserFromStorage();
-                    const updatedUser = { ...user, [fieldName]: items };
-                    
-                    // Save to ALL storage locations
-                    localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
+	                if (updateDataResult.success) {
+	                    const user = getCurrentUserFromStorage();
+	                    const updatedUser = { ...user, [fieldName]: items };
+	                    
+	                    // Save to ALL storage locations
+	                    persistUserToStorage(updatedUser);
                     
                     if (fieldName === 'favoriteBooks') {
                         updateBooksSection(items);
@@ -1742,13 +1851,12 @@
                         
                         const data = await response.json();
                         
-                        if (data.success) {
-                            const user = getCurrentUserFromStorage();
-                            const updatedUser = { ...user, profilePicture: e.target.result };
-                            
-                            // Save to ALL storage locations
-                            localStorage.setItem('litlink_user', JSON.stringify(updatedUser));
-                            localStorage.setItem('user', JSON.stringify(updatedUser));
+	                        if (data.success) {
+	                            const user = getCurrentUserFromStorage();
+	                            const updatedUser = { ...user, profilePicture: e.target.result };
+	                            
+	                            // Save to ALL storage locations
+	                            persistUserToStorage(updatedUser);
                             
                             document.getElementById('profilePicture').src = e.target.result;
                             updateProfileCompleteness(updatedUser);
@@ -1885,100 +1993,84 @@
             console.log('Books with Covers:', user.booksRead?.length || 0);
         }
 
-        // ===== INITIALIZATION =====
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Profile page initialized');
-            
-            // Verify authentication
-            const token = getToken();
-            const userId = getUserId();
-            
-            console.log('Auth check - Token:', !!token, 'UserId:', !!userId);
-            
-            if (!token || !userId) {
-                console.error('❌ Not authenticated');
-                showMessage('Please login to view your profile', 'error');
-                setTimeout(() => {
-                    window.location.href = '../Homepage/index.html';
-                }, 2000);
-                return;
-            }
-            
-            // Load user data
-            getCurrentUser().then(user => {
-                if (user.id === 'error') {
-                    return;
-                }
-                updateProfileUI(user);
-                // Load books with covers
-                displayUserBooks();
-            }).catch(error => {
-                console.error('Error loading user:', error);
-                showMessage('Failed to load profile. Please login again.', 'error');
-            });
-            
-            // Close settings when clicking outside
-            document.addEventListener('click', function(event) {
-                const settingsMenu = document.getElementById('settingsMenu');
-                const settingsBtn = document.querySelector('.settings-btn');
-                
-                if (settingsMenu && settingsBtn && 
-                    !settingsMenu.contains(event.target) && 
-                    !settingsBtn.contains(event.target)) {
-                    settingsMenu.classList.remove('active');
-                }
-            });
-            
-            // Close modals when clicking overlay
-            document.querySelectorAll('.modal-overlay').forEach(modal => {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === modal) {
-                        closeModal(modal.id);
-                    }
-                });
-            });
-            
-            // Close modals when pressing Escape
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') {
-                    document.querySelectorAll('.modal-overlay').forEach(modal => {
-                        if (modal.style.display === 'flex') {
-                            closeModal(modal.id);
-                        }
-                    });
-                    
-                    // Close settings menu
-                    const settingsMenu = document.getElementById('settingsMenu');
-                    if (settingsMenu) {
-                        settingsMenu.classList.remove('active');
-                    }
-                }
-            });
-            
-            // Hide loading overlay
-            setTimeout(() => {
-                const loadingOverlay = document.getElementById('loadingOverlay');
-                if (loadingOverlay) {
-                    loadingOverlay.style.display = 'none';
-                }
-            }, 500);
-            
-            // Add debug button
-            const debugBtn = document.createElement('button');
-            debugBtn.textContent = '🔍 Debug Profile';
-            debugBtn.style.position = 'fixed';
-            debugBtn.style.bottom = '50px';
-            debugBtn.style.right = '10px';
-            debugBtn.style.zIndex = '9999';
-            debugBtn.style.padding = '5px 10px';
-            debugBtn.style.background = '#333';
-            debugBtn.style.color = 'white';
-            debugBtn.style.border = 'none';
-            debugBtn.style.borderRadius = '5px';
-            debugBtn.style.fontSize = '12px';
-            debugBtn.style.cursor = 'pointer';
-            debugBtn.onclick = debugProfileStorage;
-            document.body.appendChild(debugBtn);
-            
-            console.log('✅ All functionality loaded');
-        });
+	        // ===== INITIALIZATION =====
+	        document.addEventListener('DOMContentLoaded', function() {
+	            // Common controls (settings dropdown is shared across pages that include this file)
+	            loadDarkModePreference();
+	            loadNotificationSettings();
+
+	            // Close settings when clicking outside
+	            document.addEventListener('click', function(event) {
+	                const settingsMenu = document.getElementById('settingsMenu');
+	                const settingsBtn = document.querySelector('.settings-btn');
+	                
+	                if (settingsMenu && settingsBtn && 
+	                    !settingsMenu.contains(event.target) && 
+	                    !settingsBtn.contains(event.target)) {
+	                    settingsMenu.classList.remove('active');
+	                }
+	            });
+
+	            // Close modals when pressing Escape
+	            document.addEventListener('keydown', function(event) {
+	                if (event.key === 'Escape') {
+	                    document.querySelectorAll('.modal-overlay').forEach(modal => {
+	                        if (modal.style.display === 'flex') {
+	                            closeModal(modal.id);
+	                        }
+	                    });
+	                    
+	                    const settingsMenu = document.getElementById('settingsMenu');
+	                    if (settingsMenu) settingsMenu.classList.remove('active');
+	                }
+	            });
+
+	            // Profile page only: avoid running profile fetch/UI logic on Settings page
+	            const isProfilePage = !!document.getElementById('profileName');
+	            if (!isProfilePage) return;
+
+	            console.log('🚀 Profile page initialized');
+
+	            // Verify authentication
+	            const token = getToken();
+	            const userId = getUserId();
+	            
+	            console.log('Auth check - Token:', !!token, 'UserId:', !!userId);
+	            
+	            if (!token || !userId) {
+	                console.error('❌ Not authenticated');
+	                showMessage('Please login to view your profile', 'error');
+	                setTimeout(() => {
+	                    window.location.href = '../Homepage/index.html';
+	                }, 2000);
+	                return;
+	            }
+
+	            getCurrentUser().then(user => {
+	                if (user.id === 'error') return;
+	                updateProfileUI(user);
+	                displayUserBooks();
+	            }).catch(error => {
+	                console.error('Error loading user:', error);
+	                showMessage('Failed to load profile. Please login again.', 'error');
+	            });
+	            
+	            // Close modals when clicking overlay
+	            document.querySelectorAll('.modal-overlay').forEach(modal => {
+	                modal.addEventListener('click', function(e) {
+	                    if (e.target === modal) {
+	                        closeModal(modal.id);
+	                    }
+	                });
+	            });
+	            
+	            // Hide loading overlay
+	            setTimeout(() => {
+	                const loadingOverlay = document.getElementById('loadingOverlay');
+	                if (loadingOverlay) {
+	                    loadingOverlay.style.display = 'none';
+	                }
+	            }, 500);
+	            
+	            console.log('✅ All functionality loaded');
+	        });

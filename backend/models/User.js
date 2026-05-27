@@ -71,6 +71,11 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   }],
   // ===== EXISTING FIELDS =====
+  textSizePreference: {
+    type: String,
+    enum: ['small', 'default', 'large'],
+    default: 'default'
+  },
   isVerified: {
     type: Boolean,
     default: false
@@ -133,7 +138,8 @@ const userSchema = new mongoose.Schema({
   wantToRead: [{
     bookId: String,
     title: String,
-    author: String
+    author: String,
+    cover: String
   }],
   followers: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -275,6 +281,34 @@ userSchema.index({
   favoriteAuthors: 1, 
   favoriteBooks: 1 
 });
+
+userSchema.virtual('completionPercentage').get(function() {
+  const fields = [
+    { value: this.profilePicture && this.profilePicture !== '📚', weight: 10 },
+    { value: this.bio && this.bio !== 'Book lover and avid reader', weight: 10 },
+    { value: this.location, weight: 10 },
+    { value: this.pronouns, weight: 5 },
+    { value: this.favoriteGenres && this.favoriteGenres.length > 0, weight: 15 },
+    { value: this.favoriteAuthors && this.favoriteAuthors.length > 0, weight: 10 },
+    { value: this.favoriteBooks && this.favoriteBooks.length > 0, weight: 10 },
+    { value: this.readingHabit, weight: 10 },
+    { value: this.readingGoal, weight: 10 },
+    { value: this.discussionPreferences && this.discussionPreferences.length > 0, weight: 10 }
+  ];
+  
+  let score = 0;
+  let totalWeight = 0;
+  
+  fields.forEach(f => {
+    totalWeight += f.weight;
+    if (f.value) score += f.weight;
+  });
+  
+  return Math.round((score / totalWeight) * 100);
+});
+
+userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toObject', { virtuals: true });
 
 const User = mongoose.model('User', userSchema);
 
