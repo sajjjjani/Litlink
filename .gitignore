@@ -1,4 +1,9 @@
 backend/node_modules/
 backend/.env
+backend/uploads/
+ai_service/venv/
+ai_service/__pycache__/
+*.pyc
+.env
 *.log
 .DS_Store
