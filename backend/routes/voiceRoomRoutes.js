@@ -53,7 +53,8 @@ router.post('/rooms', authenticate, async (req, res) => {
             maxParticipants: maxParticipants || 50,
             isPrivate: isPublic === false,
             participantCount: 0,
-            createdAt: new Date()
+            createdAt: new Date(),
+            scheduledNotified: isScheduled                 // Track notification status
         });
 
         await room.save();
@@ -97,13 +98,15 @@ router.post('/rooms', authenticate, async (req, res) => {
             });
         }
 
-        // Notify followers when a host starts a live room.
-        if (!isScheduled) {
-            try {
+        // Notify followers when a host starts a live room or schedules one
+        try {
+            if (!isScheduled) {
                 await UNS.onVoiceRoomStarted(host, room);
-            } catch (unsErr) {
-                console.error('[UNS] onVoiceRoomStarted error:', unsErr.message);
+            } else {
+                await UNS.onVoiceRoomScheduled(host, room);
             }
+        } catch (unsErr) {
+            console.error('[UNS] Voice room notification error:', unsErr.message);
         }
 
         res.json({ success: true, message: 'Voice room created successfully', room });
@@ -194,18 +197,14 @@ router.post('/rooms/:roomId/join', authenticate, async (req, res) => {
         }
 
         if (room.status !== 'live') {
-            // Auto-start if scheduled time has passed
-            if (room.status === 'scheduled' && room.scheduledFor && room.scheduledFor <= new Date()) {
-                room.status = 'live';
-                await room.save();
-            } else if (room.status === 'scheduled') {
+            if (room.status === 'scheduled') {
                 return res.status(400).json({
                     success: false,
                     message: 'Room has not started yet',
                     scheduledFor: room.scheduledFor
                 });
             } else {
-                return res.status(400).json({ success: false, message: 'Room is not available' });
+                return res.status(400).json({ success: false, message: `Room is ${room.status}` });
             }
         }
 
@@ -307,6 +306,58 @@ router.post('/rooms/:roomId/leave', authenticate, async (req, res) => {
 
     } catch (error) {
         console.error('Error leaving room:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ── POST /rooms/:roomId/start — Host only ─────────────────────────────────
+router.post('/rooms/:roomId/start', authenticate, async (req, res) => {
+    try {
+        const room = await VoiceRoom.findById(req.params.roomId);
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Room not found' });
+        }
+
+        const hostId = room.hostId._id ? room.hostId._id.toString() : room.hostId.toString();
+        if (hostId !== req.userId) {
+            return res.status(403).json({ success: false, message: 'Only the host can start this room' });
+        }
+
+        if (room.status !== 'scheduled') {
+            return res.status(400).json({ success: false, message: `Room status is ${room.status}, cannot start` });
+        }
+
+        room.status = 'live';
+        room.createdAt = new Date();
+        room.startNotified = true;                         // Track notification status
+        await room.save();
+
+        const host = await User.findById(req.userId);
+
+        // Broadcast to lobby
+        if (global.io) {
+            global.io.emit('room-created', {
+                _id: room._id,
+                name: room.name,
+                genre: room.genre,
+                description: room.description,
+                hostId: { _id: req.userId, name: host.name },
+                hostName: room.hostName,
+                status: room.status,
+                participantCount: 0
+            });
+        }
+
+        // Notify reminder users
+        try {
+            await UNS.onScheduledRoomStarted(host, room);
+        } catch (unsErr) {
+            console.error('[UNS] onScheduledRoomStarted error:', unsErr.message);
+        }
+
+        res.json({ success: true, message: 'Room started successfully', room });
+    } catch (error) {
+        console.error('Error starting room:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

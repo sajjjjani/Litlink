@@ -224,13 +224,18 @@ function connectToRoom(token) {
 
     socket.on('authenticated', (data) => {
       if (data.success) {
-        setTimeout(() => {
-          socket.emit('join-voice-room', {
-            roomId,
-            userId  : currentUser.id,
-            userName: currentUser.name
-          });
-        }, 300);
+        if (roomData && roomData.status === 'scheduled' && isCurrentUserHost()) {
+          // If host enters a scheduled room, offer to start it
+          showStartRoomPrompt();
+        } else {
+          setTimeout(() => {
+            socket.emit('join-voice-room', {
+              roomId,
+              userId  : currentUser.id,
+              userName: currentUser.name
+            });
+          }, 300);
+        }
       } else {
         // Auth failed (e.g. expired token) — don't loop, redirect to login
         showToast('Session expired. Please log in again.', 'error');
@@ -1329,6 +1334,62 @@ function leaveRoom() {
   window.location.href = 'voice-rooms.html';
 }
 
+function showStartRoomPrompt() {
+  const stage = document.getElementById('stage-content');
+  if (!stage) return;
+
+  stage.innerHTML = `
+    <div style="text-align:center;padding:60px 20px;background:var(--bg-secondary);border-radius:12px;border:1px solid var(--border)">
+      <div style="font-size:48px;margin-bottom:20px">🎙️</div>
+      <h2 style="color:var(--text-primary);margin-bottom:12px">Ready to start your room?</h2>
+      <p style="color:var(--text-muted);margin-bottom:24px;max-width:400px;margin-left:auto;margin-right:auto">
+        Your room is currently scheduled. Once you start it, notifications will be sent to people who set a reminder, and the room will appear live in the lobby.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button onclick="window.location.href='voice-rooms.html'"
+                style="padding:12px 24px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-weight:600">
+          Not Now
+        </button>
+        <button onclick="startScheduledRoomFromInside()"
+                style="padding:12px 24px;background:var(--accent);border:none;border-radius:8px;color:var(--bg-primary);cursor:pointer;font-weight:600">
+          Start Room Now
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function startScheduledRoomFromInside() {
+  const token = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
+  try {
+    showToast('Starting room...', 'info');
+    const res = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast('Room started!', 'success');
+      // Now actually join the room via socket
+      socket.emit('join-voice-room', {
+        roomId,
+        userId  : currentUser.id,
+        userName: currentUser.name
+      });
+      // UI will be updated by room-joined event
+    } else {
+      showToast(data.message || 'Failed to start room', 'error');
+    }
+  } catch (err) {
+    console.error('Error starting room:', err);
+    showToast('Failed to start room. Please try again.', 'error');
+  }
+}
+
 function cleanupWebRTC() {
   Object.values(peerConnections).forEach(p => { try { p.destroy(); } catch (e) {} });
   peerConnections = {};
@@ -1526,3 +1587,4 @@ window.sendEmojiReaction = sendEmojiReaction;
 window.voteSkip          = voteSkip;
 window.skipMyTurn        = skipMyTurn;
 window.submitTopicPrompt = submitTopicPrompt;
+window.startScheduledRoomFromInside = startScheduledRoomFromInside;

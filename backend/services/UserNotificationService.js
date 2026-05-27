@@ -264,7 +264,7 @@ class UserNotificationService {
             actionUrl: `/voice-rooms/${room._id}`,
             sourceUserId: host._id,
             relatedEntityId: room._id,
-            relatedEntityType: 'ChatRoom',
+            relatedEntityType: 'VoiceRoom',
             metadata: {
               roomId: room._id,
               roomName: room.name,
@@ -278,6 +278,154 @@ class UserNotificationService {
       await Promise.allSettled(notifications);
     } catch (err) {
       console.error('[UNS] onVoiceRoomStarted error:', err.message);
+    }
+  }
+
+  static async onVoiceRoomScheduled(host, room) {
+    try {
+      const hostUser = await (require('../models/User'))
+        .findById(host._id)
+        .select('followers');
+
+      const followerIds = (hostUser?.followers || [])
+        .map((id) => id.toString())
+        .filter((id) => id !== host._id.toString());
+
+      if (followerIds.length === 0) return;
+
+      const notifications = followerIds.map((followerId) =>
+        Notification.createUserNotification(
+          followerId,
+          'voice_room_created',
+          'New Voice Room Scheduled',
+          `${host.name} scheduled a voice room: "${room.name}".`,
+          {
+            priority: 'medium',
+            actionUrl: `/voice-rooms/voice-rooms.html`,
+            sourceUserId: host._id,
+            relatedEntityId: room._id,
+            relatedEntityType: 'VoiceRoom',
+            metadata: {
+              roomId: room._id,
+              roomName: room.name,
+              hostId: host._id,
+              hostName: host.name,
+              scheduledFor: room.scheduledFor
+            }
+          }
+        )
+      );
+
+      await Promise.allSettled(notifications);
+    } catch (err) {
+      console.error('[UNS] onVoiceRoomScheduled error:', err.message);
+    }
+  }
+
+  static async onVoiceRoomAboutToStart(room) {
+    try {
+      const notifications = [];
+
+      // Notify Host
+      notifications.push(Notification.createUserNotification(
+        room.hostId,
+        'voice_room_prestart',
+        'Room Starting Soon 🎙️',
+        `Your scheduled voice room "${room.name}" will start in 2 minutes.`,
+        {
+          priority: 'high',
+          actionUrl: `/voice-rooms/voice-rooms.html`,
+          relatedEntityId: room._id,
+          relatedEntityType: 'VoiceRoom'
+        }
+      ));
+
+      // Notify Reminder Users
+      if (room.reminderUsers && room.reminderUsers.length > 0) {
+        room.reminderUsers.forEach(userId => {
+          notifications.push(Notification.createUserNotification(
+            userId,
+            'voice_room_reminder',
+            'Voice Room Starting Soon 🎙️',
+            `A scheduled room you set a reminder for ("${room.name}") is about to start.`,
+            {
+              priority: 'medium',
+              actionUrl: `/voice-rooms/voice-rooms.html`,
+              relatedEntityId: room._id,
+              relatedEntityType: 'VoiceRoom'
+            }
+          ));
+        });
+      }
+
+      await Promise.allSettled(notifications);
+    } catch (err) {
+      console.error('[UNS] onVoiceRoomAboutToStart error:', err.message);
+    }
+  }
+
+  static async onScheduledRoomStarted(host, room) {
+    try {
+      if (!room.reminderUsers || room.reminderUsers.length === 0) return;
+
+      const notifications = room.reminderUsers.map(userId =>
+        Notification.createUserNotification(
+          userId,
+          'voice_room_reminder',
+          'Voice Room Started 🎙️',
+          `The scheduled voice room "${room.name}" you set a reminder for has started.`,
+          {
+            priority: 'high',
+            actionUrl: `/voice-rooms/${room._id}`,
+            relatedEntityId: room._id,
+            relatedEntityType: 'VoiceRoom'
+          }
+        )
+      );
+
+      await Promise.allSettled(notifications);
+    } catch (err) {
+      console.error('[UNS] onScheduledRoomStarted error:', err.message);
+    }
+  }
+
+  static async onScheduledRoomCancelled(room) {
+    try {
+      const notifications = [];
+
+      // Notify Host
+      notifications.push(Notification.createUserNotification(
+        room.hostId,
+        'system',
+        'Scheduled Room Cancelled',
+        `Your scheduled room "${room.name}" was cancelled because it was not started in time.`,
+        {
+          priority: 'medium',
+          relatedEntityId: room._id,
+          relatedEntityType: 'VoiceRoom'
+        }
+      ));
+
+      // Notify Reminder Users
+      if (room.reminderUsers && room.reminderUsers.length > 0) {
+        room.reminderUsers.forEach(userId => {
+          notifications.push(Notification.createUserNotification(
+            userId,
+            'system',
+            'Scheduled Room Cancelled',
+            `The scheduled room "${room.name}" was cancelled.`,
+            {
+              priority: 'medium',
+              relatedEntityId: room._id,
+              relatedEntityType: 'VoiceRoom'
+            }
+          ));
+        });
+      }
+
+      await Promise.allSettled(notifications);
+    } catch (err) {
+      console.error('[UNS] onScheduledRoomCancelled error:', err.message);
     }
   }
 }

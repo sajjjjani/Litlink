@@ -221,8 +221,29 @@ function renderUpcoming(rooms) {
   }
   list.innerHTML = rooms.map(room => {
     const genre = room.genre || 'Discussion';
+    const hostId = room.hostId?._id || room.hostId;
+    const isHost = currentUser && hostId && hostId.toString() === currentUser.id.toString();
     const hostName = room.hostId?.name || room.hostName || 'Host';
     const scheduledTime = room.scheduledFor ? formatScheduledTime(room.scheduledFor) : 'Soon';
+
+    // Check if room is ready to start (at or after scheduled time)
+    const isReady = room.scheduledFor && new Date(room.scheduledFor) <= new Date();
+
+    let actionButton = '';
+    if (isHost && isReady) {
+      actionButton = `
+        <button class="upc-remind" style="background:var(--accent);color:var(--bg-primary);border:none" onclick="startScheduledRoom('${room._id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M5 3l14 9-14 9V3z"/></svg>
+          Start Room
+        </button>`;
+    } else {
+      actionButton = `
+        <button class="upc-remind" onclick="setReminder('${room._id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Set Reminder
+        </button>`;
+    }
+
     return `
       <div class="upcoming-card">
         <div class="upc-time">
@@ -234,12 +255,34 @@ function renderUpcoming(rooms) {
           <span class="genre-chip">${escapeHtml(genre)}</span>
           <span>by ${escapeHtml(hostName)}</span>
         </div>
-        <button class="upc-remind" onclick="setReminder('${room._id}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          Set Reminder
-        </button>
+        ${actionButton}
       </div>`;
   }).join('');
+}
+
+async function startScheduledRoom(roomId) {
+  const token = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
+  try {
+    showToast('Starting room...', 'info');
+    const res = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast('Room started! Entering...', 'success');
+      goToRoom(roomId);
+    } else {
+      showToast(data.message || 'Failed to start room', 'error');
+    }
+  } catch (err) {
+    console.error('Error starting room:', err);
+    showToast('Failed to start room. Please try again.', 'error');
+  }
 }
 
 function addRoomToList(room)   { if (!room) return; liveRooms.unshift(room); renderRooms(liveRooms); }
@@ -408,3 +451,4 @@ else init();
 
 window.goToRoom    = goToRoom;
 window.setReminder = setReminder;
+window.startScheduledRoom = startScheduledRoom;
