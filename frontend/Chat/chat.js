@@ -23,13 +23,31 @@ const CHAT_WS_HOST = (function () {
 
 function getAuthToken() {
     try {
+        if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getToken === 'function') {
+            return window.LitlinkSessionAuth.getToken();
+        }
         return sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token') || sessionStorage.getItem('authToken') || localStorage.getItem('authToken') || sessionStorage.getItem('token') || localStorage.getItem('token');
     } catch (e) { return null; }
+}
+
+function getAuthUser() {
+    try {
+        if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUser === 'function') {
+            return window.LitlinkSessionAuth.getUser();
+        }
+        const userStr = sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user');
+        return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function getCurrentUserId() {
     if (currentUser && (currentUser._id || currentUser.id)) return (currentUser._id || currentUser.id).toString();
     try {
+        if (window.LitlinkSessionAuth && typeof window.LitlinkSessionAuth.getUserId === 'function') {
+            return window.LitlinkSessionAuth.getUserId() || '';
+        }
         return sessionStorage.getItem('litlink_userId') || localStorage.getItem('litlink_userId') || sessionStorage.getItem('userId') || localStorage.getItem('userId') || '';
     } catch (e) { return ''; }
 }
@@ -56,6 +74,37 @@ function parseTimeToDate(timeStr) {
     }
 }
 
+function parseSpoilers(text) {
+    if (!text) return '';
+    const regex = /\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi;
+    return text.replace(regex, (match, p1) => {
+        return `<span class="spoiler-text" onclick="this.classList.toggle('revealed')">${p1}</span>`;
+    });
+}
+
+function formatCompatibility(val) {
+    if (window.LitlinkMatchUtils && typeof window.LitlinkMatchUtils.normalizePercentage === 'function') {
+        return window.LitlinkMatchUtils.normalizePercentage(val);
+    }
+    const score = Number(val);
+    return Number.isFinite(score) ? Math.max(0, Math.round(score)) : 0;
+}
+
+function sortMatchesList() {
+    matches.sort((a, b) => {
+        const timeA = window.LitlinkMatchUtils
+            ? window.LitlinkMatchUtils.getLatestActivityTimestamp(a)
+            : (a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0);
+        const timeB = window.LitlinkMatchUtils
+            ? window.LitlinkMatchUtils.getLatestActivityTimestamp(b)
+            : (b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0);
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+        return (a.name || '').localeCompare(b.name || '');
+    });
+}
+
 // ===== DOM ELEMENTS =====
 const matchesList = document.getElementById('matchesList');
 const messagesContainer = document.getElementById('messagesContainer');
@@ -78,9 +127,9 @@ async function initializeChat() {
     try {
         console.log('🚀 Initializing chat...');
         
-        const userStr = sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user');
-        if (userStr) {
-            currentUser = JSON.parse(userStr);
+        const user = getAuthUser();
+        if (user) {
+            currentUser = user;
             console.log('✅ User found:', currentUser.name);
             updateSidebarUserInfo();
         } else {
@@ -342,17 +391,24 @@ function onIncomingChatMessage(data) {
     const senderId = data.senderId || (data.message && data.message.sender);
     const currentMatch = matches.find(function (m) { return m.active; });
     
-    if (!currentMatch || (currentMatch._id !== senderId && currentMatch.id !== senderId)) {
-        const match = matches.find(m => m._id === senderId || m.id === senderId);
-        if (match) {
+    const match = matches.find(m => m._id === senderId || m.id === senderId);
+    if (match) {
+        let text = data.text || (data.message && data.message.content) || '';
+        text = text.replace(/\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi, '[Spoiler]');
+        match.preview = text ? (text.length > 30 ? text.substring(0, 27) + '...' : text) : '📎 Attachment';
+        match.lastMessageTime = new Date();
+        
+        if (!currentMatch || (currentMatch._id !== senderId && currentMatch.id !== senderId)) {
             match.unreadCount = (match.unreadCount || 0) + 1;
-            renderMatches();
             showNotification(`New message from ${match.name}`, 'info');
         }
-        return;
+        sortMatchesList();
+        renderMatches();
     }
     
-    refreshCurrentConversation();
+    if (currentMatch && (currentMatch._id === senderId || currentMatch.id === senderId)) {
+        refreshCurrentConversation();
+    }
 }
 
 function onChatMessageSent(data) {
@@ -533,6 +589,7 @@ async function loadMatches() {
         showMessageLoading('Loading matches...');
         
         const res = await fetch(`${API_BASE_URL}/api/chat/matches`, {
+            cache: 'no-store',
             headers: { 
                 'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
@@ -545,7 +602,16 @@ async function loadMatches() {
         if (data.success && Array.isArray(data.matches)) {
             matches = data.matches
                 .filter(m => m._id && !m.isSystem && m.name !== 'System Admin' && m.name !== 'Admin' && m.role !== 'admin')
-                .map(m => ({ ...m, id: m._id, active: false, messages: m.messages || [], unreadCount: m.unreadCount || 0, online: m.online || false }));
+                .map(m => ({
+                    ...m,
+                    id: m._id,
+                    active: false,
+                    messages: m.messages || [],
+                    unreadCount: m.unreadCount || 0,
+                    online: m.online || false,
+                    lastMessageTime: m.lastMessageTime || null
+                }));
+            sortMatchesList();
             document.getElementById('statMatches').textContent = matches.length;
             document.getElementById('statOnline').textContent  = matches.filter(m => m.online).length;
             document.getElementById('statMessages').textContent = matches.reduce((t, m) => t + (m.messages ? m.messages.length : 0), 0);
@@ -594,7 +660,7 @@ function renderMatches() {
                 <p class="match-explanation" style="color: #C9A27B; font-size: 0.75rem; font-style: italic; margin: 2px 0;">✨ ${escapeHtml(match.explanation || 'You have similar reading interests.')}</p>
                 <p class="match-preview">${escapeHtml(match.preview || 'No messages yet')}</p>
             </div>
-            <div class="compatibility-badge">${match.compatibility || 75}%</div>
+            <div class="compatibility-badge">${formatCompatibility(match.compatibility)}%</div>
         </div>
     `).join('');
 
@@ -781,9 +847,12 @@ async function refreshCurrentConversation() {
                     
                     if (currentMatch.messages.length > 0) {
                         const lastMsg = currentMatch.messages[currentMatch.messages.length - 1];
-                        currentMatch.preview = lastMsg.text ? 
-                            (lastMsg.text.length > 30 ? lastMsg.text.substring(0, 27) + '...' : lastMsg.text) : 
+                        let previewText = lastMsg.text || '';
+                        previewText = previewText.replace(/\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi, '[Spoiler]');
+                        currentMatch.preview = previewText ? 
+                            (previewText.length > 30 ? previewText.substring(0, 27) + '...' : previewText) : 
                             (lastMsg.attachment ? '📎 Attachment' : 'No messages yet');
+                        currentMatch.lastMessageTime = lastMsg.createdAt || new Date();
                     } else {
                         currentMatch.preview = 'No messages yet';
                     }
@@ -794,6 +863,7 @@ async function refreshCurrentConversation() {
                         showEmptyConversation(currentMatch);
                     }
                     
+                    sortMatchesList();
                     renderMatches();
                 }
             }
@@ -858,7 +928,7 @@ function renderMessages(messages, currentMatch) {
                 ${avatarHtml}
                 <div class="message-content">
                     ${actionsHtml}
-                    <div class="message-bubble">${escapeHtml(msg.text || '')}</div>
+                    <div class="message-bubble">${parseSpoilers(escapeHtml(msg.text || ''))}</div>
                     <div class="message-time">${msg.time || ''}</div>
                 </div>
             </div>
@@ -891,7 +961,7 @@ function renderMessages(messages, currentMatch) {
 
 function renderAttachmentMessage(msg, currentMatch, actionsHtml, msgId, isSent) {
     const att = msg.attachment || {};
-    const caption = escapeHtml(msg.text || att.caption || '');
+    const caption = parseSpoilers(escapeHtml(msg.text || att.caption || ''));
     const isImage = att.category === 'image' || att.type === 'image' || (att.mimeType && att.mimeType.startsWith('image/'));
     
     // Build data URL for display
@@ -1021,8 +1091,11 @@ async function sendMessage() {
                 });
                 
                 messageInput.value = '';
-                currentMatch.preview = text.length > 30 ? text.substring(0, 27) + '...' : text;
+                let previewText = text.replace(/\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi, '[Spoiler]');
+                currentMatch.preview = previewText.length > 30 ? previewText.substring(0, 27) + '...' : previewText;
+                currentMatch.lastMessageTime = now;
                 
+                sortMatchesList();
                 renderMatches();
                 renderMessages(currentMatch.messages, currentMatch);
                 
@@ -1042,8 +1115,11 @@ async function sendMessage() {
             currentMatch.messages.push(newMessage);
             
             messageInput.value = '';
-            currentMatch.preview = text.length > 30 ? text.substring(0, 27) + '...' : text;
+            let previewText = text.replace(/\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi, '[Spoiler]');
+            currentMatch.preview = previewText.length > 30 ? previewText.substring(0, 27) + '...' : previewText;
+            currentMatch.lastMessageTime = now;
             
+            sortMatchesList();
             renderMatches();
             renderMessages(currentMatch.messages, currentMatch);
             
@@ -1301,6 +1377,8 @@ async function sendAttachment(file, category, caption) {
             createdAt: now
         });
         currentMatch.preview = category === 'image' ? '📷 Sent a photo' : '📎 Sent a file';
+        currentMatch.lastMessageTime = now;
+        sortMatchesList();
         renderMatches();
         renderMessages(currentMatch.messages, currentMatch);
         document.getElementById('statMessages').textContent = matches.reduce((t, m) => t + (m.messages ? m.messages.length : 0), 0);
@@ -1417,12 +1495,19 @@ function showContentWarningBanner(message, type) {
     }, dur);
 }
 
-function showNotification(message, type = 'info') {
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(n => n.remove());
-    
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
+
+    function showNotification(message, type = 'info') {
+        // Check global notification preference
+        if (localStorage.getItem('notificationsEnabled') === 'false') {
+            console.log('🔇 Notification suppressed (global setting OFF):', message);
+            return;
+        }
+
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(n => n.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
     
     const icons = {
         success: '✓',
@@ -1450,6 +1535,26 @@ function showNotification(message, type = 'info') {
 function initializeEventListeners() {
     if (sendBtn) {
         sendBtn.addEventListener('click', sendMessage);
+    }
+    
+    const spoilerBtn = document.getElementById('spoilerBtn');
+    if (spoilerBtn && messageInput) {
+        spoilerBtn.addEventListener('click', () => {
+            const start = messageInput.selectionStart;
+            const end = messageInput.selectionEnd;
+            const text = messageInput.value;
+            
+            const before = text.substring(0, start);
+            const selected = text.substring(start, end);
+            const after = text.substring(end);
+            
+            const spoilerText = `[SPOILER]${selected}[/SPOILER]`;
+            messageInput.value = before + spoilerText + after;
+            
+            const newCursorPos = start + 9 + selected.length;
+            messageInput.focus();
+            messageInput.setSelectionRange(newCursorPos, newCursorPos);
+        });
     }
     
     if (messageInput) {

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="../config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Litlink - Book Chat</title>
     <link rel="stylesheet" href="chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -280,6 +282,9 @@
                 <button class="icon-btn" id="attachBtn">
                     <i class="fas fa-paperclip"></i>
                 </button>
+                <button class="icon-btn" id="spoilerBtn" title="Mark selected text as spoiler">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
                 <input 
                     type="text" 
                     class="message-input" 
@@ -297,12 +302,12 @@
     <!-- Authentication Check -->
     <script>
     (function() {
-        const token = localStorage.getItem('litlink_token');
-        const userStr = localStorage.getItem('litlink_user');
+        const token = window.LitlinkSessionAuth ? window.LitlinkSessionAuth.getToken() : (sessionStorage.getItem('litlink_token') || localStorage.getItem('litlink_token'));
+        const user = window.LitlinkSessionAuth ? window.LitlinkSessionAuth.getUser() : JSON.parse(sessionStorage.getItem('litlink_user') || localStorage.getItem('litlink_user') || 'null');
         
         console.log('🔍 Authentication check:', token ? 'Token found' : 'No token');
         
-        if (!token || !userStr) {
+        if (!token || !user) {
             console.log('User not authenticated, showing message...');
             const welcomeState = document.getElementById('welcomeState');
             if (welcomeState) {
@@ -323,5 +328,6 @@
 
     <script src="chat.js"></script>
     <script src="../utils/modal.js"></script>
+    <script src="../utils/textSize.js"></script>
 </body>
 </html>

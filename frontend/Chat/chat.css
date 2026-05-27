@@ -80,6 +80,14 @@
 }
 
 /* ===== BASE STYLES ===== */
+:root {
+    --font-scale: 1;
+}
+
+html {
+    font-size: calc(16px * var(--font-scale, 1));
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -1135,4 +1143,29 @@ body {
     .chat-user-genre {
         font-size: 0.8rem;
     }
+}
+
+/* Spoiler tag styling */
+.spoiler-text {
+    background: rgba(245, 230, 211, 0.15);
+    color: transparent !important;
+    text-shadow: 0 0 8px currentColor;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 4px;
+    padding: 0 4px;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.spoiler-text:hover {
+    background: rgba(245, 230, 211, 0.25);
+}
+
+.spoiler-text.revealed {
+    color: inherit !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    cursor: default;
+    user-select: text;
 }

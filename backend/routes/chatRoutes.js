@@ -94,7 +94,8 @@ router.get('/matches', authenticate, async (req, res) => {
         let preview = 'No messages yet';
         if (lastMsg) {
           if (lastMsg.content && lastMsg.content.trim()) {
-            preview = lastMsg.content.length > 50 ? lastMsg.content.substring(0, 47) + '...' : lastMsg.content;
+            let contentText = lastMsg.content.replace(/\[SPOILER\]([\s\S]*?)\[\/SPOILER\]/gi, '[Spoiler]');
+            preview = contentText.length > 50 ? contentText.substring(0, 47) + '...' : contentText;
           } else if (lastMsg.attachment && lastMsg.attachment.data) {
             preview = lastMsg.attachment.category === 'image' ? '📷 Photo' : '📎 File';
           }
@@ -133,11 +134,23 @@ router.get('/matches', authenticate, async (req, res) => {
       
       let compatibility = 70;
       if (aiMatchesMap.has(user._id.toString())) {
-        compatibility = Math.round(aiMatchesMap.get(user._id.toString()) * 100);
+        let score = aiMatchesMap.get(user._id.toString());
+        if (score > 0 && score <= 1) {
+          compatibility = Math.round(score * 100);
+        } else if (score > 1 && score <= 100) {
+          compatibility = Math.round(score);
+        } else if (score > 100) {
+          if (score % 100 === 0 && score <= 10000) {
+            compatibility = Math.round(score / 100);
+          } else {
+            compatibility = Math.round(score % 100);
+          }
+        }
       } else if (currentUser.favoriteGenres && user.favoriteGenres) {
         const shared = currentUser.favoriteGenres.filter(g => user.favoriteGenres.includes(g));
-        compatibility = 70 + Math.min(25, shared.length * 5);
+        compatibility = Math.min(100, 70 + (shared.length * 5));
       }
+      compatibility = Math.floor(compatibility);
 
       // Generate Explanation
       const commonGenres = (currentUser.favoriteGenres || []).filter(g => (user.favoriteGenres || []).includes(g));
@@ -175,12 +188,16 @@ router.get('/matches', authenticate, async (req, res) => {
         online:         user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false,
         unreadCount:    info.unreadCount || 0,
         conversationId: info.conversationId,
-        compatibility
+        compatibility,
+        lastMessageTime: info.lastMessageTime || null
       };
     }).sort((a, b) => {
-      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
-      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
-      return (b.compatibility || 0) - (a.compatibility || 0);
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      return (a.name || '').localeCompare(b.name || '');
     });
 
     res.json({ success: true, matches });
