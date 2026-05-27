@@ -21,6 +21,46 @@ function getBookCoverUrl(bookId, coverId, isbn) {
   return null;
 }
 
+// ==================== USER PREFERENCES ENDPOINTS ====================
+
+// GET /api/users/preferences - Get user preferences
+router.get('/preferences', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('textSizePreference');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, textSizePreference: user.textSizePreference || 'default' });
+  } catch (error) {
+    console.error('Error fetching user preferences:', error);
+    res.status(500).json({ success: false, message: 'Error fetching preferences' });
+  }
+});
+
+// PUT /api/users/preferences - Update user preferences
+router.put('/preferences', authenticate, async (req, res) => {
+  try {
+    const { textSizePreference } = req.body;
+    
+    if (!['small', 'default', 'large'].includes(textSizePreference)) {
+      return res.status(400).json({ success: false, message: 'Invalid text size preference' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.textSizePreference = textSizePreference;
+    await user.save();
+
+    res.json({ success: true, message: 'Preferences updated successfully', textSizePreference: user.textSizePreference });
+  } catch (error) {
+    console.error('Error updating preferences:', error);
+    res.status(500).json({ success: false, message: 'Error updating preferences' });
+  }
+});
+
 // ==================== USER ENDPOINTS FOR EXPLORE PAGE ====================
 
 // GET /api/users - Get all users (excluding current user, admins, banned)
@@ -627,7 +667,7 @@ router.get('/:userId/want-to-read', authenticate, async (req, res) => {
       id: book.bookId,
       title: book.title,
       author: book.author,
-      cover: `https://covers.openlibrary.org/b/olid/${book.bookId}-M.jpg`
+      cover: book.cover || `https://covers.openlibrary.org/b/olid/${book.bookId}-M.jpg`
     }));
     
     res.json({ success: true, wantToRead, total: wantToRead.length });
@@ -641,7 +681,7 @@ router.get('/:userId/want-to-read', authenticate, async (req, res) => {
 router.post('/:userId/want-to-read', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
-    const { bookId, bookTitle, bookAuthor } = req.body;
+    const { bookId, bookTitle, bookAuthor, bookCover } = req.body;
     
     if (userId !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
@@ -666,7 +706,8 @@ router.post('/:userId/want-to-read', authenticate, async (req, res) => {
     user.wantToRead.push({
       bookId,
       title: bookTitle,
-      author: bookAuthor || 'Unknown Author'
+      author: bookAuthor || 'Unknown Author',
+      cover: bookCover
     });
     
     await user.save();

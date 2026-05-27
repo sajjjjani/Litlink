@@ -1,14 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
+const VoiceRoom = require('../models/VoiceRoom');
+const DiscussionThread = require('../models/DiscussionThread');
+const Circle = require('../models/Circle');
+const Notification = require('../models/Notification');
+const Conversation = require('../models/Conversation');
 
 // GET /api/dashboard/:userId
 router.get('/:userId', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    if (userId !== req.userId.toString()) {
+    if (userId !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Unauthorized access' });
     }
     
@@ -17,60 +23,196 @@ router.get('/:userId', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    // Get user's notifications from the database (if implemented)
-    // For now, we'll use mock notifications
-    const notifications = [
-      { 
-        id: 'notif1',
-        type: 'match',
-        title: 'New Reader Match',
-        message: 'Alex M. shares your interest in Fantasy novels',
-        timestamp: '5m ago',
-        read: false,
-        icon: '🔗',
-        actionUrl: '/chat/chat1'
+    // 1. Get real notifications
+    const realNotifications = await Notification.find({ recipient: userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+      
+    const notifications = realNotifications.map(n => ({
+      id: n._id,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      timestamp: n.createdAt,
+      read: n.read,
+      icon: n.icon || (n.type === 'match' ? '🔗' : n.type === 'message' ? '💬' : '📌'),
+      actionUrl: n.actionUrl || '#'
+    }));
+
+    // 2. Get real voice rooms
+    const activeVoiceRooms = await VoiceRoom.find({ status: { $in: ['active', 'live'] } })
+      .populate('host', 'name profilePicture')
+      .limit(3)
+      .lean();
+      
+    const voiceRooms = activeVoiceRooms.map(room => ({
+      id: room._id,
+      name: room.name,
+      participants: room.participants?.length || 0,
+      host: { 
+        name: room.host?.name || 'Litlink Host', 
+        image: room.host?.profilePicture || 'https://i.pravatar.cc/40?img=1' 
       },
-      { 
-        id: 'notif2',
-        type: 'message',
-        title: 'New Message',
-        message: 'Sarah replied to your book suggestion',
-        timestamp: '1h ago',
-        read: false,
-        icon: '💬',
-        actionUrl: '/chat/chat2'
+      tags: [room.genre || 'General', room.isPrivate ? 'Private' : 'Public']
+    }));
+
+    // 3. Trending circles by real activity (posts, engagement, member activity, recency)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const circleActivity = await DiscussionThread.aggregate([
+      {
+        $match: {
+          isDeleted: false,
+          circleId: { $exists: true, $ne: null }
+        }
       },
-      { 
-        id: 'notif3',
-        type: 'board',
-        title: 'Board Update',
-        message: 'New discussion started in Fantasy Worlds',
-        timestamp: '3h ago',
-        read: true,
-        icon: '📌',
-        actionUrl: '/board/board1'
+      {
+        $group: {
+          _id: '$circleId',
+          activeDiscussions: {
+            $sum: {
+              $cond: [{ $gte: ['$lastActivity', sevenDaysAgo] }, 1, 0]
+            }
+          },
+          latestPosts: {
+            $sum: {
+              $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0]
+            }
+          },
+          recentEngagement: {
+            $sum: {
+              $add: [
+                { $ifNull: ['$commentCount', 0] },
+                { $ifNull: ['$likeCount', 0] },
+                {
+                  $cond: [
+                    { $gte: ['$lastActivity', sevenDaysAgo] },
+                    { $ifNull: ['$views', 0] },
+                    0
+                  ]
+                }
+              ]
+            }
+          },
+          latestActivityAt: { $max: { $ifNull: ['$lastActivity', '$createdAt'] } },
+          activeMemberSet: { $addToSet: '$author' }
+        }
       },
-      { 
-        id: 'notif4',
-        type: 'voice',
-        title: 'Voice Room Starting',
-        message: 'Mystery Book Club voice chat starts in 10 minutes',
-        timestamp: '5h ago',
-        read: true,
-        icon: '🎙️',
-        actionUrl: '/voice/room1'
-      },
-      { 
-        id: 'notif5',
-        type: 'achievement',
-        title: 'Achievement Unlocked!',
-        message: 'You\'ve completed your weekly reading goal!',
-        timestamp: '1d ago',
-        read: true,
-        icon: '🏆',
-        actionUrl: '/profile#achievements'
+      {
+        $project: {
+          activeDiscussions: 1,
+          latestPosts: 1,
+          recentEngagement: 1,
+          latestActivityAt: 1,
+          activeMembers: { $size: '$activeMemberSet' }
+        }
       }
-    ];
+    ]);
+
+    const activityByCircleId = new Map(
+      circleActivity.map(item => [item._id.toString(), item])
+    );
+
+    const activityCircleIds = Array.from(activityByCircleId.keys()).map(
+      id => new mongoose.Types.ObjectId(id)
+    );
+
+    const circleDocs = await Circle.find(
+      activityCircleIds.length ? { _id: { $in: activityCircleIds } } : {}
+    )
+      .select('circleId name icon genre stats members createdAt')
+      .lean();
+
+    // If activity is sparse, backfill with largest circles so the section is never fake.
+    if (circleDocs.length < 6) {
+      const existingIds = new Set(circleDocs.map(circle => circle._id.toString()));
+      const fallbackCircles = await Circle.find({
+        _id: { $nin: Array.from(existingIds).map(id => new mongoose.Types.ObjectId(id)) }
+      })
+        .sort({ 'stats.memberCount': -1, createdAt: -1 })
+        .limit(6 - circleDocs.length)
+        .select('circleId name icon genre stats members createdAt')
+        .lean();
+      circleDocs.push(...fallbackCircles);
+    }
+
+    const trendingCircles = circleDocs.map(circle => {
+      const activity = activityByCircleId.get(circle._id.toString()) || {};
+      const memberCount = circle.stats?.memberCount || circle.members?.length || 0;
+      const activeToday = circle.stats?.activeToday || 0;
+      const activeDiscussions = activity.activeDiscussions || 0;
+      const latestPosts = activity.latestPosts || 0;
+      const recentEngagement = activity.recentEngagement || 0;
+      const activeMembers = activity.activeMembers || 0;
+      const lastActivityAt = activity.latestActivityAt || circle.createdAt;
+      const hoursSinceLastActivity = lastActivityAt
+        ? Math.max(0, (Date.now() - new Date(lastActivityAt).getTime()) / (1000 * 60 * 60))
+        : 168;
+      const recencyBoost = Math.max(0, 72 - hoursSinceLastActivity);
+
+      const activityScore = (
+        (activeDiscussions * 8) +
+        (latestPosts * 6) +
+        (recentEngagement * 0.3) +
+        (activeMembers * 4) +
+        (activeToday * 5) +
+        (memberCount * 0.5) +
+        recencyBoost
+      );
+
+      return {
+        id: circle._id,
+        circleId: circle.circleId,
+        name: circle.name,
+        icon: circle.icon || '📚',
+        genre: circle.genre || 'General',
+        memberCount,
+        activeDiscussions,
+        recentEngagement: Math.round(recentEngagement),
+        latestPosts,
+        activeMembers,
+        lastActivityAt,
+        activityScore: Math.round(activityScore)
+      };
+    })
+      .sort((a, b) => b.activityScore - a.activityScore)
+      .slice(0, 6);
+
+    // 4. Get active chats
+    const conversations = await Conversation.find({ participants: userId })
+      .sort({ updatedAt: -1 })
+      .populate('participants', 'name profilePicture')
+      .limit(3)
+      .lean();
+      
+    const activeChats = conversations.map(conv => {
+      const otherUser = conv.participants.find(p => p._id.toString() !== userId);
+      return {
+        id: conv._id,
+        name: otherUser?.name || 'Chat',
+        avatar: otherUser?.profilePicture || 'https://i.pravatar.cc/60?img=1',
+        lastMessage: conv.lastMessagePreview || 'No messages yet',
+        timestamp: conv.updatedAt,
+        unreadCount: conv.unreadCount ? (conv.unreadCount[userId] || 0) : 0
+      };
+    });
+
+    // 5. Get suggested circles (renamed from book clubs)
+    const suggestedCircles = await Circle.find({ 'settings.isPrivate': false })
+      .sort({ 'stats.memberCount': -1 })
+      .limit(3)
+      .lean();
+      
+    const suggestedClubs = suggestedCircles.map(circle => ({
+      id: circle._id,
+      name: circle.name,
+      description: circle.description,
+      icon: circle.icon || '📚',
+      members: circle.stats?.memberCount || circle.members?.length || 0,
+      currentBook: circle.currentBook || 'Reading session in progress'
+    }));
     
     const dashboardData = {
       user: {
@@ -81,50 +223,25 @@ router.get('/:userId', authenticate, async (req, res) => {
         favoriteGenres: user.favoriteGenres || ['Magical Realism'],
         bio: user.bio,
         location: user.location,
-        readingGoal: user.readingGoal || 12
+        readingGoal: user.readingGoal || 12,
+        completionPercentage: user.completionPercentage || 0
       },
       stats: {
-        totalMatches: 4,
-        activeChats: 3,
-        joinedBoards: 2,
+        totalMatches: user.matches?.length || 0,
+        activeChats: activeChats.length,
+        joinedBoards: user.joinedCircles?.length || 0,
         booksRead: user.booksRead?.length || 0,
         unreadNotifications: notifications.filter(n => !n.read).length
       },
       notifications: notifications,
-      topMatches: [
-        { id: 'match1', name: 'Elena R.', profileImage: 'https://i.pravatar.cc/150?img=5', tags: ['Fantasy', 'Sci-Fi'], sharedBooks: 32, isConnected: false },
-        { id: 'match2', name: 'Marcus Chen', profileImage: 'https://i.pravatar.cc/150?img=12', tags: ['Mystery', 'Thriller'], sharedBooks: 28, isConnected: false },
-        { id: 'match3', name: 'Sarah J.', profileImage: 'https://i.pravatar.cc/150?img=9', tags: ['Romance', 'YA'], sharedBooks: 25, isConnected: false },
-        { id: 'match4', name: 'David K.', profileImage: 'https://i.pravatar.cc/150?img=14', tags: ['History', 'Biographies'], sharedBooks: 21, isConnected: false }
-      ],
-      trendingBoards: [
-        { id: 'board1', name: 'Fantasy Worlds', icon: '✨', color: 'purple', activeUsers: 15000, isJoined: false },
-        { id: 'board2', name: 'Modern Romance', icon: '💕', color: 'pink', activeUsers: 9000, isJoined: false },
-        { id: 'board3', name: 'Mystery & Thriller', icon: '🔍', color: 'blue', activeUsers: 21000, isJoined: false },
-        { id: 'board4', name: 'Literary Fiction', icon: '✒️', color: 'brown', activeUsers: 6000, isJoined: false },
-        { id: 'board5', name: 'Young Adult', icon: '🌹', color: 'teal', activeUsers: 12000, isJoined: false },
-        { id: 'board6', name: 'Sci-Fi Classics', icon: '🚀', color: 'indigo', activeUsers: 8000, isJoined: false }
-      ],
-      activeChats: [
-        { id: 'chat1', name: 'The Midnight Library Club', avatar: 'https://i.pravatar.cc/60?img=20', lastMessage: 'Has anyone finished chapter 5 yet?', timestamp: '2m ago', unreadCount: 3 },
-        { id: 'chat2', name: 'James Wilson', avatar: 'https://i.pravatar.cc/60?img=33', lastMessage: "I think you'd love 'Project Hail Mary'!", timestamp: '1h ago', unreadCount: 0 },
-        { id: 'chat3', name: 'Sci-Fi Enthusiasts', avatar: 'https://i.pravatar.cc/60?img=47', lastMessage: 'Meeting is scheduled for Friday at 8pm 📚', timestamp: 'yesterday', unreadCount: 0 }
-      ],
-      voiceRooms: [
-        { id: 'room1', name: 'Romance Readers Hangout', participants: 12, host: { name: 'Bella S.', image: 'https://i.pravatar.cc/40?img=25' }, tags: ['💕 Hot', 'Discussion'] },
-        { id: 'room2', name: 'Mystery Ch. 4 Deep Dive', participants: 8, host: { name: 'The Book Detectives', image: 'https://i.pravatar.cc/40?img=32' }, tags: ['🔍 Mystery', 'Deep'] },
-        { id: 'room3', name: 'Writing Sprint: 25min', participants: 15, host: { name: 'Author Circle', image: 'https://i.pravatar.cc/40?img=41' }, tags: ['Creative', 'Write'] }
-      ],
-      recentActivity: [
-        { id: 'activity1', icon: '📚', description: 'Sarah posted in Fantasy Board', timestamp: '3h ago' },
-        { id: 'activity2', icon: '📖', description: 'New Voice Room "Sci-Fi Talk"', timestamp: '5h ago' },
-        { id: 'activity3', icon: '🔗', description: '3 readers matched with you', timestamp: '8h ago' }
-      ],
-      suggestedUsers: [
-        { id: 'user1', name: 'Alex M.', profilePicture: 'https://i.pravatar.cc/50?img=16', tags: ['Fantasy'], isFavorited: false },
-        { id: 'user2', name: 'Jordan T.', profilePicture: 'https://i.pravatar.cc/50?img=28', tags: ['Sci-Fi'], isFavorited: false },
-        { id: 'user3', name: 'Casey L.', profilePicture: 'https://i.pravatar.cc/50?img=35', tags: ['Mystery'], isFavorited: false }
-      ]
+      topMatches: [], // Match logic is separate but can be added if needed
+      trendingCircles: trendingCircles,
+      // Backward-compat alias used by existing dashboard clients.
+      trendingBoards: trendingCircles,
+      activeChats: activeChats,
+      voiceRooms: voiceRooms,
+      suggestedClubs: suggestedClubs,
+      recentActivity: [] // Can be fetched from UserActivity model if needed
     };
     
     res.json({ success: true, dashboard: dashboardData });

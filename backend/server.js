@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const http = require('http');
 require('dotenv').config();
+const { corsOrigin } = require('./utils/allowedOrigins');
 
 // Import models
 const User = require('./models/User');
@@ -32,27 +33,18 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const circleRequestRoutes = require('./routes/circleRequestRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const adminSettingsRoutes = require('./routes/adminSettings.routes');
+const userSettingsRoutes = require('./routes/userSettingsRoutes');
+const bookCommunityRoutes = require('./routes/bookCommunityRoutes');
 // Import WebSocket server
 const SocketServer = require('./socketServer');
+const roomScheduler = require('./services/roomScheduler');
 
 const app = express();
+const frontendPath = path.join(__dirname, '..', 'frontend');
 
 // ===== MIDDLEWARE =====
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'http://localhost:5000',
-    'http://127.0.0.1:5000',
-    'http://localhost:5002',
-    'http://127.0.0.1:5002',
-    'http://localhost:5001',
-    'http://127.0.0.1:5001'
-  ],
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -104,6 +96,7 @@ const connectDB = async () => {
 // ===== ROUTES =====
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
+app.use('/api/books', bookCommunityRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
@@ -118,6 +111,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/circle-requests', circleRequestRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/admin/settings', adminSettingsRoutes);
+app.use('/api/user-settings', userSettingsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -142,7 +136,7 @@ app.get('/health', (req, res) => {
 });
 
 // API Info endpoint
-app.get('/', (req, res) => {
+app.get('/api/info', (req, res) => {
   res.json({
     name: 'Litlink Backend API',
     version: '1.0.0',
@@ -168,6 +162,13 @@ app.get('/', (req, res) => {
     },
     status: 'running'
   });
+});
+
+// Serve the frontend from the same hosted service.
+app.use(express.static(frontendPath));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'Homepage', 'index.html'));
 });
 
 // 404 handler
@@ -249,6 +250,9 @@ const startServer = async () => {
 
     console.log('✅ WebSocket server initialized with voice room, chat and notification support');
     
+    // Start background Room Scheduler
+    roomScheduler.startScheduler();
+    
     server.listen(PORT, () => {
       console.log('='.repeat(70));
       console.log('🚀 Litlink Backend Server Started!');
@@ -322,6 +326,9 @@ const startServer = async () => {
 
 function gracefulShutdown() {
   console.log('\n🔄 Shutting down gracefully...');
+  
+  // Stop background Room Scheduler
+  roomScheduler.stopScheduler();
   
   const forceShutdownTimeout = setTimeout(() => {
     console.error('❌ Could not close connections in time, forcing shutdown');

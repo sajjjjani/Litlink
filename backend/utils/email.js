@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { getHomepageUrl } = require('./publicUrl');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -10,7 +11,10 @@ const transporter = nodemailer.createTransport({
 
 async function sendVerificationEmail(email, verificationCode, userName) {
   try {
-    const verificationLink = `http://localhost:5500/verify-email.html?email=${encodeURIComponent(email)}&code=${verificationCode}`;
+    const verificationLink = getHomepageUrl('verify-email.html', {
+      email,
+      code: verificationCode
+    });
     
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
@@ -86,7 +90,10 @@ async function sendVerificationEmail(email, verificationCode, userName) {
 
 async function sendPasswordResetEmail(email, otp, userName) {
   try {
-    const resetLink = `http://localhost:5500/verify-otp.html?email=${encodeURIComponent(email)}&otp=${otp}`;
+    const resetLink = getHomepageUrl('verify-otp.html', {
+      email,
+      otp
+    });
     
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
@@ -163,4 +170,3 @@ module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail
 };
-

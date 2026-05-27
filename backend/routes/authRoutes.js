@@ -42,6 +42,59 @@ function formatUserResponse(user) {
   };
 }
 
+// GET /api/auth/me
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password -verificationCode -resetToken');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, user: formatUserResponse(user) });
+  } catch (error) {
+    console.error('Auth me error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/auth/change-password
+router.put('/change-password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+    }
+
+    const hasLetter = /[A-Za-z]/.test(newPassword);
+    const hasNumber = /\d/.test(newPassword);
+    if (!hasLetter || !hasNumber) {
+      return res.status(400).json({ success: false, message: 'Password must include at least one letter and one number' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const ok = await bcrypt.compare(currentPassword, user.password);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   try {
@@ -434,4 +487,3 @@ router.delete('/user/:userId', authenticate, async (req, res) => {
 });
 
 module.exports = router;
-
