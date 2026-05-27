@@ -182,7 +182,9 @@ async function loadUserCircles() {
                 }
                 
                 if (data.circles.length > 0) {
-                    currentCircle = data.circles[0].circleId;
+                    if (!currentCircle || !data.circles.some(c => c.circleId === currentCircle)) {
+                        currentCircle = data.circles[0].circleId;
+                    }
                     updateFeedTitle();
                     loadCircleMembers(currentCircle);
                 } else {
@@ -228,6 +230,8 @@ function updateCircleSelector(circles) {
     const circleSelect = document.getElementById('activeCircle');
     if (!circleSelect) return;
     
+    const previousValue = circleSelect.value;
+    
     circleSelect.innerHTML = '';
     
     if (!circles || circles.length === 0) {
@@ -242,6 +246,10 @@ function updateCircleSelector(circles) {
         option.dataset.role = circle.role;
         circleSelect.appendChild(option);
     });
+    
+    if (previousValue && circles.some(c => c.circleId === previousValue)) {
+        circleSelect.value = previousValue;
+    }
 }
 
 function addCreateCircleButton() {
@@ -1689,12 +1697,20 @@ function showCircleThreadModal() {
                 
                 <div id="eventOptions" style="display: none;">
                     <div class="form-group">
-                        <label for="eventDate">Event Date & Time</label>
-                        <input type="datetime-local" id="eventDate" class="modal-input">
+                        <label><i class="fas fa-calendar-day"></i> Select Date</label>
+                        <div id="circleEventCalendar" class="calendar-widget"></div>
                     </div>
                     <div class="form-group">
-                        <label for="eventDuration">Duration</label>
-                        <select id="eventDuration" class="modal-select">
+                        <label><i class="fas fa-clock"></i> Select Time</label>
+                        <div id="circleEventTimeSlots" class="time-slots"></div>
+                    </div>
+                    <div id="circleEventSummary" class="calendar-summary" style="display: none;">
+                        <i class="fas fa-calendar-check"></i>
+                        <span id="circleEventSummaryText">No date selected</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="circleEventDuration">Duration</label>
+                        <select id="circleEventDuration" class="modal-select">
                             <option value="30">30 minutes</option>
                             <option value="60">1 hour</option>
                             <option value="90">1.5 hours</option>
@@ -1702,8 +1718,8 @@ function showCircleThreadModal() {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="eventType">Event Type</label>
-                        <select id="eventType" class="modal-select">
+                        <label for="circleEventType">Event Type</label>
+                        <select id="circleEventType" class="modal-select">
                             <option value="voice">🎙️ Voice Chat Discussion</option>
                             <option value="text">💬 Text Discussion</option>
                             <option value="video">📹 Video Call</option>
@@ -1827,9 +1843,47 @@ function showCircleThreadModal() {
     const pollOptionsDiv = modal.querySelector('#pollOptions');
     const eventOptionsDiv = modal.querySelector('#eventOptions');
     
+    let circleEventCal = null;
+    let circleEventTimePicker = null;
+
     typeSelect.addEventListener('change', function() {
         pollOptionsDiv.style.display = this.value === 'poll' ? 'block' : 'none';
-        eventOptionsDiv.style.display = this.value === 'event' ? 'block' : 'none';
+        const isEvent = this.value === 'event';
+        eventOptionsDiv.style.display = isEvent ? 'block' : 'none';
+        if (isEvent && !circleEventCal) {
+            const calContainer = modal.querySelector('#circleEventCalendar');
+            const timeContainer = modal.querySelector('#circleEventTimeSlots');
+            const summaryEl = modal.querySelector('#circleEventSummary');
+            const summaryText = modal.querySelector('#circleEventSummaryText');
+            window._circleThreadEventDate = null;
+            window._circleThreadEventTime = '';
+            circleEventCal = initCalendar(calContainer, null, (date) => {
+                window._circleThreadEventDate = date;
+                if (window._circleThreadEventDate && window._circleThreadEventTime) {
+                    const opts = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+                    const ds = window._circleThreadEventDate.toLocaleDateString('en-US', opts);
+                    const [h, m] = window._circleThreadEventTime.split(':').map(Number);
+                    const ampm = h >= 12 ? 'PM' : 'AM';
+                    const hr = h % 12 || 12;
+                    const ts = `${hr}:${m.toString().padStart(2, '0')} ${ampm}`;
+                    summaryText.textContent = `${ds} at ${ts}`;
+                    summaryEl.style.display = 'flex';
+                }
+            });
+            circleEventTimePicker = initTimeSlots(timeContainer, '', (time) => {
+                window._circleThreadEventTime = time;
+                if (window._circleThreadEventDate && window._circleThreadEventTime) {
+                    const opts = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+                    const ds = window._circleThreadEventDate.toLocaleDateString('en-US', opts);
+                    const [h, m] = window._circleThreadEventTime.split(':').map(Number);
+                    const ampm = h >= 12 ? 'PM' : 'AM';
+                    const hr = h % 12 || 12;
+                    const ts = `${hr}:${m.toString().padStart(2, '0')} ${ampm}`;
+                    summaryText.textContent = `${ds} at ${ts}`;
+                    summaryEl.style.display = 'flex';
+                }
+            });
+        }
     });
     
     const addPollBtn = modal.querySelector('#addPollOption');
@@ -1850,6 +1904,8 @@ function showCircleThreadModal() {
     const postBtn = modal.querySelector('.post-circle-btn');
     
     function closeModal() {
+        delete window._circleThreadEventDate;
+        delete window._circleThreadEventTime;
         modal.remove();
         document.body.style.overflow = '';
     }
@@ -1902,17 +1958,19 @@ function showCircleThreadModal() {
                 
                 formData.append('poll', JSON.stringify({ question: pollQuestion, options: pollOptions }));
             } else if (type === 'event') {
-                const eventDate = modal.querySelector('#eventDate')?.value;
-                const eventDuration = modal.querySelector('#eventDuration')?.value;
-                const eventType = modal.querySelector('#eventType')?.value;
+                const circleEventDate = window._circleThreadEventDate;
+                const circleEventTime = window._circleThreadEventTime;
+                const eventDuration = modal.querySelector('#circleEventDuration')?.value;
+                const eventType = modal.querySelector('#circleEventType')?.value;
                 
-                if (!eventDate) {
-                    showNotification('Please select an event date', 'error');
+                if (!circleEventDate || !circleEventTime) {
+                    showNotification('Please select a date and time for the event', 'error');
                     postBtn.innerHTML = 'Post to Circle';
                     postBtn.disabled = false;
                     return;
                 }
-                formData.append('event', JSON.stringify({ date: eventDate, duration: eventDuration, type: eventType }));
+                const eventDateStr = formatDatetimeLocal(circleEventDate, circleEventTime);
+                formData.append('event', JSON.stringify({ date: eventDateStr, duration: parseInt(eventDuration), type: eventType }));
             }
             
             const response = await fetch('http://localhost:5002/api/discussions/circles/threads', {
@@ -2462,14 +2520,6 @@ function showQuickPollModal(circleName, circleValue) {
     });
 }
 
-function showQuickEventModal(circleName, circleValue) {
-    showNotification(`Schedule an event in ${circleName} - Coming soon!`, 'info');
-}
-
-function showBookSuggestionModal(circleName, circleValue) {
-    showNotification(`Suggest a book to ${circleName} - Coming soon!`, 'info');
-}
-
 function updateFeedTitle() {
     if (currentFeed === 'circle') {
         const circleSelect = document.getElementById('activeCircle');
@@ -2699,7 +2749,7 @@ function createThreadCard(thread) {
         
         let typeSpecificHtml = '';
         if (thread.type === 'poll' && thread.poll) {
-            typeSpecificHtml = createPollPreview(thread.poll);
+            typeSpecificHtml = createPollPreview(thread.poll, thread._id);
         } else if (thread.type === 'event' && thread.event) {
             typeSpecificHtml = createEventPreview(thread.event);
         } else {
@@ -2783,6 +2833,18 @@ function createThreadCard(thread) {
             }
         });
         
+        // Poll voting click handlers
+        if (thread.type === 'poll' && thread.poll) {
+            const pollOptions = card.querySelectorAll('.poll-clickable[data-option-index]');
+            pollOptions.forEach(opt => {
+                opt.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const optionIndex = parseInt(opt.dataset.optionIndex);
+                    await handlePollVote(thread._id, optionIndex, card);
+                });
+            });
+        }
+        
         return card;
     } catch (error) {
         console.error('Error creating thread card:', error);
@@ -2790,25 +2852,115 @@ function createThreadCard(thread) {
     }
 }
 
-function createPollPreview(poll) {
-    const totalVotes = poll.totalVotes || poll.options?.reduce((sum, opt) => sum + (opt.votes || 0), 0) || 0;
+function createPollPreview(poll, threadId) {
     const options = poll.options || [];
+    const currentUserId = getAuthUserId();
+    const userVotedIndex = options.findIndex(opt => {
+        if (Array.isArray(opt.votes)) {
+            return opt.votes.some(v => String(v) === String(currentUserId));
+        }
+        if (Array.isArray(opt.voterIds)) {
+            return opt.voterIds.some(v => String(v) === String(currentUserId));
+        }
+        return opt.userVoted === true;
+    });
+    const hasVoted = userVotedIndex >= 0;
+    const totalVotes = poll.totalVotes || options.reduce((sum, opt) => {
+        if (Array.isArray(opt.votes)) return sum + opt.votes.length;
+        return sum + (opt.votes || 0);
+    }, 0) || 0;
+    
+    function getOptionVotes(opt) {
+        if (Array.isArray(opt.votes)) return opt.votes.length;
+        if (typeof opt.votes === 'number') return opt.votes;
+        return opt.voteCount || 0;
+    }
     
     return `
-        <div class="poll-preview" style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 20px; margin: 15px 0;">
+        <div class="poll-preview" data-poll-thread-id="${threadId || ''}" data-poll-question="${escapeHtml(poll.question)}" style="background: rgba(0, 0, 0, 0.2); border-radius: 12px; padding: 20px; margin: 15px 0;">
             <h4 style="color: #fff; margin-bottom: 15px; font-size: 16px;">${escapeHtml(poll.question)}</h4>
-            ${options.map(option => `
-                <div class="poll-option" style="margin-bottom: 15px; position: relative;">
-                    <span class="poll-label" style="display: block; margin-bottom: 5px; color: #e8d4c0; font-size: 14px;">${escapeHtml(option.text)}</span>
+            ${options.map((option, idx) => {
+                const voteCount = getOptionVotes(option);
+                const pct = option.percentage != null ? option.percentage : (totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0);
+                return `
+                <div class="poll-option ${hasVoted ? 'poll-voted' : 'poll-clickable'}" data-option-index="${idx}" 
+                     style="margin-bottom: 15px; position: relative; ${!hasVoted ? 'cursor: pointer;' : ''}">
+                    <span class="poll-label" style="display: block; margin-bottom: 5px; color: #e8d4c0; font-size: 14px;">
+                        ${hasVoted && userVotedIndex === idx ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-right: 6px;"></i>' : ''}
+                        ${escapeHtml(option.text)}
+                    </span>
                     <div class="poll-bar-container" style="position: relative; height: 30px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; overflow: hidden;">
-                        <div class="poll-bar" style="height: 100%; background: linear-gradient(90deg, #e8d4c0, #a88b76); border-radius: 6px; transition: width 0.3s ease; width: ${option.percentage || 0}%;"></div>
-                        <span class="poll-percentage" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 600; font-size: 12px; z-index: 1;">${option.percentage || 0}%</span>
+                        <div class="poll-bar" style="height: 100%; background: linear-gradient(90deg, #e8d4c0, #a88b76); border-radius: 6px; transition: width 0.3s ease; width: ${pct}%;"></div>
+                        <span class="poll-percentage" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 600; font-size: 12px; z-index: 1;">${pct}% (${voteCount})</span>
                     </div>
-                </div>
-            `).join('')}
+                </div>`;
+            }).join('')}
             <div class="poll-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; color: #a88b76; font-size: 13px;">
                 <span>${totalVotes} votes</span>
+                ${!hasVoted && threadId ? '<span style="color: #4caf50; font-size: 12px;"><i class="fas fa-hand-pointer"></i> Click an option to vote</span>' : ''}
             </div>
+        </div>
+    `;
+}
+
+async function handlePollVote(threadId, optionIndex, containerEl) {
+    const token = getAuthToken();
+    if (!token) {
+        showNotification('Please log in to vote', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`http://localhost:5002/api/discussions/threads/${threadId}/poll/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ optionIndex })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const pollPreview = containerEl.querySelector('.poll-preview');
+            if (pollPreview) {
+                const currentUserId = getAuthUserId();
+                const hasVoted = true;
+                const options = data.results || [];
+                const totalVotes = data.totalVotes || 0;
+
+                pollPreview.innerHTML = createPollResultsHtml(pollPreview.dataset.pollQuestion || '', options, totalVotes, currentUserId, optionIndex);
+            }
+            showNotification('Vote recorded!', 'success');
+        } else {
+            showNotification(data.message || 'Error voting', 'error');
+        }
+    } catch (error) {
+        console.error('Error voting in poll:', error);
+        showNotification('Error voting. Please try again.', 'error');
+    }
+}
+
+function createPollResultsHtml(question, results, totalVotes, currentUserId, userVotedIndex) {
+    return `
+        <h4 style="color: #fff; margin-bottom: 15px; font-size: 16px;">${escapeHtml(question)}</h4>
+        ${results.map((opt, idx) => {
+            const pct = opt.percentage || 0;
+            return `
+            <div class="poll-option poll-voted" style="margin-bottom: 15px; position: relative;">
+                <span class="poll-label" style="display: block; margin-bottom: 5px; color: #e8d4c0; font-size: 14px;">
+                    ${idx === userVotedIndex ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-right: 6px;"></i>' : ''}
+                    ${escapeHtml(opt.text)}
+                </span>
+                <div class="poll-bar-container" style="position: relative; height: 30px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; overflow: hidden;">
+                    <div class="poll-bar" style="height: 100%; background: linear-gradient(90deg, #e8d4c0, #a88b76); border-radius: 6px; transition: width 0.3s ease; width: ${pct}%;"></div>
+                    <span class="poll-percentage" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 600; font-size: 12px; z-index: 1;">${pct}% (${opt.votes || 0})</span>
+                </div>
+            </div>`;
+        }).join('')}
+        <div class="poll-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; color: #a88b76; font-size: 13px;">
+            <span>${totalVotes} votes</span>
         </div>
     `;
 }
@@ -2969,6 +3121,27 @@ async function viewThread(threadId) {
                 <div style="background:rgba(0,0,0,0.15);border-radius:12px;padding:20px;border-left:3px solid rgba(232,212,192,0.2);margin-bottom:18px;">
                     <p style="color:#d4c0ac;font-size:15px;line-height:1.8;white-space:pre-wrap;">${escapeHtml(thread.content)}</p>
                 </div>
+                ${thread.attachments && thread.attachments.length > 0 ? `
+                <div class="thread-attachments" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;">
+                    ${thread.attachments.map((att, idx) => `
+                        <div class="attachment-item ${att.isCensored ? 'censored' : ''}"
+                             style="position:relative;border-radius:12px;overflow:hidden;cursor:pointer;aspect-ratio:16/9;background:#000;"
+                             onclick="handleAttachmentClick(this,'${att.url}',${att.isCensored})">
+                            <img src="${att.url}"
+                                 style="width:100%;height:100%;object-fit:cover;transition:all 0.3s;${att.isCensored ? 'filter:blur(20px);' : ''}"
+                                 class="attachment-img">
+                            ${att.isCensored ? `
+                                <div class="censor-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);color:#fff;gap:8px;">
+                                    <i class="fas fa-eye-slash" style="font-size:20px;"></i>
+                                    <span style="font-size:12px;font-weight:600;">Censored Content</span>
+                                    <span style="font-size:10px;opacity:0.8;">Click to reveal</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+                ${thread.type === 'poll' && thread.poll ? createPollPreview(thread.poll, thread._id) : ''}
+                ${thread.type === 'event' && thread.event ? createEventPreview(thread.event) : ''}
                 ${thread.tags && thread.tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">${thread.tags.map(t=>`<span style="background:rgba(139,69,40,0.25);border:1px solid rgba(232,212,192,0.15);border-radius:12px;padding:3px 10px;color:#c4a891;font-size:12px;"><i class="fas fa-hashtag"></i> ${escapeHtml(t)}</span>`).join('')}</div>` : ''}
                 <div style="display:flex;gap:20px;align-items:center;padding:14px 0;border-top:1px solid rgba(232,212,192,0.1);border-bottom:1px solid rgba(232,212,192,0.1);">
                     <button id="likeThreadBtn" data-thread-id="${thread._id}" style="background:${isLiked ? 'rgba(255,80,80,0.2)' : 'rgba(139,69,40,0.2)'};border:1px solid ${isLiked ? 'rgba(255,80,80,0.4)' : 'rgba(232,212,192,0.2)'};border-radius:8px;padding:8px 16px;color:${isLiked ? '#ff6b6b' : '#e8d4c0'};cursor:pointer;display:flex;align-items:center;gap:6px;font-size:14px;transition:all 0.2s;">
@@ -3080,6 +3253,19 @@ async function viewThread(threadId) {
         });
 
         bindReplyButtons(modal, threadId, token);
+
+        // Poll voting in detail modal
+        modal.querySelectorAll('.poll-clickable[data-option-index]').forEach(opt => {
+            opt.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const pollPreview = opt.closest('.poll-preview');
+                const tid = pollPreview?.dataset.pollThreadId;
+                const optionIndex = parseInt(opt.dataset.optionIndex);
+                if (tid) {
+                    await handlePollVote(tid, optionIndex, modal.querySelector('#threadDetailBody'));
+                }
+            });
+        });
 
     } catch (error) {
         console.error('Error loading thread:', error);
@@ -3470,13 +3656,46 @@ function handleAttachmentClick(element, url, isCensored) {
             if (overlay) overlay.style.display = 'none';
             element.classList.remove('censored');
         } else {
-            img.style.filter = 'blur(20px)';
-            if (overlay) overlay.style.display = 'flex';
-            element.classList.add('censored');
+            showImageLightbox(url);
         }
     } else {
-        window.open(url, '_blank');
+        showImageLightbox(url);
     }
+}
+
+function showImageLightbox(url) {
+    const existing = document.querySelector('.image-lightbox-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'image-lightbox-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px;';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);cursor:default;';
+    img.onclick = (e) => e.stopPropagation();
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.cssText = 'position:fixed;top:20px;right:30px;background:none;border:none;color:#fff;font-size:36px;cursor:pointer;z-index:100001;font-family:Arial,sans-serif;line-height:1;';
+    closeBtn.onclick = () => overlay.remove();
+
+    overlay.appendChild(img);
+    overlay.appendChild(closeBtn);
+    overlay.onclick = () => overlay.remove();
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const origOverflow = document.body.style.overflow;
+    const observer = new MutationObserver(() => {
+        if (!document.body.contains(overlay)) {
+            document.body.style.overflow = origOverflow;
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true });
 }
 
 
@@ -3669,6 +3888,140 @@ async function deleteThread(threadId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CALENDAR AND TIME SLOT HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initCalendar(containerEl, selectedDate, onDateChange) {
+    let viewDate = selectedDate || new Date();
+    let currentMonth = viewDate.getMonth();
+    let currentYear = viewDate.getFullYear();
+
+    function render() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const firstDay = new Date(currentYear, currentMonth, 1);
+        const lastDay = new Date(currentYear, currentMonth + 1, 0);
+        const startPad = firstDay.getDay();
+        const daysInMonth = lastDay.getDate();
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+        let html = `
+            <div class="calendar-header">
+                <button class="calendar-nav-btn" data-cal-nav="prev"><i class="fas fa-chevron-left"></i></button>
+                <h4>${monthNames[currentMonth]} ${currentYear}</h4>
+                <button class="calendar-nav-btn" data-cal-nav="next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="calendar-grid">
+                <span class="calendar-day-header">Sun</span>
+                <span class="calendar-day-header">Mon</span>
+                <span class="calendar-day-header">Tue</span>
+                <span class="calendar-day-header">Wed</span>
+                <span class="calendar-day-header">Thu</span>
+                <span class="calendar-day-header">Fri</span>
+                <span class="calendar-day-header">Sat</span>`;
+
+        for (let i = 0; i < startPad; i++) {
+            html += '<div class="calendar-day empty"></div>';
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(currentYear, currentMonth, d);
+            date.setHours(0, 0, 0, 0);
+            const isToday = date.getTime() === today.getTime();
+            const isSelected = selectedDate && date.getTime() === new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
+            const isPast = date.getTime() < today.getTime();
+            let cls = 'calendar-day';
+            if (isToday) cls += ' today';
+            if (isSelected) cls += ' selected';
+            if (isPast) cls += ' disabled';
+            html += `<div class="${cls}" data-cal-day="${d}">${d}</div>`;
+        }
+        html += '</div>';
+        containerEl.innerHTML = html;
+
+        containerEl.querySelector('[data-cal-nav="prev"]')?.addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            render();
+        });
+        containerEl.querySelector('[data-cal-nav="next"]')?.addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            render();
+        });
+        containerEl.querySelectorAll('.calendar-day:not(.empty):not(.disabled)').forEach(el => {
+            el.addEventListener('click', () => {
+                const d = parseInt(el.dataset.calDay);
+                const newDate = new Date(currentYear, currentMonth, d);
+                if (selectedDate) {
+                    newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+                }
+                selectedDate = newDate;
+                containerEl.querySelectorAll('.calendar-day.selected').forEach(e => e.classList.remove('selected'));
+                el.classList.add('selected');
+                if (onDateChange) onDateChange(selectedDate);
+            });
+        });
+    }
+    render();
+    return {
+        getDate: () => selectedDate,
+        setDate: (d) => { selectedDate = d; render(); }
+    };
+}
+
+function initTimeSlots(containerEl, selectedTimeStr, onTimeChange) {
+    let selectedTime = selectedTimeStr || '';
+
+    const slots = {
+        'Morning': ['09:00', '10:00', '11:00'],
+        'Afternoon': ['12:00', '13:00', '14:00', '15:00', '16:00'],
+        'Evening': ['17:00', '18:00', '19:00', '20:00', '21:00']
+    };
+
+    function formatDisplay(hhmm) {
+        const [h, m] = hhmm.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const hour = h % 12 || 12;
+        return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+    }
+
+    function render() {
+        let html = '';
+        for (const [group, times] of Object.entries(slots)) {
+            html += `<span class="time-slot-group-label">${group}</span><div class="time-slot-grid">`;
+            times.forEach(t => {
+                const isSelected = t === selectedTime;
+                html += `<div class="time-slot-btn ${isSelected ? 'selected' : ''}" data-time="${t}">${formatDisplay(t)}</div>`;
+            });
+            html += '</div>';
+        }
+        containerEl.innerHTML = html;
+
+        containerEl.querySelectorAll('.time-slot-btn').forEach(el => {
+            el.addEventListener('click', () => {
+                selectedTime = el.dataset.time;
+                containerEl.querySelectorAll('.time-slot-btn.selected').forEach(e => e.classList.remove('selected'));
+                el.classList.add('selected');
+                if (onTimeChange) onTimeChange(selectedTime);
+            });
+        });
+    }
+    render();
+    return {
+        getTime: () => selectedTime,
+        setTime: (t) => { selectedTime = t; render(); }
+    };
+}
+
+function formatDatetimeLocal(date, timeStr) {
+    if (!date) return '';
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}T${timeStr || '12:00'}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SCHEDULE EVENT AND SUGGEST BOOK FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -3704,8 +4057,18 @@ function showQuickEventModal(circleName, circleValue) {
                 </div>
                 
                 <div class="form-group">
-                    <label for="eventDate">Event Date & Time</label>
-                    <input type="datetime-local" id="eventDate" class="modal-input">
+                    <label><i class="fas fa-calendar-day"></i> Select Date</label>
+                    <div id="eventCalendarContainer" class="calendar-widget"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-clock"></i> Select Time</label>
+                    <div id="eventTimeSlotContainer" class="time-slots"></div>
+                </div>
+                
+                <div id="eventCalendarSummary" class="calendar-summary" style="display: none;">
+                    <i class="fas fa-calendar-check"></i>
+                    <span id="eventSummaryText">No date selected</span>
                 </div>
                 
                 <div class="form-group">
@@ -3737,13 +4100,53 @@ function showQuickEventModal(circleName, circleValue) {
             </div>
         </div>
     `;
-
+    
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
 
     const closeBtn = modal.querySelector('.modal-close');
     const cancelBtn = modal.querySelector('.cancel-btn');
     const createBtn = modal.querySelector('#createEventBtn');
+    const titleInput = modal.querySelector('#eventTitle');
+    const descInput = modal.querySelector('#eventDescription');
+    const durationSelect = modal.querySelector('#eventDuration');
+    const typeSelect = modal.querySelector('#eventType');
+    const summaryEl = modal.querySelector('#eventCalendarSummary');
+    const summaryText = modal.querySelector('#eventSummaryText');
+
+    let selectedDate = null;
+    let selectedTime = '';
+
+    const calendarContainer = modal.querySelector('#eventCalendarContainer');
+    const timeSlotContainer = modal.querySelector('#eventTimeSlotContainer');
+
+    const calendar = initCalendar(calendarContainer, null, (date) => {
+        selectedDate = date;
+        updateSummary();
+    });
+
+    const timeSlots = initTimeSlots(timeSlotContainer, '', (time) => {
+        selectedTime = time;
+        updateSummary();
+    });
+
+    function updateSummary() {
+        if (selectedDate && selectedTime) {
+            const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+            const dateStr = selectedDate.toLocaleDateString('en-US', options);
+            const [h, m] = selectedTime.split(':').map(Number);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const hour = h % 12 || 12;
+            const timeStr = `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+            summaryText.textContent = `${dateStr} at ${timeStr}`;
+            summaryEl.style.display = 'flex';
+        } else if (selectedDate) {
+            summaryText.textContent = selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' (select time)';
+            summaryEl.style.display = 'flex';
+        } else {
+            summaryEl.style.display = 'none';
+        }
+    }
 
     function closeModal() {
         modal.remove();
@@ -3757,14 +4160,20 @@ function showQuickEventModal(circleName, circleValue) {
     });
 
     createBtn.addEventListener('click', async () => {
-        const title = document.getElementById('eventTitle').value.trim();
-        const description = document.getElementById('eventDescription').value.trim();
-        const eventDate = document.getElementById('eventDate').value;
-        const duration = document.getElementById('eventDuration').value;
-        const eventType = document.getElementById('eventType').value;
+        const title = titleInput.value.trim();
+        const description = descInput.value.trim();
+        const duration = durationSelect.value;
+        const eventType = typeSelect.value;
 
-        if (!title || !description || !eventDate) {
-            showNotification('Please fill in all required fields', 'error');
+        if (!title || !description || !selectedDate || !selectedTime) {
+            showNotification('Please fill in all required fields (title, description, date, and time)', 'error');
+            return;
+        }
+        
+        const eventDateStr = formatDatetimeLocal(selectedDate, selectedTime);
+        const eventDt = new Date(eventDateStr);
+        if (eventDt <= new Date()) {
+            showNotification('Event date must be in the future', 'error');
             return;
         }
 
@@ -3785,7 +4194,7 @@ function showQuickEventModal(circleName, circleValue) {
                     circleId: circleValue,
                     circleName: circleName,
                     event: {
-                        date: eventDate,
+                        date: eventDateStr,
                         duration: parseInt(duration),
                         type: eventType
                     }
@@ -3894,6 +4303,10 @@ function showBookSuggestionModal(circleName, circleValue) {
     const closeBtn = modal.querySelector('.modal-close');
     const cancelBtn = modal.querySelector('.cancel-btn');
     const suggestBtn = modal.querySelector('#suggestBookBtn');
+    const bookTitleInput = modal.querySelector('#bookTitle');
+    const bookAuthorInput = modal.querySelector('#bookAuthor');
+    const bookGenreSelect = modal.querySelector('#bookGenre');
+    const bookReasonInput = modal.querySelector('#bookReason');
 
     function closeModal() {
         modal.remove();
@@ -3907,10 +4320,10 @@ function showBookSuggestionModal(circleName, circleValue) {
     });
 
     suggestBtn.addEventListener('click', async () => {
-        const bookTitle = document.getElementById('bookTitle').value.trim();
-        const bookAuthor = document.getElementById('bookAuthor').value.trim();
-        const bookGenre = document.getElementById('bookGenre').value;
-        const bookReason = document.getElementById('bookReason').value.trim();
+        const bookTitle = bookTitleInput.value.trim();
+        const bookAuthor = bookAuthorInput.value.trim();
+        const bookGenre = bookGenreSelect.value;
+        const bookReason = bookReasonInput.value.trim();
 
         if (!bookTitle || !bookAuthor || !bookReason) {
             showNotification('Please fill in all required fields', 'error');

@@ -56,9 +56,9 @@ const discussionThreadSchema = new mongoose.Schema({
   
   // Event support
   event: {
-    date: Date,
-    duration: Number,
-    type: String,
+    date: { type: Date },
+    duration: { type: Number },
+    type: { type: String },
     attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
   },
   

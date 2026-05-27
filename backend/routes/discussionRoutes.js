@@ -11,6 +11,18 @@ const FilterService = require('../services/filterService');
 const UNS = require('../services/UserNotificationService');
 const upload = require('../middleware/upload');
 const { toAbsoluteUrl } = require('../utils/publicUrl');
+const path = require('path');
+
+// Helper to convert uploaded file to a usable URL (handles both Cloudinary and local storage)
+const BACKEND_ORIGIN = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5002';
+function getFileUrl(file) {
+  if (file.path && /^https?:\/\//i.test(file.path)) {
+    return file.path;
+  }
+  const filename = file.filename || path.basename(file.path || '');
+  const origin = BACKEND_ORIGIN.replace(/\/+$/, '');
+  return origin + '/uploads/threads/' + filename;
+}
 
 // Helper to check if user is suspended
 async function isUserSuspended(userId) {
@@ -1390,7 +1402,7 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
         const censors = censorIndices ? JSON.parse(censorIndices) : [];
         req.files.forEach((file, index) => {
           attachments.push({
-            url: file.path, // Full Cloudinary URL
+            url: getFileUrl(file),
             isCensored: censors.includes(index)
           });
         });
@@ -1399,7 +1411,7 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
         // Continue without censoring if parsing fails
         req.files.forEach((file) => {
           attachments.push({
-            url: file.path,
+            url: getFileUrl(file),
             isCensored: false
           });
         });
@@ -1548,20 +1560,6 @@ router.post('/circles/threads', authMiddleware, upload.array('images', 4), async
     
     if (titleFilterResult.warningIssued || contentFilterResult.warningIssued) {
       responseData.warningIssued = true;
-      responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
-      responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
-    }
-    
-    res.json(responseData);
-  } catch (error) {
-    console.error('Error creating circle thread:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error creating thread: ' + error.message,
-      error: error.message 
-    });
-  }
-});
       responseData.warningMessage = titleFilterResult.message || contentFilterResult.message;
       responseData.warningCount = titleFilterResult.warningCount || contentFilterResult.warningCount;
     }
@@ -2250,7 +2248,7 @@ router.post('/threads', authMiddleware, upload.array('images', 4), async (req, r
       const censors = censorIndices ? JSON.parse(censorIndices) : [];
       req.files.forEach((file, index) => {
         attachments.push({
-          url: file.path, // Full Cloudinary URL
+          url: getFileUrl(file),
           isCensored: censors.includes(index)
         });
       });
