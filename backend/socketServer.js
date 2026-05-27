@@ -6,6 +6,7 @@ const RoomParticipant = require('./models/RoomParticipant');
 const User = require('./models/User');
 const Conversation = require('./models/Conversation');
 const FilterService = require('./services/filterService');
+const { corsOrigin } = require('./utils/allowedOrigins');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RotatingRoomState — in-memory state for a single rotating-mode room
@@ -70,15 +71,7 @@ class SocketServer {
     try {
       this.io = new Server(server, {
         cors: {
-          origin: [
-            'http://localhost:3000', 'http://127.0.0.1:3000',
-            'http://localhost:5500', 'http://127.0.0.1:5500',
-            'http://localhost:8080', 'http://127.0.0.1:8080',
-            'http://localhost:5002', 'http://127.0.0.1:5002',
-            'http://localhost:5000', 'http://127.0.0.1:5000',
-            /^http:\/\/localhost:\d+$/,
-            /^http:\/\/127\.0\.0\.1:\d+$/
-          ],
+          origin: corsOrigin,
           methods: ['GET', 'POST'],
           credentials: true
         },
@@ -1085,7 +1078,13 @@ class SocketServer {
       }
 
       if (count === 0) {
-        await VoiceRoom.findByIdAndUpdate(roomId, { status: 'ended', endedAt: new Date() });
+        const room = await VoiceRoom.findById(roomId);
+        if (room) {
+          room.status = 'completed';
+          room.endedAt = new Date();
+          room.duration = Math.round((room.endedAt - room.createdAt) / 60000) || 0;
+          await room.save();
+        }
         this.io.to(`room-${roomId}`).emit('room-ended', {
           message: 'Room ended (no participants)',
           endedAt: new Date()

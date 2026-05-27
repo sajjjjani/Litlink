@@ -286,11 +286,13 @@ router.post('/rooms/:roomId/leave', authenticate, async (req, res) => {
         await VoiceRoom.findByIdAndUpdate(req.params.roomId, { participantCount: remainingCount });
 
         if (remainingCount === 0) {
-            await VoiceRoom.findByIdAndUpdate(req.params.roomId, {
-                status: 'ended',
-                endedAt: new Date(),
-                duration: Math.round((new Date() - participant.roomId.createdAt) / 60000) || 0
-            });
+            const room = await VoiceRoom.findById(req.params.roomId);
+            if (room) {
+                room.status = 'completed';
+                room.endedAt = new Date();
+                room.duration = Math.round((room.endedAt - room.createdAt) / 60000) || 0;
+                await room.save();
+            }
         }
 
         if (global.io) {
@@ -330,7 +332,7 @@ router.post('/rooms/:roomId/end', authenticate, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Only the host can end this room' });
         }
 
-        room.status = 'ended';
+        room.status = 'completed';
         room.endedAt = new Date();
         room.duration = Math.round((room.endedAt - room.createdAt) / 60000) || 0;
         await room.save();
@@ -373,7 +375,7 @@ router.get('/rooms/stats', authenticate, async (req, res) => {
         const totalRooms = await VoiceRoom.countDocuments();
         const liveRooms = await VoiceRoom.countDocuments({ status: 'live' });
         const scheduledRooms = await VoiceRoom.countDocuments({ status: 'scheduled' });
-        const endedRooms = await VoiceRoom.countDocuments({ status: 'ended' });
+        const endedRooms = await VoiceRoom.countDocuments({ status: { $in: ['ended', 'completed'] } });
         const totalParticipants = await RoomParticipant.countDocuments();
         const activeParticipants = await RoomParticipant.countDocuments({ leftAt: null });
 
@@ -470,6 +472,39 @@ router.put('/rooms/:roomId/participants/status', authenticate, async (req, res) 
 
     } catch (error) {
         console.error('Error updating status:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ── POST /rooms/:roomId/reminder ──────────────────────────────────────────
+router.post('/rooms/:roomId/reminder', authenticate, async (req, res) => {
+    try {
+        const room = await VoiceRoom.findById(req.params.roomId);
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Room not found' });
+        }
+        if (room.status !== 'scheduled') {
+            return res.status(400).json({ success: false, message: 'Can only set reminders for scheduled rooms' });
+        }
+
+        const userIdStr = req.userId.toString();
+        
+        // Initialize reminderUsers array if it doesn't exist
+        if (!room.reminderUsers) {
+            room.reminderUsers = [];
+        }
+
+        const hasReminder = room.reminderUsers.some(uid => uid.toString() === userIdStr);
+        if (hasReminder) {
+            return res.status(400).json({ success: false, message: 'Reminder already set for this room' });
+        }
+
+        room.reminderUsers.push(req.userId);
+        await room.save();
+
+        res.json({ success: true, message: 'Reminder set successfully' });
+    } catch (error) {
+        console.error('Error setting reminder:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

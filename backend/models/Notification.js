@@ -12,6 +12,7 @@ const notificationSchema = new mongoose.Schema({
       // ── Canonical user notification types (v2) ─────────────────────────────
       'follow', 'unfollow', 'circle_request', 'circle_accept',
       'thread_create', 'like', 'comment', 'voice_room_created', 'circle_created',
+      'voice_room_prestart', 'voice_room_reminder',
 
       // ── User social notifications ──────────────────────────────────────────
       'follow',               // Someone followed you
@@ -20,6 +21,8 @@ const notificationSchema = new mongoose.Schema({
       'circle_accepted',      // You were accepted into a circle
       'thread_liked',         // Someone liked your thread
       'thread_commented',     // Someone commented on your thread
+      'thread_edited',        // A thread you liked was edited
+      'thread_deleted',       // A thread you liked was deleted
 
       // ── Legacy / general user notifications ───────────────────────────────
       'match', 'message', 'board', 'voice', 'achievement',
@@ -126,11 +129,15 @@ const USER_ICON_MAP = {
   circle_accepted:     '✅',
   thread_liked:        '❤️',
   thread_commented:    '💭',
+  thread_edited:       '✏️',
+  thread_deleted:      '🗑️',
   match:               '🤝',
   message:             '✉️',
   board:               '📋',
   voice:               '🎙️',
   voice_room_created:  '🎙️',
+  voice_room_prestart: '🎙️',
+  voice_room_reminder: '🎙️',
   circle_created:      '👥',
   achievement:         '🏆',
   warning:             '⚠️',

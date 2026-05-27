@@ -249,10 +249,38 @@ function updateRoomInList(u)   { const i = liveRooms.findIndex(r => r._id === u.
 /* ===== NAVIGATION ===== */
 function goToRoom(id) { if (!id) return; window.location.href = `room.html?id=${id}`; }
 
-function setReminder(roomId) {
-  const reminders = JSON.parse(localStorage.getItem('roomReminders') || '[]');
-  if (!reminders.includes(roomId)) { reminders.push(roomId); localStorage.setItem('roomReminders', JSON.stringify(reminders)); showToast("Reminder set!", 'success'); }
-  else showToast('Reminder already set', 'info');
+async function setReminder(roomId) {
+  const token = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
+  try {
+    const res = await fetch(`${API_BASE}/voice-rooms/rooms/${roomId}/reminder`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = { success: false, message: 'Server error' };
+    }
+    
+    if (data.success) {
+      const reminders = JSON.parse(localStorage.getItem('roomReminders') || '[]');
+      if (!reminders.includes(roomId)) {
+        reminders.push(roomId);
+        localStorage.setItem('roomReminders', JSON.stringify(reminders));
+      }
+      showToast("Reminder set!", 'success');
+    } else {
+      showToast(data.message || 'Failed to set reminder', 'error');
+    }
+  } catch (err) {
+    console.error('Error setting reminder:', err);
+    showToast('Failed to set reminder. Please try again.', 'error');
+  }
 }
 
 /* ===== MODAL ===== */
