@@ -552,13 +552,8 @@ class SocketServer {
           }
 
           if (room.status !== 'live') {
-            if (room.status === 'scheduled' && room.scheduledFor && room.scheduledFor <= new Date()) {
-              room.status = 'live';
-              await room.save();
-            } else {
-              socket.emit('error', { message: 'Room is not live' });
-              return;
-            }
+            socket.emit('error', { message: `Room is ${room.status}` });
+            return;
           }
 
           socket.join(`room-${roomId}`);

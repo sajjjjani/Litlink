@@ -61,7 +61,7 @@ const voiceRoomSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['live', 'scheduled', 'ended', 'completed', 'missed'],
+    enum: ['live', 'scheduled', 'ended', 'completed', 'missed', 'cancelled'],
     default: 'live'
   },
   scheduledFor: {
@@ -73,6 +73,14 @@ const voiceRoomSchema = new mongoose.Schema({
     ref: 'User'
   }],
   preStartNotified: {
+    type: Boolean,
+    default: false
+  },
+  startNotified: {
+    type: Boolean,
+    default: false
+  },
+  scheduledNotified: {
     type: Boolean,
     default: false
   },
