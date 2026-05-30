@@ -2254,13 +2254,23 @@ router.post('/threads', authMiddleware, upload.array('images', 4), async (req, r
       });
     }
 
+    // Parse tags if it's a string
+    let parsedTags = [];
+    if (tags) {
+      if (typeof tags === 'string') {
+        parsedTags = tags.split(',').map(t => t.trim()).filter(t => t);
+      } else if (Array.isArray(tags)) {
+        parsedTags = tags;
+      }
+    }
+
     const thread = new DiscussionThread({
       title: filteredTitle,
       content: filteredContent,
       author: req.userId,
       type: (type === 'discussion' || !type) ? 'book' : type,
       genre: genre || 'General',
-      tags: tags || [],
+      tags: parsedTags,
       bookReferences: bookReferences || [],
       category: category || 'general',
       isPublic: true,

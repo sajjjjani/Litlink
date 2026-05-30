@@ -34,7 +34,7 @@ const discussionThreadSchema = new mongoose.Schema({
   tags: [{ type: String }],
   category: { 
     type: String, 
-    enum: ['literary', 'news', 'challenge', 'general', 'announcement', 'discussion', 'question', 'recommendation'],
+    enum: ['literary', 'book', 'news', 'challenge', 'general', 'announcement', 'discussion', 'question', 'recommendation'],
     default: 'general'
   },
   type: { 
