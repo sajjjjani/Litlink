@@ -1,4 +1,31 @@
 const Notification = require('../models/Notification');
+const UserSettings = require('../models/UserSettings');
+
+// Cache for notification preference checks to avoid repeated DB lookups
+const _notifPrefCache = new Map();
+
+async function _checkNotifSetting(userId, key) {
+  const cacheKey = `${userId}:${key}`;
+  const cached = _notifPrefCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  try {
+    const settings = await UserSettings.findOne({ userId }).lean();
+    const allowed = settings?.notifications?.[key] !== false; // default true
+    _notifPrefCache.set(cacheKey, allowed);
+    setTimeout(() => _notifPrefCache.delete(cacheKey), 5000);
+    return allowed;
+  } catch {
+    return true;
+  }
+}
+
+function _invalidateUserCache(userId) {
+  for (const key of _notifPrefCache.keys()) {
+    if (key.startsWith(`${userId}:`)) {
+      _notifPrefCache.delete(key);
+    }
+  }
+}
 
 class UserNotificationService {
 
@@ -6,6 +33,10 @@ class UserNotificationService {
     try {
       // Don't notify if someone follows themselves (edge case)
       if (follower._id.toString() === targetUserId.toString()) return;
+
+      // Check if user has new follower notifications enabled
+      const allowed = await _checkNotifSetting(targetUserId, 'newFollowers');
+      if (!allowed) return;
 
       await Notification.createUserNotification(
         targetUserId,
@@ -33,6 +64,9 @@ class UserNotificationService {
   static async onUnfollow(unfollower, targetUserId) {
     try {
       if (unfollower._id.toString() === targetUserId.toString()) return;
+
+      const allowed = await _checkNotifSetting(targetUserId, 'newFollowers');
+      if (!allowed) return;
 
       await Notification.createUserNotification(
         targetUserId,
@@ -68,7 +102,18 @@ class UserNotificationService {
 
       if (memberIds.length === 0) return;
 
-      const notifications = memberIds.map(memberId =>
+      // Check notification preference for each member
+      const prefResults = await Promise.allSettled(
+        memberIds.map(id => _checkNotifSetting(id, 'circleAnnouncements'))
+      );
+      const allowedIds = memberIds.filter((_, i) => {
+        const r = prefResults[i];
+        return r.status === 'fulfilled' && r.value !== false;
+      });
+
+      if (allowedIds.length === 0) return;
+
+      const notifications = allowedIds.map(memberId =>
         Notification.createUserNotification(
           memberId,
           'thread_create',
@@ -122,7 +167,18 @@ class UserNotificationService {
 
       if (moderatorIds.length === 0) return;
 
-      const notifications = moderatorIds.map(modId =>
+      // Check preference for each moderator
+      const prefResults = await Promise.allSettled(
+        moderatorIds.map(id => _checkNotifSetting(id, 'circleAnnouncements'))
+      );
+      const allowedIds = moderatorIds.filter((_, i) => {
+        const r = prefResults[i];
+        return r.status === 'fulfilled' && r.value !== false;
+      });
+
+      if (allowedIds.length === 0) return;
+
+      const notifications = allowedIds.map(modId =>
         Notification.createUserNotification(
           modId,
           'circle_request',
@@ -153,6 +209,9 @@ class UserNotificationService {
 
   static async onCircleAccepted(acceptedUserId, circle) {
     try {
+      const allowed = await _checkNotifSetting(acceptedUserId, 'circleAnnouncements');
+      if (!allowed) return;
+
       await Notification.createUserNotification(
         acceptedUserId,
         'circle_accept',
@@ -178,6 +237,9 @@ class UserNotificationService {
     try {
       const authorId = (thread.author || thread.userId || thread.authorId || '').toString();
       if (!authorId || liker._id.toString() === authorId) return;
+
+      const allowed = await _checkNotifSetting(authorId, 'discussionLikes');
+      if (!allowed) return;
 
       await Notification.createUserNotification(
         authorId,
@@ -208,6 +270,9 @@ class UserNotificationService {
     try {
       const authorId = (thread.author || thread.userId || thread.authorId || '').toString();
       if (!authorId || commenter._id.toString() === authorId) return;
+
+      const allowed = await _checkNotifSetting(authorId, 'discussionComments');
+      if (!allowed) return;
 
       const preview = commentPreview.length > 80
         ? commentPreview.substring(0, 77) + '…'
@@ -253,7 +318,18 @@ class UserNotificationService {
 
       if (followerIds.length === 0) return;
 
-      const notifications = followerIds.map((followerId) =>
+      // Check room reminder preference for each follower
+      const prefResults = await Promise.allSettled(
+        followerIds.map(id => _checkNotifSetting(id, 'roomStartedAlerts'))
+      );
+      const allowedIds = followerIds.filter((_, i) => {
+        const r = prefResults[i];
+        return r.status === 'fulfilled' && r.value !== false;
+      });
+
+      if (allowedIds.length === 0) return;
+
+      const notifications = allowedIds.map((followerId) =>
         Notification.createUserNotification(
           followerId,
           'voice_room_created',
@@ -282,4 +358,5 @@ class UserNotificationService {
   }
 }
 
+UserNotificationService.invalidateCache = _invalidateUserCache;
 module.exports = UserNotificationService;

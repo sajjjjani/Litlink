@@ -1,7 +1,17 @@
 const VoiceRoom = require('../models/VoiceRoom');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const UserSettings = require('../models/UserSettings');
 const UNS = require('./UserNotificationService');
+
+async function _checkNotifSetting(userId, key) {
+  try {
+    const settings = await UserSettings.findOne({ userId }).lean();
+    return settings?.notifications?.[key] !== false;
+  } catch {
+    return true;
+  }
+}
 
 let intervalId = null;
 
@@ -91,9 +101,16 @@ const checkScheduledRooms = async () => {
           console.error(`[Scheduler] Error triggering UNS.onVoiceRoomStarted:`, unsErr.message);
         }
 
-        // Notify users who requested reminders
+        // Notify users who requested reminders (respect their roomReminders preference)
         if (room.reminderUsers && room.reminderUsers.length > 0) {
-          for (const userId of room.reminderUsers) {
+          const prefResults = await Promise.allSettled(
+            room.reminderUsers.map(id => _checkNotifSetting(id, 'roomReminders'))
+          );
+          const allowedIds = room.reminderUsers.filter((_, i) => {
+            const r = prefResults[i];
+            return r.status === 'fulfilled' && r.value !== false;
+          });
+          for (const userId of allowedIds) {
             try {
               await Notification.createUserNotification(
                 userId,
