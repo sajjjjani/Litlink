@@ -293,7 +293,7 @@ userSchema.index({
 userSchema.virtual('completionPercentage').get(function() {
   const fields = [
     { value: this.profilePicture && this.profilePicture !== '📚' && this.profilePicture !== '', weight: 10 },
-    { value: this.bio && this.bio !== 'Book lover and avid reader' && this.bio !== 'Welcome to Litlink! Start your reading journey here.', weight: 10 },
+    { value: this.bio && !['Book lover and avid reader', 'Welcome to Litlink! Start your reading journey here.'].includes(this.bio), weight: 10 },
     { value: this.location, weight: 10 },
     { value: this.pronouns, weight: 5 },
     { value: this.favoriteGenres && this.favoriteGenres.length > 0, weight: 15 },

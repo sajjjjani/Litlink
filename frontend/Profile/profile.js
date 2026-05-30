@@ -544,7 +544,7 @@
         function updateProfileCompleteness(user) {
             const fields = [
                 { key: 'profilePicture', label: 'Profile Picture', weight: 10, ok: user.profilePicture && String(user.profilePicture).trim() !== '' && String(user.profilePicture).trim() !== '📚' },
-                { key: 'bio', label: 'Bio', weight: 10, ok: !!(user.bio && String(user.bio).trim()) && String(user.bio).trim() !== 'Book lover and avid reader' },
+                { key: 'bio', label: 'Bio', weight: 10, ok: !!(user.bio && String(user.bio).trim()) && !['Book lover and avid reader', 'Welcome to Litlink! Start your reading journey here.'].includes(String(user.bio).trim()) },
                 { key: 'location', label: 'Location', weight: 10, ok: !!(user.location && String(user.location).trim()) },
                 { key: 'pronouns', label: 'Pronouns', weight: 5, ok: !!(user.pronouns && String(user.pronouns).trim()) },
                 { key: 'favoriteGenres', label: 'Favorite Genres', weight: 15, ok: Array.isArray(user.favoriteGenres) && user.favoriteGenres.length > 0 },

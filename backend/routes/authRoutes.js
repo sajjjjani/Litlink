@@ -140,13 +140,13 @@ router.post('/signup', async (req, res) => {
       verificationExpiry: new Date(Date.now() + 30 * 60 * 1000),
       bio: 'Welcome to Litlink! Start your reading journey here.',
       profilePicture: '',
-      readingGoal: 12,
+      readingGoal: 0,
       favoriteGenres: [],
       favoriteAuthors: [],
       favoriteBooks: [],
       booksRead: [],
-      preferredFormats: ['Paperback', 'E-book'],
-      discussionPreferences: ['Online Forums'],
+      preferredFormats: [],
+      discussionPreferences: [],
       receiveRecommendations: true
     });
     
