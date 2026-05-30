@@ -551,8 +551,8 @@
                 { key: 'favoriteAuthors', label: 'Favorite Authors', weight: 10, ok: Array.isArray(user.favoriteAuthors) && user.favoriteAuthors.length > 0 },
                 { key: 'favoriteBooks', label: 'Favorite Books', weight: 10, ok: (Array.isArray(user.favoriteBooks) && user.favoriteBooks.length > 0) || (Array.isArray(user.booksRead) && user.booksRead.length > 0) },
                 { key: 'readingHabit', label: 'Reading Habit', weight: 10, ok: !!(user.readingHabit && String(user.readingHabit).trim()) && String(user.readingHabit).trim().toLowerCase() !== 'not set' },
-                { key: 'readingGoal', label: 'Reading Goal', weight: 10, ok: Number(user.readingGoal) > 0 },
-                { key: 'discussionPreferences', label: 'Discussion Preferences', weight: 10, ok: Array.isArray(user.discussionPreferences) && user.discussionPreferences.length > 0 }
+                { key: 'readingGoal', label: 'Reading Goal', weight: 10, ok: Number(user.readingGoal) > 0 && Number(user.readingGoal) !== 12 },
+                { key: 'discussionPreferences', label: 'Discussion Preferences', weight: 10, ok: Array.isArray(user.discussionPreferences) && user.discussionPreferences.length > 0 && !(user.discussionPreferences.length === 1 && user.discussionPreferences[0] === 'Online Forums') }
             ];
 
             let score = 0;

@@ -300,8 +300,8 @@ userSchema.virtual('completionPercentage').get(function() {
     { value: this.favoriteAuthors && this.favoriteAuthors.length > 0, weight: 10 },
     { value: (this.favoriteBooks && this.favoriteBooks.length > 0) || (this.booksRead && this.booksRead.length > 0), weight: 10 },
     { value: this.readingHabit && String(this.readingHabit).trim().toLowerCase() !== 'not set', weight: 10 },
-    { value: this.readingGoal > 0, weight: 10 },
-    { value: this.discussionPreferences && this.discussionPreferences.length > 0, weight: 10 }
+    { value: this.readingGoal > 0 && this.readingGoal !== 12, weight: 10 },
+    { value: this.discussionPreferences && this.discussionPreferences.length > 0 && !(this.discussionPreferences.length === 1 && this.discussionPreferences[0] === 'Online Forums'), weight: 10 }
   ];
 
   let score = 0;
