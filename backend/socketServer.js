@@ -256,6 +256,56 @@ class SocketServer {
             }
           }
 
+          // ── Check if recipient is blocked ────────────────────────────────
+          const UserSettings = require('./models/UserSettings');
+          if (sender.blockedUsers && sender.blockedUsers.some(id => id.toString() === recipientId)) {
+            socket.emit('message-blocked', {
+              blocked: true,
+              warning: 'You cannot message a blocked user.'
+            });
+            return;
+          }
+
+          // ── Check if sender is blocked by recipient ──────────────────────
+          const recipientUser = await User.findById(recipientId).select('blockedUsers');
+          if (recipientUser && recipientUser.blockedUsers && recipientUser.blockedUsers.some(id => id.toString() === currentUserId)) {
+            socket.emit('message-blocked', {
+              blocked: true,
+              warning: 'You cannot message this user.'
+            });
+            return;
+          }
+
+          // ── Check recipient's message privacy setting ────────────────────
+          try {
+            const recipientSettings = await UserSettings.findOne({ userId: recipientId });
+            if (recipientSettings && recipientSettings.privacy) {
+              const msgPrivacy = recipientSettings.privacy.messagePrivacy || 'everyone';
+              if (msgPrivacy === 'none') {
+                socket.emit('message-blocked', {
+                  privacyBlocked: true,
+                  warning: 'This user is not accepting messages.'
+                });
+                return;
+              }
+              if (msgPrivacy === 'followers') {
+                const recipient = await User.findById(recipientId).select('followers');
+                if (recipient && recipient.followers) {
+                  const isFollower = recipient.followers.some(id => id.toString() === currentUserId);
+                  if (!isFollower) {
+                    socket.emit('message-blocked', {
+                      privacyBlocked: true,
+                      warning: 'This user only accepts messages from followers.'
+                    });
+                    return;
+                  }
+                }
+              }
+            }
+          } catch (settingsError) {
+            console.error('Failed to check notification settings, continuing delivery:', settingsError);
+          }
+
           // ── Content filter (text messages only) ──────────────────────────
           let finalContent = content || '';
           let filterWarning = null;
@@ -343,6 +393,12 @@ class SocketServer {
           conversation.unreadCount.set(recipientId, currentUnread + 1);
 
           await conversation.save();
+
+          // Emit updated unread count to recipient
+          this._emitToUser(recipientId, 'unread-count-updated', {
+            unreadCount: currentUnread + 1,
+            senderId: currentUserId
+          });
 
           const messageToSend = {
             _id: messageObj._id,
@@ -579,11 +635,15 @@ class SocketServer {
               userId: verifiedUserId,
               userName,
               socketId: socket.id,
+              isMuted: true,
+              canSpeak: false,
               joinedAt: new Date()
             });
           } else {
             participant.socketId = socket.id;
             participant.leftAt = null;
+            participant.isMuted = true;
+            participant.canSpeak = false;
           }
           await participant.save();
 
@@ -591,7 +651,7 @@ class SocketServer {
           await VoiceRoom.findByIdAndUpdate(roomId, { participantCount });
 
           const participants = await RoomParticipant.find({ roomId, leftAt: null })
-            .select('userId userName isMuted handRaised isSpeaking');
+            .select('userId userName isMuted canSpeak handRaised isSpeaking');
 
           socket.to(`room-${roomId}`).emit('user-joined', {
             userId: verifiedUserId,
@@ -614,6 +674,7 @@ class SocketServer {
               userId: p.userId.toString(),
               name: p.userName,
               isMuted: p.isMuted,
+              canSpeak: p.canSpeak,
               handRaised: p.handRaised,
               isSpeaking: p.isSpeaking
             }))
@@ -647,11 +708,33 @@ class SocketServer {
         }
       });
 
-      // Mute toggle
+      // Mute toggle — enforces host permissions
       socket.on('toggle-mute', async (data) => {
         try {
           const { roomId, isMuted } = data;
           if (!currentUserId) return;
+
+          // If trying to unmute, check if user has permission to speak
+          if (!isMuted) {
+            const participant = await RoomParticipant.findOne(
+              { roomId, userId: currentUserId, leftAt: null }
+            );
+
+            if (!participant) return;
+
+            // Check if user is the host
+            const room = await VoiceRoom.findById(roomId);
+            const isHost = room && room.hostId?.toString() === currentUserId;
+
+            // Non-host users cannot unmute without canSpeak permission
+            if (!isHost && !participant.canSpeak) {
+              socket.emit('mute-denied', {
+                message: 'You do not have permission to speak. Wait for the host to grant it.',
+                timestamp: new Date()
+              });
+              return;
+            }
+          }
 
           await RoomParticipant.findOneAndUpdate(
             { roomId, userId: currentUserId, leftAt: null },
@@ -746,6 +829,359 @@ class SocketServer {
           });
         } catch (error) {
           console.error('Error updating speaking status:', error);
+        }
+      });
+
+      // ─────────────────────────────────────────
+      // HOST MODERATION EVENTS
+      // ─────────────────────────────────────────
+
+      // Host mutes a participant
+      socket.on('host-mute-user', async (data) => {
+        try {
+          const { roomId, targetUserId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can mute users.' });
+            return;
+          }
+
+          await RoomParticipant.findOneAndUpdate(
+            { roomId, userId: targetUserId, leftAt: null },
+            { isMuted: true, canSpeak: false }
+          );
+
+          // If host is muting themselves, just update DB
+          if (targetUserId === currentUserId) {
+            this.io.to(`room-${roomId}`).emit('user-muted', {
+              userId: targetUserId,
+              isMuted: true,
+              timestamp: new Date()
+            });
+            return;
+          }
+
+          this.io.to(`room-${roomId}`).emit('host-muted-user', {
+            userId: targetUserId,
+            isMuted: true,
+            mutedBy: currentUserId,
+            timestamp: new Date()
+          });
+
+          // Also emit the standard mute event so UI updates
+          this.io.to(`room-${roomId}`).emit('user-muted', {
+            userId: targetUserId,
+            isMuted: true,
+            timestamp: new Date()
+          });
+
+          console.log(`🔇 Host ${currentUserId} muted user ${targetUserId} in room ${roomId}`);
+        } catch (error) {
+          console.error('host-mute-user error:', error);
+        }
+      });
+
+      // Host unmutes a participant
+      socket.on('host-unmute-user', async (data) => {
+        try {
+          const { roomId, targetUserId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can unmute users.' });
+            return;
+          }
+
+          await RoomParticipant.findOneAndUpdate(
+            { roomId, userId: targetUserId, leftAt: null },
+            { isMuted: false }
+          );
+
+          this.io.to(`room-${roomId}`).emit('user-muted', {
+            userId: targetUserId,
+            isMuted: false,
+            timestamp: new Date()
+          });
+
+          console.log(`🔊 Host ${currentUserId} unmuted user ${targetUserId} in room ${roomId}`);
+        } catch (error) {
+          console.error('host-unmute-user error:', error);
+        }
+      });
+
+      // Host unmutes ALL participants except self
+      socket.on('host-unmute-all', async (data) => {
+        try {
+          const { roomId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can unmute all.' });
+            return;
+          }
+
+          // Unmute all participants except the host
+          await RoomParticipant.updateMany(
+            { roomId, userId: { $ne: currentUserId }, leftAt: null },
+            { isMuted: false, canSpeak: true }
+          );
+
+          // Broadcast unmute-all event so clients re-enable audio
+          this.io.to(`room-${roomId}`).emit('host-unmute-all', {
+            exceptUserId: currentUserId,
+            timestamp: new Date()
+          });
+
+          // Send individual unmute + speak-allowed events for each non-host participant
+          const allParticipants = await RoomParticipant.find(
+            { roomId, userId: { $ne: currentUserId }, leftAt: null }
+          ).select('userId');
+
+          for (const p of allParticipants) {
+            this.io.to(`room-${roomId}`).emit('user-muted', {
+              userId: p.userId.toString(),
+              isMuted: false,
+              timestamp: new Date()
+            });
+            this.io.to(`room-${roomId}`).emit('user-speak-allowed', {
+              userId: p.userId.toString(),
+              canSpeak: true,
+              timestamp: new Date()
+            });
+          }
+
+          console.log(`🔊 Host ${currentUserId} unmuted all participants in room ${roomId}`);
+        } catch (error) {
+          console.error('host-unmute-all error:', error);
+        }
+      });
+
+      // Host mutes ALL participants except self
+      socket.on('host-mute-all', async (data) => {
+        try {
+          const { roomId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can mute all.' });
+            return;
+          }
+
+          // Mute all participants except the host
+          await RoomParticipant.updateMany(
+            { roomId, userId: { $ne: currentUserId }, leftAt: null },
+            { isMuted: true, canSpeak: false }
+          );
+
+          // Broadcast mute-all event so clients force-disable audio
+          this.io.to(`room-${roomId}`).emit('host-mute-all', {
+            exceptUserId: currentUserId,
+            timestamp: new Date()
+          });
+
+          // Send individual mute events for each non-host participant
+          const allParticipants = await RoomParticipant.find(
+            { roomId, userId: { $ne: currentUserId }, leftAt: null }
+          ).select('userId');
+
+          for (const p of allParticipants) {
+            this.io.to(`room-${roomId}`).emit('user-muted', {
+              userId: p.userId.toString(),
+              isMuted: true,
+              timestamp: new Date()
+            });
+            this.io.to(`room-${roomId}`).emit('user-speak-allowed', {
+              userId: p.userId.toString(),
+              canSpeak: false,
+              timestamp: new Date()
+            });
+          }
+
+          console.log(`🔇 Host ${currentUserId} muted all participants in room ${roomId}`);
+        } catch (error) {
+          console.error('host-mute-all error:', error);
+        }
+      });
+
+      // Host allows a participant to speak
+      socket.on('host-allow-speak', async (data) => {
+        try {
+          const { roomId, targetUserId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can grant speaking permission.' });
+            return;
+          }
+
+          await RoomParticipant.findOneAndUpdate(
+            { roomId, userId: targetUserId, leftAt: null },
+            { canSpeak: true, isMuted: false }
+          );
+
+          this.io.to(`room-${roomId}`).emit('user-speak-allowed', {
+            userId: targetUserId,
+            canSpeak: true,
+            timestamp: new Date()
+          });
+
+          // Also emit unmute so UI reflects it
+          this.io.to(`room-${roomId}`).emit('user-muted', {
+            userId: targetUserId,
+            isMuted: false,
+            timestamp: new Date()
+          });
+
+          console.log(`🎤 Host ${currentUserId} allowed ${targetUserId} to speak in room ${roomId}`);
+        } catch (error) {
+          console.error('host-allow-speak error:', error);
+        }
+      });
+
+      // Host revokes speaking permission
+      socket.on('host-revoke-speak', async (data) => {
+        try {
+          const { roomId, targetUserId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can revoke speaking permission.' });
+            return;
+          }
+
+          await RoomParticipant.findOneAndUpdate(
+            { roomId, userId: targetUserId, leftAt: null },
+            { canSpeak: false, isMuted: true }
+          );
+
+          this.io.to(`room-${roomId}`).emit('user-speak-allowed', {
+            userId: targetUserId,
+            canSpeak: false,
+            timestamp: new Date()
+          });
+
+          this.io.to(`room-${roomId}`).emit('user-muted', {
+            userId: targetUserId,
+            isMuted: true,
+            timestamp: new Date()
+          });
+
+          console.log(`🔇 Host ${currentUserId} revoked speak permission for ${targetUserId} in room ${roomId}`);
+        } catch (error) {
+          console.error('host-revoke-speak error:', error);
+        }
+      });
+
+      // Host kicks a user from the room
+      socket.on('host-kick-user', async (data) => {
+        try {
+          const { roomId, targetUserId } = data;
+          if (!currentUserId) return;
+
+          const room = await VoiceRoom.findById(roomId);
+          if (!room || room.hostId?.toString() !== currentUserId) {
+            socket.emit('error', { message: 'Only the host can remove users.' });
+            return;
+          }
+
+          // Mark participant as left
+          await RoomParticipant.findOneAndUpdate(
+            { roomId, userId: targetUserId, leftAt: null },
+            { leftAt: new Date() }
+          );
+
+          const count = await RoomParticipant.countDocuments({ roomId, leftAt: null });
+          await VoiceRoom.findByIdAndUpdate(roomId, { participantCount: count });
+
+          // Notify the kicked user
+          this._emitToUser(targetUserId, 'user-kicked', {
+            roomId,
+            message: 'You were removed from the room by the host.',
+            timestamp: new Date()
+          });
+
+          // Notify everyone else
+          this.io.to(`room-${roomId}`).emit('user-left', {
+            userId: targetUserId,
+            kicked: true,
+            timestamp: new Date()
+          });
+
+          // Clean up RTC connections for the kicked user
+          const rState = this.rotatingRooms.get(roomId);
+          if (rState) {
+            rState.leaveQueue(targetUserId);
+            if (rState.isCurrentSpeaker(targetUserId)) {
+              this._advanceToNextSpeaker(roomId);
+            }
+          }
+
+          // Disconnect the kicked user's sockets from the room
+          const kickedSids = this.roomParticipants.get(roomId)?.get(targetUserId);
+          if (kickedSids) {
+            for (const sid of kickedSids) {
+              const sock = this.io.sockets.sockets.get(sid);
+              if (sock) {
+                sock.leave(`room-${roomId}`);
+              }
+            }
+            this.roomParticipants.get(roomId).delete(targetUserId);
+          }
+
+          console.log(`👢 Host ${currentUserId} kicked user ${targetUserId} from room ${roomId}`);
+        } catch (error) {
+          console.error('host-kick-user error:', error);
+        }
+      });
+
+      // Report a user from voice room
+      socket.on('report-user', async (data) => {
+        try {
+          const { roomId, reportedUserId, reason, category } = data;
+          if (!currentUserId) {
+            socket.emit('error', { message: 'Authentication required' });
+            return;
+          }
+
+          if (!reportedUserId || !reason || !category) {
+            socket.emit('error', { message: 'Missing required fields' });
+            return;
+          }
+
+          const Report = require('./models/Report');
+
+          const report = new Report({
+            reporter: currentUserId,
+            reportedUser: reportedUserId,
+            reportedItemType: 'voice_room',
+            reportedItemId: roomId,
+            reason: reason,
+            category: category,
+            status: 'pending',
+            priority: 'medium'
+          });
+
+          // Mark as new for post-save hook
+          report.wasNew = true;
+          await report.save();
+
+          socket.emit('report-submitted', {
+            success: true,
+            message: 'Report submitted successfully. Our team will review it.',
+            reportId: report._id
+          });
+
+          console.log(`📋 Report from ${currentUserId} against ${reportedUserId} in room ${roomId}: ${category} - ${reason}`);
+        } catch (error) {
+          console.error('report-user error:', error);
+          socket.emit('error', { message: 'Failed to submit report.' });
         }
       });
 
