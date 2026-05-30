@@ -166,6 +166,7 @@ app.get('/api/info', (req, res) => {
 
 // Serve the frontend from the same hosted service.
 app.use(express.static(frontendPath));
+app.use(express.static(path.join(frontendPath, 'Homepage')));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(frontendPath, 'Homepage', 'index.html'));
