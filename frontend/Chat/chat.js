@@ -985,7 +985,7 @@ function renderAttachmentMessage(msg, currentMatch, actionsHtml, msgId, isSent) 
                 <div class="message-content">
                     ${actionsHtml}
                     <div class="message-bubble attachment">
-                        <img src="${imgSrc}" alt="Shared image" class="attachment-image" onclick="window.open('${imgSrc}','_blank')" onerror="this.parentElement.innerHTML='<span style=\"color:#d4b5a0;font-size:.85rem\">Image unavailable</span>'">
+                        <img src="${imgSrc}" alt="Shared image" class="attachment-image" onclick="LitlinkChat.showImagePreview('${imgSrc}')" onerror="this.parentElement.innerHTML='<span style=\"color:#d4b5a0;font-size:.85rem\">Image unavailable</span>'">
                         ${caption ? `<p class="attachment-caption">${caption}</p>` : ''}
                     </div>
                     <div class="message-time">${msg.time || ''}</div>
@@ -1881,7 +1881,7 @@ window.LitlinkChat = {
     showNotification,
     toggleSidebar,
     refreshMatches: loadMatches,
-    showSettings: () => showNotification('Settings coming soon!', 'info'),
+    showSettings: () => { window.location.href = '../Profile/settings.html'; },
     showBlockReportModal,
     blockUser,
     reportUser,
@@ -1893,6 +1893,33 @@ window.LitlinkChat = {
             messageInput.focus();
             sendMessage();
         }
+    },
+    showImagePreview: (url) => {
+        const existing = document.querySelector('.chat-lightbox-overlay');
+        if (existing) existing.remove();
+        const overlay = document.createElement('div');
+        overlay.className = 'chat-lightbox-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px;';
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);cursor:default;';
+        img.onclick = (e) => e.stopPropagation();
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'position:fixed;top:20px;right:30px;background:none;border:none;color:#fff;font-size:36px;cursor:pointer;z-index:100001;font-family:Arial,sans-serif;line-height:1;';
+        closeBtn.onclick = () => overlay.remove();
+        overlay.appendChild(img);
+        overlay.appendChild(closeBtn);
+        overlay.onclick = () => overlay.remove();
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+        const observer = new MutationObserver(() => {
+            if (!document.body.contains(overlay)) {
+                document.body.style.overflow = '';
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
     },
     downloadAttachment: (url, filename, mimeType) => {
         try {
