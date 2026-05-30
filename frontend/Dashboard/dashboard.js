@@ -1781,8 +1781,9 @@ function populateSuggestedReaders(users) {
             <button class="star-btn" onclick="event.stopPropagation(); toggleFavorite('${reader._id || reader.id}', this)">${reader.isFavorited ? '✓' : '⭐'}</button>
         `;
 
+        const profileId = reader._id || reader.id || reader.userId || (reader.userDetails && reader.userDetails._id);
         suggestedItem.addEventListener('click', () => {
-            window.location.href = `../Profile/view-profile.html?id=${reader._id || reader.id}`;
+            window.location.href = `../Profile/view-profile.html?id=${profileId}`;
         });
 
         suggestedList.appendChild(suggestedItem);

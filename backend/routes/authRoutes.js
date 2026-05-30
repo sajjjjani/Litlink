@@ -152,6 +152,13 @@ router.post('/signup', async (req, res) => {
     
     await user.save();
     
+    try {
+      const UserSettings = require('../models/UserSettings');
+      await new UserSettings({ userId: user._id }).save();
+    } catch (settingsErr) {
+      console.error('Failed to create UserSettings:', settingsErr.message);
+    }
+    
     const verification = new Verification({
       email: email.toLowerCase(),
       code: verificationCode,

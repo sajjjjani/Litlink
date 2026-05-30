@@ -103,9 +103,18 @@ router.get('/:userId', authenticate, async (req, res) => {
     const targetUserId = req.params.userId;
     const viewerId = req.user._id.toString();
     
+    if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
     // Check profile visibility
     const UserSettings = require('../models/UserSettings');
-    const settings = await UserSettings.findOne({ userId: targetUserId });
+    let settings;
+    try {
+      settings = await UserSettings.findOne({ userId: targetUserId });
+    } catch {
+      settings = null;
+    }
     let profilePrivacy = 'everyone';
     if (settings && settings.privacy && settings.privacy.profilePrivacy) {
       profilePrivacy = settings.privacy.profilePrivacy;
