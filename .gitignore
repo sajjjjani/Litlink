@@ -7,3 +7,4 @@ ai_service/__pycache__/
 .env
 *.log
 .DS_Store
+litlink-backup/
