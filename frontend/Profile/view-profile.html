@@ -668,7 +668,7 @@ function isOnline(lastLogin) {
     return Date.now() - new Date(lastLogin) < 5 * 60 * 1000;
 }
 
-function calcMatch(viewedUser, currentUser) {
+function calcMatchFallback(viewedUser, currentUser) {
     if (!currentUser || !viewedUser) return 0;
     let score = 0;
     const sharedGenres   = (viewedUser.favoriteGenres  || []).filter(g => (currentUser.favoriteGenres  || []).includes(g));
@@ -677,7 +677,7 @@ function calcMatch(viewedUser, currentUser) {
     score += sharedGenres.length  * 12;
     score += sharedAuthors.length * 10;
     score += sharedBooks.length   * 8;
-    return Math.min(100, 50 + score);
+    return Math.min(100, score);
 }
 
 function getSharedItems(viewedUser, currentUser) {
@@ -767,9 +767,9 @@ function updateFollowerCount(delta) {
     el.textContent = Math.max(0, (parseInt(el.textContent) || 0) + delta);
 }
 
-function renderProfile(user, threads, currentUser) {
+function renderProfile(user, threads, currentUser, serverMatchPct) {
     const online   = isOnline(user.lastLogin);
-    const match    = calcMatch(user, currentUser);
+    const match    = serverMatchPct != null ? serverMatchPct : calcMatchFallback(user, currentUser);
     const shared   = getSharedItems(user, currentUser);
     const isSelf   = currentUser && (currentUser._id === user._id || currentUser.id === user._id);
     const following = (user.followers || []).some(f =>
@@ -974,9 +974,27 @@ async function init() {
             return;
         }
 
+        // Check if profile is privacy-restricted
+        if (user.privacyRestricted) {
+            document.getElementById('loadingSkeleton').style.display = 'none';
+            document.getElementById('profileRoot').style.display = '';
+            document.getElementById('profileRoot').innerHTML = `
+                <div class="hero" style="text-align:center;padding:60px 40px;">
+                    <div style="font-size:4rem;margin-bottom:16px;">🔒</div>
+                    <div class="user-name" style="font-size:1.5rem;margin-bottom:8px;">${esc(user.privacyReason || 'This profile is private.')}</div>
+                    <p style="color:#d4b5a0;margin-bottom:24px;">Sign in as a follower to view this profile.</p>
+                    <a class="btn btn-outline" href="../Chat/chatexplore.html">
+                        <i class="fas fa-arrow-left"></i> Back to Explore
+                    </a>
+                </div>
+            `;
+            document.title = 'Private Profile — Litlink';
+            return;
+        }
+
         let threads = [];
         try {
-            const threadsRes = await fetch(`${API}/api/discussions?author=${userId}&limit=10`, {
+            const threadsRes = await fetch(`${API}/api/discussions/user/${userId}/threads?limit=10`, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
             if (threadsRes.ok) {
@@ -988,11 +1006,27 @@ async function init() {
             console.log('Could not fetch discussion threads:', err);
         }
 
+        // Fetch real match percentage from server
+        let matchPercentage = null;
+        try {
+            const matchRes = await fetch(`${API}/api/matches/matches/${userId}`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            if (matchRes.ok) {
+                const matchData = await matchRes.json();
+                if (matchData.success && matchData.match) {
+                    matchPercentage = matchData.match.matchPercentage;
+                }
+            }
+        } catch (err) {
+            console.log('Could not fetch match percentage:', err);
+        }
+
         document.title = `${user.name} — Litlink`;
 
         document.getElementById('loadingSkeleton').style.display = 'none';
         document.getElementById('profileRoot').style.display = '';
-        renderProfile(user, threads, currentUser);
+        renderProfile(user, threads, currentUser, matchPercentage);
 
     } catch (err) {
         console.error('Profile load error:', err);

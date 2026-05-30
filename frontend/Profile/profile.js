@@ -454,6 +454,9 @@
                     const bookCard = document.createElement('div');
                     bookCard.className = 'book-card';
                     bookCard.style.position = 'relative';
+                    bookCard.style.cursor = 'pointer';
+                    
+                    const bookId = book.bookId || book.id;
                     
                     const cover = document.createElement('div');
                     cover.className = 'book-cover';
@@ -461,9 +464,8 @@
                     let coverUrl = '';
                     if (book.cover) {
                         coverUrl = book.cover;
-                    } else if (book.bookId || book.id) {
-                        const targetId = book.bookId || book.id;
-                        coverUrl = `https://covers.openlibrary.org/b/olid/${targetId}-M.jpg`;
+                    } else if (bookId) {
+                        coverUrl = `https://covers.openlibrary.org/b/olid/${bookId}-M.jpg`;
                     }
 
                     if (coverUrl) {
@@ -482,10 +484,11 @@
                     removeBtn.style.position = 'absolute';
                     removeBtn.style.top = '-5px';
                     removeBtn.style.right = '-5px';
-                    removeBtn.onclick = async () => {
+                    removeBtn.onclick = async (e) => {
+                        e.stopPropagation();
                         const token = getToken();
                         const userId = getUserId();
-                        const targetId = book.bookId || book.id;
+                        const targetId = bookId;
                         if (targetId) {
                             try {
                                 const response = await fetch(`${API_BASE_URL}/users/${userId}/want-to-read/${targetId}`, {
@@ -502,6 +505,11 @@
                             }
                         }
                     };
+                    
+                    // Make the entire card clickable to open book details
+                    bookCard.addEventListener('click', function() {
+                        window.location.href = '../Genre/book.html?id=' + encodeURIComponent(bookId);
+                    });
                     
                     bookCard.appendChild(cover);
                     bookCard.appendChild(title);
@@ -533,33 +541,45 @@
             }
         }
 
-	        function updateProfileCompleteness(user) {
-	            const checks = [
-	                { key: 'name', ok: !!(user.name && String(user.name).trim()) },
-	                { key: 'bio', ok: !!(user.bio && String(user.bio).trim()) },
-	                { key: 'location', ok: !!(user.location && String(user.location).trim()) },
-	                { key: 'pronouns', ok: !!(user.pronouns && String(user.pronouns).trim()) },
-	                { key: 'profilePicture', ok: !!(user.profilePicture && String(user.profilePicture).trim()) },
-	                { key: 'favoriteGenres', ok: Array.isArray(user.favoriteGenres) && user.favoriteGenres.length > 0 },
-	                { key: 'favoriteAuthors', ok: Array.isArray(user.favoriteAuthors) && user.favoriteAuthors.length > 0 },
-	                { key: 'favoriteBooks', ok: Array.isArray(user.favoriteBooks) && user.favoriteBooks.length > 0 },
-	                { key: 'readingHabit', ok: !!(user.readingHabit && String(user.readingHabit).trim()) && String(user.readingHabit).trim().toLowerCase() !== 'not set' },
-	                { key: 'readingGoal', ok: Number(user.readingGoal) > 0 }
-	            ];
+        function updateProfileCompleteness(user) {
+            const fields = [
+                { key: 'profilePicture', label: 'Profile Picture', weight: 10, ok: user.profilePicture && String(user.profilePicture).trim() !== '' && String(user.profilePicture).trim() !== '📚' },
+                { key: 'bio', label: 'Bio', weight: 10, ok: !!(user.bio && String(user.bio).trim()) && String(user.bio).trim() !== 'Book lover and avid reader' },
+                { key: 'location', label: 'Location', weight: 10, ok: !!(user.location && String(user.location).trim()) },
+                { key: 'pronouns', label: 'Pronouns', weight: 5, ok: !!(user.pronouns && String(user.pronouns).trim()) },
+                { key: 'favoriteGenres', label: 'Favorite Genres', weight: 15, ok: Array.isArray(user.favoriteGenres) && user.favoriteGenres.length > 0 },
+                { key: 'favoriteAuthors', label: 'Favorite Authors', weight: 10, ok: Array.isArray(user.favoriteAuthors) && user.favoriteAuthors.length > 0 },
+                { key: 'favoriteBooks', label: 'Favorite Books', weight: 10, ok: (Array.isArray(user.favoriteBooks) && user.favoriteBooks.length > 0) || (Array.isArray(user.booksRead) && user.booksRead.length > 0) },
+                { key: 'readingHabit', label: 'Reading Habit', weight: 10, ok: !!(user.readingHabit && String(user.readingHabit).trim()) && String(user.readingHabit).trim().toLowerCase() !== 'not set' },
+                { key: 'readingGoal', label: 'Reading Goal', weight: 10, ok: Number(user.readingGoal) > 0 },
+                { key: 'discussionPreferences', label: 'Discussion Preferences', weight: 10, ok: Array.isArray(user.discussionPreferences) && user.discussionPreferences.length > 0 }
+            ];
 
-	            const total = checks.length;
-	            const completed = checks.filter(c => c.ok).length;
+            let score = 0;
+            let totalWeight = 0;
+            const missing = [];
 
-	            let percentage = Math.round((completed / total) * 100);
-	            if (completed === total) percentage = 100;
-	            percentage = Math.max(0, Math.min(100, percentage));
-            
+            fields.forEach(f => {
+                totalWeight += f.weight;
+                if (f.ok) {
+                    score += f.weight;
+                } else {
+                    missing.push(f.label);
+                }
+            });
+
+            let percentage = Math.round((score / totalWeight) * 100);
+            if (!Number.isFinite(percentage)) percentage = 0;
+            if (fields.every(f => f.ok)) percentage = 100;
+            percentage = Math.max(0, Math.min(100, percentage));
+
             const percentageEl = document.getElementById('completenessPercentage');
             const fillEl = document.getElementById('completenessFill');
-            
+            const tipsEl = document.getElementById('completenessTips');
+
             if (percentageEl) {
                 percentageEl.textContent = `${percentage}%`;
-                
+
                 if (percentage < 30) {
                     percentageEl.style.color = '#ef4444';
                 } else if (percentage < 70) {
@@ -570,10 +590,10 @@
                     percentageEl.style.color = '#f5e6d3';
                 }
             }
-            
+
             if (fillEl) {
                 fillEl.style.width = `${percentage}%`;
-                
+
                 if (percentage < 30) {
                     fillEl.style.background = '#ef4444';
                 } else if (percentage < 70) {
@@ -584,6 +604,168 @@
                     fillEl.style.background = '#f5e6d3';
                 }
             }
+
+            if (tipsEl) {
+                if (percentage === 100) {
+                    tipsEl.innerHTML = '<p style="color:#10b981"><i class="fas fa-check-circle"></i> Your profile is complete!</p>';
+                } else if (missing.length > 0) {
+                    tipsEl.innerHTML = '<p>Complete these to reach 100%:</p><ul style="margin-top:6px;padding-left:18px;font-size:0.8rem;line-height:1.6">' +
+                        missing.map(m => `<li style="color:#ef4444">${m}</li>`).join('') +
+                        '</ul>';
+                } else {
+                    tipsEl.innerHTML = '<p>Complete your profile to connect with more readers!</p>';
+                }
+            }
+        }
+
+        // ===== FOLLOWERS / FOLLOWING MODALS =====
+
+        window.showFollowersModal = async function() {
+            const modal = document.getElementById('followersModal');
+            const list = document.getElementById('followersList');
+            if (!modal || !list) return;
+
+            modal.style.display = 'flex';
+            modal.style.visibility = 'visible';
+            modal.style.opacity = '1';
+            document.body.style.overflow = 'hidden';
+            list.innerHTML = '<div class="follow-loading">Loading followers...</div>';
+
+            try {
+                const token = getToken();
+                const userId = getUserId();
+                const response = await fetch(`${API_BASE_URL}/users/${userId}/followers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success && data.followers) {
+                    if (data.followers.length === 0) {
+                        list.innerHTML = '<div class="follow-empty">No followers yet</div>';
+                        return;
+                    }
+                    list.innerHTML = data.followers.map(f => `
+                        <div class="follow-user-card">
+                            <img class="follow-user-avatar" src="${f.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || 'User')}&background=E0B973&color=3B1D14&size=80`}" alt="${escHtml(f.name)}">
+                            <div class="follow-user-info">
+                                <div class="follow-user-name">${escHtml(f.name)}</div>
+                                <div class="follow-user-username">@${escHtml(f.username || f.name.toLowerCase().replace(/\s+/g, '_'))}</div>
+                            </div>
+                            <div class="follow-user-actions">
+                                <button class="follow-action-btn message" onclick="openChat('${f._id}')"><i class="fas fa-envelope"></i> Message</button>
+                                <button class="follow-action-btn view-profile" onclick="viewUserProfile('${f._id}')"><i class="fas fa-user"></i> View Profile</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="follow-empty">Could not load followers</div>';
+                }
+            } catch (e) {
+                console.error('Error loading followers:', e);
+                list.innerHTML = '<div class="follow-empty">Error loading followers</div>';
+            }
+        };
+
+        window.showFollowingModal = async function() {
+            const modal = document.getElementById('followingModal');
+            const list = document.getElementById('followingList');
+            if (!modal || !list) return;
+
+            modal.style.display = 'flex';
+            modal.style.visibility = 'visible';
+            modal.style.opacity = '1';
+            document.body.style.overflow = 'hidden';
+            list.innerHTML = '<div class="follow-loading">Loading following...</div>';
+
+            try {
+                const token = getToken();
+                const userId = getUserId();
+                const response = await fetch(`${API_BASE_URL}/users/${userId}/following`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success && data.following) {
+                    if (data.following.length === 0) {
+                        list.innerHTML = '<div class="follow-empty">Not following anyone yet</div>';
+                        return;
+                    }
+                    list.innerHTML = data.following.map(f => `
+                        <div class="follow-user-card">
+                            <img class="follow-user-avatar" src="${f.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || 'User')}&background=E0B973&color=3B1D14&size=80`}" alt="${escHtml(f.name)}">
+                            <div class="follow-user-info">
+                                <div class="follow-user-name">${escHtml(f.name)}</div>
+                                <div class="follow-user-username">@${escHtml(f.username || f.name.toLowerCase().replace(/\s+/g, '_'))}</div>
+                            </div>
+                            <div class="follow-user-actions">
+                                <button class="follow-action-btn unfollow" onclick="unfollowUser('${f._id}', this)"><i class="fas fa-user-minus"></i> Unfollow</button>
+                                <button class="follow-action-btn message" onclick="openChat('${f._id}')"><i class="fas fa-envelope"></i> Message</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="follow-empty">Could not load following</div>';
+                }
+            } catch (e) {
+                console.error('Error loading following:', e);
+                list.innerHTML = '<div class="follow-empty">Error loading following</div>';
+            }
+        };
+
+        window.unfollowUser = async function(userId, btnElement) {
+            if (!confirm('Unfollow this user?')) return;
+
+            try {
+                const token = getToken();
+                const response = await fetch(`${API_BASE_URL}/users/${userId}/unfollow`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    const card = btnElement.closest('.follow-user-card');
+                    if (card) {
+                        card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateX(20px)';
+                        setTimeout(() => card.remove(), 300);
+                    }
+                    decrementFollowingCount();
+                    showMessage('Unfollowed successfully', 'success');
+                } else {
+                    showMessage(data.message || 'Could not unfollow', 'error');
+                }
+            } catch (e) {
+                console.error('Error unfollowing:', e);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        };
+
+        window.openChat = function(userId) {
+            window.location.href = `../Chat/chat.html?userId=${userId}`;
+        };
+
+        window.viewUserProfile = function(userId) {
+            window.location.href = `../Profile/view-profile.html?userId=${userId}`;
+        };
+
+        function decrementFollowingCount() {
+            const el = document.getElementById('statFollowing');
+            if (el) {
+                const current = parseInt(el.textContent) || 0;
+                el.textContent = Math.max(0, current - 1);
+            }
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         // ===== BOOK FUNCTIONALITY =====
@@ -788,6 +970,18 @@
               padding: 15px;
               border-radius: 10px;
               margin: 10px 0;
+              cursor: pointer;
+              transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            }
+            
+            .book-card-display:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+              background: rgba(245, 230, 211, 0.3);
+            }
+            
+            .book-card-display:active {
+              transform: translateY(0);
             }
             
             .book-card-cover {
@@ -1053,10 +1247,16 @@
                     ${data.book.author ? `<div class="book-card-author">${data.book.author}</div>` : ''}
                     <small>Added: ${new Date(data.book.addedAt || Date.now()).toLocaleDateString()}</small>
                   </div>
-                  <button class="remove-book-btn" onclick="removeBookFromProfile('${data.book.id}')">
+                  <button class="remove-book-btn" onclick="event.stopPropagation(); removeBookFromProfile('${data.book.id}')">
                     <i class="fas fa-times"></i>
                   </button>
                 `;
+                
+                // Make the entire card clickable to open book details
+                bookCard.style.cursor = 'pointer';
+                bookCard.addEventListener('click', function() {
+                  window.location.href = '../Genre/book.html?id=' + encodeURIComponent(data.book.id);
+                });
                 
                 // Ensure cover loads or falls back properly
                 const img = bookCard.querySelector('img');
@@ -1153,27 +1353,33 @@
                   
                   console.log(`📖 Rendering book "${safeTitle}" with cover: ${coverUrl}`);
                   
-                  bookCard.innerHTML = `
-                    <img src="${coverUrl}" 
-                         alt="${safeTitle}" 
-                         class="book-card-cover" 
-                         onerror="console.error('Cover failed:', this.src); this.onerror=null; this.src='${placeholderUrl}'; this.style.objectFit='cover';">
-                    <div class="book-card-info">
-                      <div class="book-card-title">${safeTitle}</div>
-                      ${book.author ? `<div class="book-card-author">${book.author}</div>` : ''}
-                      <small>Added: ${new Date(book.addedAt).toLocaleDateString()}</small>
-                    </div>
-                    <button class="remove-book-btn" onclick="removeBookFromProfile('${book.id}')">
-                      <i class="fas fa-times"></i>
-                    </button>
-                  `;
-                  
-                  // Ensure cover loads or falls back properly
-                  const img = bookCard.querySelector('img');
-                  img.addEventListener('error', function() {
-                    this.src = placeholderUrl;
-                    this.style.display = 'block';
-                  });
+                   bookCard.innerHTML = `
+                     <img src="${coverUrl}" 
+                          alt="${safeTitle}" 
+                          class="book-card-cover" 
+                          onerror="console.error('Cover failed:', this.src); this.onerror=null; this.src='${placeholderUrl}'; this.style.objectFit='cover';">
+                     <div class="book-card-info">
+                       <div class="book-card-title">${safeTitle}</div>
+                       ${book.author ? `<div class="book-card-author">${book.author}</div>` : ''}
+                       <small>Added: ${new Date(book.addedAt).toLocaleDateString()}</small>
+                     </div>
+                     <button class="remove-book-btn" onclick="event.stopPropagation(); removeBookFromProfile('${book.id}')">
+                       <i class="fas fa-times"></i>
+                     </button>
+                   `;
+                   
+                   // Make the entire card clickable to open book details
+                   bookCard.style.cursor = 'pointer';
+                   bookCard.addEventListener('click', function() {
+                     window.location.href = '../Genre/book.html?id=' + encodeURIComponent(book.id);
+                   });
+                   
+                   // Ensure cover loads or falls back properly
+                   const img = bookCard.querySelector('img');
+                   img.addEventListener('error', function() {
+                     this.src = placeholderUrl;
+                     this.style.display = 'block';
+                   });
                   
                   // Insert before the buttons
                   const addBookBtn = booksContainer.querySelector('.add-tag-btn');
@@ -2012,13 +2218,13 @@
 	            });
 
 	            // Close modals when pressing Escape
-	            document.addEventListener('keydown', function(event) {
-	                if (event.key === 'Escape') {
-	                    document.querySelectorAll('.modal-overlay').forEach(modal => {
-	                        if (modal.style.display === 'flex') {
-	                            closeModal(modal.id);
-	                        }
-	                    });
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    document.querySelectorAll('.modal-overlay').forEach(modal => {
+                        if (modal.classList.contains('active') || modal.style.display === 'flex') {
+                            closeModal(modal.id);
+                        }
+                    });
 	                    
 	                    const settingsMenu = document.getElementById('settingsMenu');
 	                    if (settingsMenu) settingsMenu.classList.remove('active');

@@ -930,6 +930,7 @@ input:checked + .slider:before {
     justify-content: center;
     align-items: center;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .book-card:hover {
@@ -1660,6 +1661,167 @@ input:checked + .slider:before {
         padding: 20px;
         width: 95%;
     }
+}
+
+/* ==================== FOLLOWERS / FOLLOWING MODALS ==================== */
+.clickable-stat {
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+    padding: 8px 12px;
+    border-radius: 12px;
+}
+
+.clickable-stat:active {
+    transform: scale(0.96);
+}
+
+#followersModal,
+#followingModal {
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.follow-modal {
+    background: #3d2617;
+    border-radius: 24px;
+    width: 90%;
+    max-width: 420px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(245, 230, 211, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    animation: modalAppear 0.3s ease;
+}
+
+.follow-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+}
+
+.follow-modal-header h3 {
+    color: #f5e6d3;
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.follow-modal-header h3 i {
+    color: #e0b973;
+    margin-right: 8px;
+}
+
+.follow-modal-body {
+    padding: 16px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.follow-loading {
+    color: #d4b5a0;
+    text-align: center;
+    padding: 40px 0;
+    font-size: 0.95rem;
+}
+
+.follow-empty {
+    color: #d4b5a0;
+    text-align: center;
+    padding: 40px 0;
+    font-size: 0.95rem;
+}
+
+.follow-user-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(245, 230, 211, 0.06);
+}
+
+.follow-user-card:last-child {
+    border-bottom: none;
+}
+
+.follow-user-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #5c3a28;
+}
+
+.follow-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.follow-user-name {
+    color: #f5e6d3;
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.follow-user-username {
+    color: #d4b5a0;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.follow-user-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.follow-action-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.follow-action-btn.message {
+    background: #e0b973;
+    color: #2c1810;
+}
+
+.follow-action-btn.message:hover {
+    background: #d4a85c;
+    transform: translateY(-1px);
+}
+
+.follow-action-btn.view-profile {
+    background: transparent;
+    color: #e0b973;
+    border: 1px solid #e0b973;
+}
+
+.follow-action-btn.view-profile:hover {
+    background: rgba(224, 185, 115, 0.15);
+    transform: translateY(-1px);
+}
+
+.follow-action-btn.unfollow {
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.follow-action-btn.unfollow:hover {
+    background: rgba(239, 68, 68, 0.15);
+    transform: translateY(-1px);
 }
 
 @media (max-width: 480px) {

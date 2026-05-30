@@ -10,7 +10,22 @@
     <link rel="stylesheet" href="profile.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Additional spacious styles */
+        :root {
+            --bg-card: #ffffff;
+            --bg-section: #f5f0e8;
+            --text-primary: #2c1810;
+            --text-secondary: #5c3a28;
+            --text-muted: #8b6f47;
+            --accent: #e0b973;
+            --accent-hover: #d4a657;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --border: rgba(139, 111, 71, 0.2);
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            --radius: 16px;
+            --transition: 0.2s ease;
+        }
+
         .settings-container {
             max-width: 900px;
             margin: 0 auto;
@@ -20,37 +35,37 @@
         .settings-header {
             margin-bottom: 2.5rem;
             padding-bottom: 1rem;
-            border-bottom: 2px solid rgba(224, 185, 115, 0.2);
+            border-bottom: 2px solid var(--border);
         }
 
         .settings-header h1 {
             font-size: 2rem;
-            color: #2c1810;
+            color: var(--text-primary);
             margin-bottom: 0.5rem;
         }
 
         .settings-header p {
-            color: #5c3a28;
+            color: var(--text-secondary);
             font-size: 1rem;
         }
 
         .settings-section {
-            background: white;
-            border-radius: 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
             margin-bottom: 2rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--shadow);
             overflow: hidden;
         }
 
         .settings-section-header {
             padding: 1.5rem 2rem;
             background: linear-gradient(135deg, #f5f0e8 0%, #faf6ef 100%);
-            border-bottom: 1px solid rgba(224, 185, 115, 0.2);
+            border-bottom: 1px solid var(--border);
         }
 
         .settings-section-header h2 {
             font-size: 1.25rem;
-            color: #2c1810;
+            color: var(--text-primary);
             margin: 0;
             display: flex;
             align-items: center;
@@ -58,7 +73,7 @@
         }
 
         .settings-section-header h2 i {
-            color: #e0b973;
+            color: var(--accent);
             font-size: 1.35rem;
         }
 
@@ -66,7 +81,7 @@
             padding: 1.5rem 2rem;
         }
 
-        .settings-item-large {
+        .settings-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -74,8 +89,14 @@
             border-bottom: 1px solid rgba(139, 111, 71, 0.1);
         }
 
-        .settings-item-large:last-child {
+        .settings-item:last-child {
             border-bottom: none;
+        }
+
+        .settings-item.col {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
         }
 
         .settings-item-info {
@@ -84,20 +105,54 @@
 
         .settings-item-info label {
             font-weight: 600;
-            color: #2c1810;
+            color: var(--text-primary);
             font-size: 1rem;
             display: block;
             margin-bottom: 0.25rem;
         }
 
         .settings-value {
-            color: #5c3a28;
+            color: var(--text-secondary);
             margin: 0;
             font-size: 0.95rem;
         }
 
+        .settings-badge {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .settings-badge.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .settings-badge.suspended {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .settings-badge.banned {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .settings-badge.deactivated {
+            background: #e5e7eb;
+            color: #4b5563;
+        }
+
+        .settings-badge.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .settings-description {
-            color: #8b6f47;
+            color: var(--text-muted);
             font-size: 0.85rem;
             margin: 0.25rem 0 0 0;
         }
@@ -109,16 +164,16 @@
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 500;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .action-btn.edit {
-            background: #e0b973;
-            color: #2c1810;
+            background: var(--accent);
+            color: var(--text-primary);
         }
 
         .action-btn.edit:hover {
-            background: #d4a657;
+            background: var(--accent-hover);
             transform: translateY(-1px);
         }
 
@@ -132,12 +187,12 @@
         }
 
         .action-btn.delete {
-            background: #dc2626;
+            background: var(--danger);
             color: white;
         }
 
         .action-btn.delete:hover {
-            background: #b91c1c;
+            background: var(--danger-hover);
         }
 
         .settings-select {
@@ -145,7 +200,7 @@
             border-radius: 8px;
             border: 1px solid rgba(139, 111, 71, 0.3);
             background: white;
-            color: #2c1810;
+            color: var(--text-primary);
             font-size: 0.9rem;
             cursor: pointer;
             min-width: 160px;
@@ -153,15 +208,15 @@
 
         .settings-select:focus {
             outline: none;
-            border-color: #e0b973;
+            border-color: var(--accent);
         }
 
-        /* Toggle Switch */
         .toggle-switch {
             position: relative;
             display: inline-block;
             width: 52px;
             height: 28px;
+            flex-shrink: 0;
         }
 
         .toggle-switch input {
@@ -173,10 +228,7 @@
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background-color: #ccc;
             transition: 0.3s;
             border-radius: 28px;
@@ -195,14 +247,52 @@
         }
 
         input:checked + .slider {
-            background-color: #e0b973;
+            background-color: var(--accent);
         }
 
         input:checked + .slider:before {
             transform: translateX(24px);
         }
 
-        /* Blocked Users List */
+        .notif-group {
+            padding: 0.75rem 0;
+        }
+
+        .notif-group-header {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            padding: 0.75rem 0 0.5rem;
+            border-bottom: 1px solid rgba(139, 111, 71, 0.08);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .notif-group-header i {
+            color: var(--accent);
+            width: 1.25rem;
+        }
+
+        .notif-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0 0.6rem 1.75rem;
+            border-bottom: 1px solid rgba(139, 111, 71, 0.05);
+        }
+
+        .notif-item:last-child {
+            border-bottom: none;
+        }
+
+        .notif-item label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
         .blocked-users-list {
             display: flex;
             flex-direction: column;
@@ -216,7 +306,7 @@
             padding: 1rem;
             background: rgba(224, 185, 115, 0.05);
             border-radius: 12px;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .blocked-user-item:hover {
@@ -234,7 +324,7 @@
             height: 48px;
             border-radius: 50%;
             object-fit: cover;
-            background: #e0b973;
+            background: var(--accent);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -243,36 +333,36 @@
 
         .blocked-user-details h4 {
             margin: 0 0 0.25rem 0;
-            color: #2c1810;
+            color: var(--text-primary);
             font-size: 1rem;
         }
 
         .blocked-user-details p {
             margin: 0;
-            color: #8b6f47;
+            color: var(--text-muted);
             font-size: 0.85rem;
         }
 
         .unblock-btn {
             padding: 0.5rem 1rem;
-            background: #dc2626;
+            background: var(--danger);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 0.85rem;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .unblock-btn:hover {
-            background: #b91c1c;
+            background: var(--danger-hover);
             transform: translateY(-1px);
         }
 
         .empty-blocked {
             text-align: center;
             padding: 2rem;
-            color: #8b6f47;
+            color: var(--text-muted);
         }
 
         .empty-blocked i {
@@ -281,23 +371,25 @@
             opacity: 0.5;
         }
 
-        /* Modal Styles */
         .modal-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.7);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 2000;
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal-overlay.active {
+            display: flex;
         }
 
         .signup-modal {
             background: white;
-            border-radius: 16px;
+            border-radius: var(--radius);
             max-width: 500px;
             width: 90%;
             max-height: 80vh;
@@ -309,13 +401,13 @@
             justify-content: space-between;
             align-items: center;
             padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid rgba(139, 111, 71, 0.2);
+            border-bottom: 1px solid var(--border);
         }
 
         .modal-header h2 {
             margin: 0;
             font-size: 1.25rem;
-            color: #2c1810;
+            color: var(--text-primary);
         }
 
         .close-btn {
@@ -323,7 +415,7 @@
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: #8b6f47;
+            color: var(--text-muted);
         }
 
         .warning-message {
@@ -339,13 +431,13 @@
         }
 
         .form-group {
-            padding: 0 1.5rem 1rem 1.5rem;
+            padding: 0 1.5rem 1rem;
         }
 
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: #2c1810;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
@@ -355,11 +447,12 @@
             border: 1px solid rgba(139, 111, 71, 0.3);
             border-radius: 8px;
             font-size: 0.95rem;
+            box-sizing: border-box;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #e0b973;
+            border-color: var(--accent);
         }
 
         .form-actions {
@@ -381,7 +474,7 @@
         .save-btn, .delete-btn {
             flex: 1;
             padding: 0.75rem;
-            background: #dc2626;
+            background: var(--danger);
             color: white;
             border: none;
             border-radius: 8px;
@@ -390,39 +483,92 @@
         }
 
         .save-btn {
-            background: #e0b973;
-            color: #2c1810;
+            background: var(--accent);
+            color: var(--text-primary);
         }
 
-        /* Responsive */
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+
+        .info-row i {
+            width: 1.25rem;
+            color: var(--accent);
+            font-size: 1rem;
+        }
+
+        .info-row .label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            min-width: 100px;
+        }
+
+        .info-row .value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .security-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(139, 111, 71, 0.08);
+        }
+
+        .security-item:last-child {
+            border-bottom: none;
+        }
+
+        .security-item i {
+            width: 1.5rem;
+            color: var(--accent);
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .security-item .sec-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .security-item .sec-value {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
         @media (max-width: 768px) {
             .settings-container {
                 padding: 1rem;
             }
-            
             .settings-section-header,
             .settings-content {
                 padding: 1rem;
             }
-            
-            .settings-item-large {
+            .settings-item {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 1rem;
+                gap: 0.75rem;
             }
-            
             .action-btn, .settings-select {
                 width: 100%;
             }
-            
             .blocked-user-item {
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
             }
-            
             .blocked-user-info {
                 flex-direction: column;
+            }
+            .notif-item {
+                padding-left: 0;
             }
         }
     </style>
@@ -437,23 +583,23 @@
             </div>
             <div class="nav-links">
                 <a href="../Dashboard/dashboard.html" class="nav-link" title="Home">
-                    <i class="fas fa-home"></i> 
+                    <i class="fas fa-home"></i>
                     <span class="nav-text">Home</span>
                 </a>
                 <a href="../Chat/chat.html" class="nav-link" title="Messages">
-                    <i class="fas fa-envelope"></i> 
+                    <i class="fas fa-envelope"></i>
                     <span class="nav-text">Messages</span>
                 </a>
-                <a href="#" class="nav-link" title="Discussions" onclick="showComingSoon('Discussions')">
-                    <i class="fas fa-comments"></i> 
+                <a href="../Discussion Board/discussion.html" class="nav-link" title="Discussions">
+                    <i class="fas fa-comments"></i>
                     <span class="nav-text">Discussions</span>
                 </a>
-                <a href="#" class="nav-link" title="Voice Rooms" onclick="showComingSoon('Voice Rooms')">
-                    <i class="fas fa-microphone"></i> 
+                <a href="../Voice Room/voice-rooms.html" class="nav-link" title="Voice Rooms">
+                    <i class="fas fa-microphone"></i>
                     <span class="nav-text">Voice Rooms</span>
                 </a>
                 <a href="../Profile/profile.html" class="nav-link" title="Profile">
-                    <i class="fas fa-user"></i> 
+                    <i class="fas fa-user"></i>
                     <span class="nav-text">Profile</span>
                 </a>
             </div>
@@ -463,15 +609,6 @@
                         <i class="fas fa-cog"></i>
                     </button>
                     <div class="settings-menu" id="settingsMenu">
-                        <div class="settings-item">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
-                                <span class="slider"></span>
-                            </label>
-                            <span class="settings-label">
-                                <i class="fas fa-moon"></i> Dark Mode
-                            </span>
-                        </div>
                         <div class="settings-item">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="notificationsToggle" checked onchange="toggleNotifications()">
@@ -504,43 +641,58 @@
     <div class="settings-container">
         <div class="settings-header">
             <h1><i class="fas fa-cog"></i> Settings</h1>
-            <p>Manage your account, privacy, and blocked users</p>
+            <p>Manage your account, privacy, notifications, and more</p>
         </div>
 
         <div class="settings-sections">
             <!-- Account Information -->
             <div class="settings-section">
                 <div class="settings-section-header">
-                    <h2><i class="fas fa-user-circle"></i> Account Information</h2>
+                    <h2><i class="fas fa-user-circle"></i> Account</h2>
                 </div>
                 <div class="settings-content">
-                    <div class="settings-item-large">
-                        <div class="settings-item-info">
-                            <label>Email Address</label>
-                            <p id="userEmail" class="settings-value">Loading...</p>
-                        </div>
-                        <span class="action-btn edit" style="cursor: default; opacity: 0.75; pointer-events: none;">Read-only</span>
+                    <div class="info-row">
+                        <i class="fas fa-user"></i>
+                        <span class="label">Username</span>
+                        <span class="value" id="settingsUsername">Loading...</span>
                     </div>
-                    <div class="settings-item-large">
+                    <div class="info-row">
+                        <i class="fas fa-envelope"></i>
+                        <span class="label">Email</span>
+                        <span class="value" id="settingsEmail">Loading...</span>
+                    </div>
+                    <div class="info-row">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span class="label">Joined</span>
+                        <span class="value" id="settingsJoinDate">Loading...</span>
+                    </div>
+                    <div class="info-row">
+                        <i class="fas fa-circle"></i>
+                        <span class="label">Status</span>
+                        <span class="value" id="settingsAccountStatus">
+                            <span class="settings-badge active">Active</span>
+                        </span>
+                    </div>
+                    <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Password</label>
-                            <p class="settings-value">••••••••</p>
+                            <p class="settings-description">Update your password regularly to keep your account secure</p>
                         </div>
                         <button class="action-btn edit" onclick="changePassword()">Change Password</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Privacy Controls -->
+            <!-- Privacy & Safety -->
             <div class="settings-section">
                 <div class="settings-section-header">
-                    <h2><i class="fas fa-shield-alt"></i> Privacy Controls</h2>
+                    <h2><i class="fas fa-shield-alt"></i> Privacy &amp; Safety</h2>
                 </div>
                 <div class="settings-content">
-                    <div class="settings-item-large">
+                    <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Who can message me</label>
-                            <p class="settings-description">Control who can send you messages</p>
+                            <p class="settings-description">Control who can send you direct messages</p>
                         </div>
                         <select id="messagePrivacy" class="settings-select" onchange="updatePrivacySetting('messagePrivacy', this.value)">
                             <option value="everyone">Everyone</option>
@@ -548,10 +700,10 @@
                             <option value="none">No one</option>
                         </select>
                     </div>
-                    <div class="settings-item-large">
+                    <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Who can view my profile</label>
-                            <p class="settings-description">Control profile visibility</p>
+                            <p class="settings-description">Control who can see your profile information</p>
                         </div>
                         <select id="profilePrivacy" class="settings-select" onchange="updatePrivacySetting('profilePrivacy', this.value)">
                             <option value="everyone">Everyone</option>
@@ -562,7 +714,7 @@
                 </div>
             </div>
 
-            <!-- Blocked Users Section -->
+            <!-- Blocked Users -->
             <div class="settings-section">
                 <div class="settings-section-header">
                     <h2><i class="fas fa-ban"></i> Blocked Users</h2>
@@ -581,48 +733,152 @@
             <!-- Notification Preferences -->
             <div class="settings-section">
                 <div class="settings-section-header">
-                    <h2><i class="fas fa-bell"></i> Notification Preferences</h2>
+                    <h2><i class="fas fa-bell"></i> Notifications</h2>
                 </div>
                 <div class="settings-content">
-                    <div class="settings-item-large">
-                        <div class="settings-item-info">
-                            <label>Email Notifications</label>
-                            <p class="settings-description">Receive email updates about your account</p>
+                    <!-- Messages -->
+                    <div class="notif-group">
+                        <div class="notif-group-header">
+                            <i class="fas fa-envelope"></i> Messages
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="emailNotifications" checked onchange="updateNotificationSetting('emailNotifications', this.checked)">
-                            <span class="slider"></span>
-                        </label>
+                        <div class="notif-item">
+                            <label for="newDirectMessages">New direct messages</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="newDirectMessages" checked onchange="updateNotificationSetting('newDirectMessages', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="unreadAlerts">Unread message alerts</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="unreadAlerts" checked onchange="updateNotificationSetting('unreadAlerts', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="settings-item-large">
-                        <div class="settings-item-info">
-                            <label>New Matches</label>
-                            <p class="settings-description">Get notified when you have new reader matches</p>
+
+                    <!-- Voice Rooms -->
+                    <div class="notif-group">
+                        <div class="notif-group-header">
+                            <i class="fas fa-microphone"></i> Voice Rooms
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="matchNotifications" checked onchange="updateNotificationSetting('matchNotifications', this.checked)">
-                            <span class="slider"></span>
-                        </label>
+                        <div class="notif-item">
+                            <label for="roomReminders">Scheduled room reminders</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="roomReminders" checked onchange="updateNotificationSetting('roomReminders', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="roomStartedAlerts">Room started alerts</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="roomStartedAlerts" checked onchange="updateNotificationSetting('roomStartedAlerts', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="settings-item-large">
-                        <div class="settings-item-info">
-                            <label>Messages</label>
-                            <p class="settings-description">Get notified about new messages</p>
+
+                    <!-- Discussion Board -->
+                    <div class="notif-group">
+                        <div class="notif-group-header">
+                            <i class="fas fa-comments"></i> Discussion Board
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="messageNotifications" checked onchange="updateNotificationSetting('messageNotifications', this.checked)">
-                            <span class="slider"></span>
-                        </label>
+                        <div class="notif-item">
+                            <label for="discussionLikes">Likes</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="discussionLikes" checked onchange="updateNotificationSetting('discussionLikes', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="discussionComments">Comments</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="discussionComments" checked onchange="updateNotificationSetting('discussionComments', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="discussionReplies">Replies</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="discussionReplies" checked onchange="updateNotificationSetting('discussionReplies', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="discussionMentions">Mentions</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="discussionMentions" checked onchange="updateNotificationSetting('discussionMentions', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="settings-item-large">
-                        <div class="settings-item-info">
-                            <label>Discussion Updates</label>
-                            <p class="settings-description">Get notified about discussions you're following</p>
+
+                    <!-- Followers -->
+                    <div class="notif-group">
+                        <div class="notif-group-header">
+                            <i class="fas fa-users"></i> Followers
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="discussionNotifications" checked onchange="updateNotificationSetting('discussionNotifications', this.checked)">
-                            <span class="slider"></span>
-                        </label>
+                        <div class="notif-item">
+                            <label for="newFollowers">New followers</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="newFollowers" checked onchange="updateNotificationSetting('newFollowers', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="followRequests">Follow requests</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="followRequests" checked onchange="updateNotificationSetting('followRequests', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Reading Circles -->
+                    <div class="notif-group">
+                        <div class="notif-group-header">
+                            <i class="fas fa-book-open"></i> Reading Circles
+                        </div>
+                        <div class="notif-item">
+                            <label for="circleEventUpdates">Event updates</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="circleEventUpdates" checked onchange="updateNotificationSetting('circleEventUpdates', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="circleSuggestedBooks">Suggested books</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="circleSuggestedBooks" checked onchange="updateNotificationSetting('circleSuggestedBooks', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="notif-item">
+                            <label for="circleAnnouncements">Circle announcements</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="circleAnnouncements" checked onchange="updateNotificationSetting('circleAnnouncements', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <h2><i class="fas fa-lock"></i> Security</h2>
+                </div>
+                <div class="settings-content">
+                    <div class="security-item">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span class="sec-label">Last Login</span>
+                        <span class="sec-value" id="settingsLastLogin">Loading...</span>
+                    </div>
+                    <div class="security-item">
+                        <i class="fas fa-desktop"></i>
+                        <span class="sec-label">Active Sessions</span>
+                        <span class="sec-value">Current session only</span>
                     </div>
                 </div>
             </div>
@@ -633,19 +889,19 @@
                     <h2><i class="fas fa-exclamation-triangle"></i> Account Actions</h2>
                 </div>
                 <div class="settings-content">
-                    <div class="settings-item-large">
+                    <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Deactivate Account</label>
-                            <p class="settings-description">Temporarily disable your account. You can reactivate it anytime.</p>
+                            <p class="settings-description">Temporarily disable your account. You can reactivate it anytime by logging in.</p>
                         </div>
-                        <button class="action-btn deactivate" onclick="deactivateAccount()">Deactivate Account</button>
+                        <button class="action-btn deactivate" onclick="deactivateAccount()">Deactivate</button>
                     </div>
-                    <div class="settings-item-large danger">
+                    <div class="settings-item danger">
                         <div class="settings-item-info">
                             <label>Delete Account</label>
                             <p class="settings-description">Permanently delete your account and all data. This cannot be undone.</p>
                         </div>
-                        <button class="action-btn delete" onclick="showDeleteAccountModal()">Delete Account</button>
+                        <button class="action-btn delete" onclick="showDeleteAccountModal()">Delete</button>
                     </div>
                 </div>
             </div>
@@ -709,10 +965,10 @@
         </div>
     </div>
 
-    <!-- Load scripts -->
     <script src="../Homepage/script.js"></script>
     <script src="profile.js"></script>
     <script src="settings.js"></script>
+    <script src="../utils/modal.js"></script>
     <script src="../utils/textSize.js"></script>
 </body>
 </html>

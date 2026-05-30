@@ -129,11 +129,11 @@
                 </div>
                 
                 <div class="profile-stats">
-                    <div class="stat-item">
+                    <div class="stat-item clickable-stat" onclick="showFollowersModal()">
                         <div class="stat-number" id="statFollowers">0</div>
                         <div class="stat-label">Followers</div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item clickable-stat" onclick="showFollowingModal()">
                         <div class="stat-number" id="statFollowing">0</div>
                         <div class="stat-label">Following</div>
                     </div>
@@ -511,6 +511,32 @@
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
         <p>Loading profile...</p>
+    </div>
+
+    <!-- Followers Modal -->
+    <div class="modal-overlay" id="followersModal">
+        <div class="follow-modal">
+            <div class="follow-modal-header">
+                <h3><i class="fas fa-users"></i> Followers</h3>
+                <button class="close-btn" onclick="closeModal('followersModal')">&times;</button>
+            </div>
+            <div class="follow-modal-body" id="followersList">
+                <div class="follow-loading">Loading followers...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Following Modal -->
+    <div class="modal-overlay" id="followingModal">
+        <div class="follow-modal">
+            <div class="follow-modal-header">
+                <h3><i class="fas fa-user-friends"></i> Following</h3>
+                <button class="close-btn" onclick="closeModal('followingModal')">&times;</button>
+            </div>
+            <div class="follow-modal-body" id="followingList">
+                <div class="follow-loading">Loading following...</div>
+            </div>
+        </div>
     </div>
 
     <!-- Load scripts -->
