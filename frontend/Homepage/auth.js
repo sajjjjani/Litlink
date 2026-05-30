@@ -341,7 +341,6 @@ async function handleSignup(formData) {
         if (data.success) {
             // Store verification data
             sessionStorage.setItem('pendingVerificationEmail', formData.email);
-            sessionStorage.setItem('verificationCode', data.verificationCode);
             
             // Show success message
             showMessageModal('Success', 'Account created successfully! Please check your email for verification instructions.', 'success');
@@ -351,7 +350,7 @@ async function handleSignup(formData) {
             
             // Wait a moment then redirect (verify-email.html is in same Homepage folder)
             setTimeout(() => {
-                const target = `verify-email.html?email=${encodeURIComponent(formData.email)}&code=${data.verificationCode}`;
+                const target = `verify-email.html?email=${encodeURIComponent(formData.email)}`;
                 console.trace('↪️ Redirecting to signup verification:', target);
                 window.location.href = target;
             }, 1000);
@@ -416,11 +415,12 @@ async function handleLogin(formData) {
             showMessageModal('Success', 'Login successful! Redirecting...', 'success');
             closeAllModals();
             
-            // FIXED: Reliable redirect logic
+            // FIXED: Reliable redirect logic based on profile completion
             setTimeout(() => {
                 console.log('📄 DEBUG Redirect Info:', {
                     serverRedirect: data.redirectTo,
                     userIsAdmin: data.user.isAdmin,
+                    completionPercentage: data.user.completionPercentage,
                     userName: data.user.name
                 });
                 
@@ -429,13 +429,19 @@ async function handleLogin(formData) {
                     console.trace('📄 Redirecting using server path:', data.redirectTo);
                     window.location.href = data.redirectTo;
                 }
-                // Fallback based on user type
+                // Fallback based on user type + completion
                 else if (data.user.isAdmin) {
                     console.trace('📄 Admin detected, redirecting to admin dashboard');
                     window.location.href = '../Admin%20Dashboard/admin.html';
                 } else {
-                    console.trace('📄 Regular user, redirecting to dashboard');
-                    window.location.href = '../Dashboard/dashboard.html';
+                    const completion = data.user.completionPercentage || 0;
+                    if (completion < 30) {
+                        console.trace('📄 Profile incomplete (' + completion + '%), redirecting to profile');
+                        window.location.href = '../Profile/profile.html';
+                    } else {
+                        console.trace('📄 Profile complete, redirecting to dashboard');
+                        window.location.href = '../Dashboard/dashboard.html';
+                    }
                 }
             }, 1000);
             
@@ -475,7 +481,7 @@ async function handleForgotPassword(email) {
         console.log('Forgot password request:', { email });
         
         if (!validateEmail(email)) {
-            alert('Please enter a valid email address');
+            window.SystemModal.warning('Invalid Email', 'Please enter a valid email address');
             hideLoading('forgotPasswordSubmit', 'Send Reset Link');
             return;
         }
@@ -542,7 +548,6 @@ async function resendVerificationCode() {
         
         if (data.success) {
             showMessageModal('Success', 'New verification email sent successfully!', 'success');
-            sessionStorage.setItem('verificationCode', data.verificationCode);
         } else {
             showMessageModal('Failed', 'Failed to resend code: ' + data.message, 'error');
         }

@@ -55,10 +55,8 @@
         // Get email from URL or sessionStorage
         const urlParams = new URLSearchParams(window.location.search);
         const emailFromURL = urlParams.get('email');
-        const codeFromURL = urlParams.get('code');
         
         const email = emailFromURL || sessionStorage.getItem('pendingVerificationEmail');
-        const storedCode = codeFromURL || sessionStorage.getItem('verificationCode');
         
         document.addEventListener('DOMContentLoaded', function() {
             const emailElement = document.getElementById('verificationEmail');
@@ -69,9 +67,6 @@
             
             if (email) {
                 emailElement.textContent = email;
-                if (storedCode) {
-                    codeInput.value = storedCode;
-                }
             } else {
                 emailElement.textContent = 'No email found. Please sign up again.';
                 emailElement.style.color = '#ef4444';
@@ -84,7 +79,7 @@
                 const code = codeInput.value.trim();
                 
                 if (!code || code.length !== 6) {
-                    alert('Please enter a valid 6-digit code');
+                    window.SystemModal.warning('Invalid Code', 'Please enter a valid 6-digit code');
                     codeInput.focus();
                     return;
                 }
@@ -120,14 +115,13 @@
                         
                         // Clear session storage
                         sessionStorage.removeItem('pendingVerificationEmail');
-                        sessionStorage.removeItem('verificationCode');
                     } else {
-                        alert('Verification failed: ' + data.message);
+                        window.SystemModal.error('Verification Failed', 'Verification failed: ' + data.message);
                         codeInput.focus();
                     }
                 } catch (error) {
                     console.error('Verification error:', error);
-                    alert('Unable to connect to the server. Please check your internet connection and try again.');
+                    window.SystemModal.error('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.');
                 }
             });
             
@@ -147,15 +141,13 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        alert('New verification code sent! Please check your email.');
-                        codeInput.value = data.verificationCode;
-                        sessionStorage.setItem('verificationCode', data.verificationCode);
+                        window.SystemModal.success('Code Sent', 'New verification code sent! Please check your email.');
                     } else {
-                        alert('Failed to resend code: ' + data.message);
+                        window.SystemModal.error('Failed', 'Failed to resend code: ' + data.message);
                     }
                 } catch (error) {
                     console.error('Resend error:', error);
-                    alert('Unable to connect to the server. Please check your internet connection and try again.');
+                    window.SystemModal.error('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.');
                 }
             });
         });
