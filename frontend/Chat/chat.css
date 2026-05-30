@@ -1010,6 +1010,7 @@ body {
 @media (max-width: 768px) {
     .container {
         height: calc(100vh - 60px);
+        height: calc(100dvh - 60px);
         margin-top: 60px;
     }
     
@@ -1027,6 +1028,7 @@ body {
         left: 0;
         width: 100%;
         height: calc(100vh - 60px);
+        height: calc(100dvh - 60px);
         transform: translateX(-100%);
         transition: transform 0.3s ease;
         z-index: 1000;
