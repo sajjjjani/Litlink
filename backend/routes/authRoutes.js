@@ -343,6 +343,41 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// POST /api/auth/test-email
+router.post('/test-email', async (req, res) => {
+  try {
+    const testEmail = req.body.email || process.env.EMAIL_USER;
+    if (!testEmail) {
+      return res.json({ success: false, message: 'No email provided and EMAIL_USER not set' });
+    }
+    const testCode = 'TEST123';
+    const result = await sendVerificationEmail(testEmail, testCode, 'Test User');
+    
+    const user = process.env.EMAIL_USER ? `${process.env.EMAIL_USER.slice(0, 3)}...` : '(not set)';
+    const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+    
+    res.json({
+      success: result,
+      message: result ? 'Test email sent! Check your inbox.' : 'Failed to send test email. See server logs.',
+      config: {
+        host,
+        port: process.env.EMAIL_PORT || '587',
+        user,
+        EMAIL_USER_set: !!process.env.EMAIL_USER,
+        EMAIL_PASSWORD_set: !!process.env.EMAIL_PASSWORD
+      }
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ success: false, message: error.message, config: {
+      EMAIL_USER_set: !!process.env.EMAIL_USER,
+      EMAIL_PASSWORD_set: !!process.env.EMAIL_PASSWORD,
+      EMAIL_HOST: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      EMAIL_PORT: process.env.EMAIL_PORT || '587'
+    }});
+  }
+});
+
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res) => {
   try {

@@ -1,20 +1,33 @@
 const nodemailer = require('nodemailer');
 const { getHomepageUrl } = require('./publicUrl');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
+function createTransporter() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASSWORD;
+
+  if (!user || !pass) {
+    console.error('❌ EMAIL_USER or EMAIL_PASSWORD not set');
+    return null;
   }
-});
+
+  const config = {
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || '587'),
+    secure: process.env.EMAIL_SECURE === 'true',
+    auth: { user, pass }
+  };
+
+  console.log(`📧 Creating transporter: host=${config.host}, port=${config.port}, secure=${config.secure}, user=${user}`);
+  return nodemailer.createTransport(config);
+}
 
 async function sendVerificationEmail(email, verificationCode, userName) {
+  const transporter = createTransporter();
+  if (!transporter) return false;
+
   try {
-    const verificationLink = getHomepageUrl('verify-email.html', {
-      email
-    });
-    
+    const verificationLink = getHomepageUrl('verify-email.html', { email });
+
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -28,23 +41,23 @@ async function sendVerificationEmail(email, verificationCode, userName) {
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .header { background-color: #2c1810; color: #f5e6d3; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
                 .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-                .button { 
-                    background-color: #2c1810; 
-                    color: #f5e6d3 !important; 
-                    padding: 12px 24px; 
-                    text-decoration: none; 
-                    border-radius: 5px; 
-                    display: inline-block; 
-                    margin: 20px 0; 
+                .button {
+                    background-color: #2c1810;
+                    color: #f5e6d3 !important;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin: 20px 0;
                     font-weight: bold;
                 }
-                .code { 
-                    background-color: #f0f0f0; 
-                    padding: 15px; 
-                    border-radius: 5px; 
-                    font-family: monospace; 
-                    font-size: 18px; 
-                    letter-spacing: 2px; 
+                .code {
+                    background-color: #f0f0f0;
+                    padding: 15px;
+                    border-radius: 5px;
+                    font-family: monospace;
+                    font-size: 18px;
+                    letter-spacing: 2px;
                     text-align: center;
                     margin: 20px 0;
                 }
@@ -88,11 +101,12 @@ async function sendVerificationEmail(email, verificationCode, userName) {
 }
 
 async function sendPasswordResetEmail(email, otp, userName) {
+  const transporter = createTransporter();
+  if (!transporter) return false;
+
   try {
-    const resetLink = getHomepageUrl('verify-otp.html', {
-      email
-    });
-    
+    const resetLink = getHomepageUrl('verify-otp.html', { email });
+
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -106,23 +120,23 @@ async function sendPasswordResetEmail(email, otp, userName) {
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .header { background-color: #2c1810; color: #f5e6d3; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
                 .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-                .button { 
-                    background-color: #2c1810; 
-                    color: #f5e6d3 !important; 
-                    padding: 12px 24px; 
-                    text-decoration: none; 
-                    border-radius: 5px; 
-                    display: inline-block; 
-                    margin: 20px 0; 
+                .button {
+                    background-color: #2c1810;
+                    color: #f5e6d3 !important;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin: 20px 0;
                     font-weight: bold;
                 }
-                .code { 
-                    background-color: #f0f0f0; 
-                    padding: 15px; 
-                    border-radius: 5px; 
-                    font-family: monospace; 
-                    font-size: 18px; 
-                    letter-spacing: 2px; 
+                .code {
+                    background-color: #f0f0f0;
+                    padding: 15px;
+                    border-radius: 5px;
+                    font-family: monospace;
+                    font-size: 18px;
+                    letter-spacing: 2px;
                     text-align: center;
                     margin: 20px 0;
                 }
