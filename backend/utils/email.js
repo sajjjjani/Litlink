@@ -17,8 +17,16 @@ function createTransporter() {
     host: process.env.EMAIL_HOST || 'smtp.sendgrid.net',
     port,
     secure,
-    auth: { user, pass }
+    auth: { user, pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000
   };
+
+  if (!secure && port !== 465) {
+    config.tls = { rejectUnauthorized: false };
+    config.requireTLS = true;
+  }
 
   console.log(`📧 Creating transporter: host=${config.host}, port=${config.port}, secure=${config.secure}, user=${user}`);
   return nodemailer.createTransport(config);
