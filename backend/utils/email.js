@@ -10,10 +10,13 @@ function createTransporter() {
     return null;
   }
 
+  const port = parseInt(process.env.EMAIL_PORT || '587');
+  const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+
   const config = {
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT || '465'),
-    secure: process.env.EMAIL_SECURE === 'true' || process.env.EMAIL_PORT === '465',
+    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+    port,
+    secure,
     auth: { user, pass }
   };
 
