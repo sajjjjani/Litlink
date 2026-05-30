@@ -89,6 +89,28 @@ body {
     display: inline-block;
 }
 
+#messagesNavLink {
+    position: relative;
+}
+
+.unread-message-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #dc2626;
+    color: white;
+    font-size: 0.6rem;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid #3d2617;
+    line-height: 1;
+}
+
 .nav-actions {
     display: flex;
     align-items: center;

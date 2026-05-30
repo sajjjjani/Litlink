@@ -849,6 +849,61 @@
             transform: translateY(-2px);
         }
 
+        .empty-voice-rooms {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            background: #3d2617;
+            border: 2px dashed rgba(245, 230, 211, 0.2);
+            border-radius: 20px;
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #f5e6d3;
+            margin-bottom: 10px;
+        }
+
+        .empty-state-desc {
+            color: #d4b5a0;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            line-height: 1.6;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .empty-state-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            background: rgba(245, 230, 211, 0.1);
+            border: 2px solid rgba(245, 230, 211, 0.2);
+            border-radius: 12px;
+            color: #f5e6d3;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .empty-state-btn:hover {
+            background: rgba(245, 230, 211, 0.15);
+            border-color: #f5e6d3;
+            transform: translateY(-2px);
+        }
+
         /* ===== DISCUSSIONS ===== */
         .discussions-list {
             display: flex;
@@ -1983,37 +2038,6 @@
             { name: 'Non-Fiction', icon: '📚', subject: 'nonfiction' }
         ];
 
-        // Voice Rooms data (fallback)
-        const voiceRooms = [
-            {
-                host: 'Sarah Chen',
-                hostInitials: 'SC',
-                title: 'Women Who Read: Weekly Talk',
-                genre: 'General Fiction',
-                book: 'Tuesdays with Morrie',
-                listeners: 7,
-                capacity: 20
-            },
-            {
-                host: 'Book Nerds',
-                hostInitials: 'BN',
-                title: 'Fantasy Chapter 3 Breakdown',
-                genre: 'Spoilers',
-                book: 'The Hobbit',
-                listeners: 4,
-                capacity: 10
-            },
-            {
-                host: 'John Miller',
-                hostInitials: 'JM',
-                title: 'Night Owl Reading Room',
-                genre: 'Chill Vibes',
-                book: 'Reading Hour',
-                listeners: 12,
-                capacity: 40
-            }
-        ];
-
         // Discussions data (fallback)
         const discussions = [
             {
@@ -2356,6 +2380,9 @@ function updateGenreCategoryWithError(genre) {
                     await loadDashboardData(userId, token);
                 }
                 
+                // Load live voice rooms directly from API (primary source)
+                await loadLiveVoiceRooms(token);
+                
                 console.log('✅ User data loaded successfully');
                 
             } catch (error) {
@@ -2379,11 +2406,7 @@ function updateGenreCategoryWithError(genre) {
                     const db = data.dashboard;
                     
                     // Update UI components with real data (or fallbacks if empty)
-                    if (db.voiceRooms && db.voiceRooms.length > 0) {
-                        renderRealVoiceRooms(db.voiceRooms);
-                    } else {
-                        generateVoiceRooms();
-                    }
+                    // Voice rooms rendered by loadLiveVoiceRooms() below
                     
                     if (db.trendingBoards && db.trendingBoards.length > 0) {
                         renderRealDiscussions(db.trendingBoards);
@@ -2406,7 +2429,6 @@ function updateGenreCategoryWithError(genre) {
                     }
                 } else {
                     // Success but no data structure
-                    generateVoiceRooms();
                     generateDiscussions();
                     generateMatches();
                     generateBookClubs();
@@ -2414,10 +2436,30 @@ function updateGenreCategoryWithError(genre) {
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
                 // Fallback to static generation if API fails
-                generateVoiceRooms();
                 generateDiscussions();
                 generateMatches();
                 generateBookClubs();
+            }
+        }
+
+        async function loadLiveVoiceRooms(token) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/voice-rooms/rooms/live`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    renderEmptyVoiceRooms();
+                    return;
+                }
+                const data = await response.json();
+                if (data.success && data.rooms && data.rooms.length > 0) {
+                    renderRealVoiceRooms(data.rooms);
+                } else {
+                    renderEmptyVoiceRooms();
+                }
+            } catch (error) {
+                console.log('Could not load live voice rooms:', error);
+                renderEmptyVoiceRooms();
             }
         }
 
@@ -2426,26 +2468,36 @@ function updateGenreCategoryWithError(genre) {
             if (!container) return;
             container.innerHTML = '';
             
+            if (!rooms || rooms.length === 0) {
+                renderEmptyVoiceRooms();
+                return;
+            }
+            
             rooms.forEach(room => {
-                const initials = room.host?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'H';
+                const hostName = room.host?.name || room.hostId?.name || 'Host';
+                const hostImage = room.host?.image || room.hostId?.profilePicture || '';
+                const hostInitials = hostName.split(' ').map(n => n[0]).join('').toUpperCase() || 'H';
+                const participantCount = room.participants || room.participantCount || 0;
+                const tags = room.tags || [room.genre || 'General'];
+                
                 const card = document.createElement('div');
                 card.className = 'voice-room-card';
                 card.innerHTML = `
                     <div class="room-header">
-                        <div class="room-host-avatar" style="background-image: url(${room.host?.image})">${room.host?.image ? '' : initials}</div>
+                        <div class="room-host-avatar" style="${hostImage ? `background-image: url(${hostImage});background-size:cover;background-position:center;` : `background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);`}">${hostImage ? '' : hostInitials}</div>
                         <div class="room-info">
                             <div class="room-live-badge">
                                 <i class="fas fa-circle"></i>
-                                LIVE • ${room.participants} listening
+                                LIVE • ${participantCount} listening
                             </div>
-                            <div class="room-title">${room.name}</div>
+                            <div class="room-title">${room.name || 'Voice Room'}</div>
                         </div>
                     </div>
                     <div class="room-meta">
-                        <span><i class="fas fa-user"></i> ${room.host?.name}</span>
-                        <span><i class="fas fa-tag"></i> ${room.tags.join(', ')}</span>
+                        <span><i class="fas fa-user"></i> ${hostName}</span>
+                        <span><i class="fas fa-tag"></i> ${tags.join(', ')}</span>
                     </div>
-                    <button class="room-join-btn" onclick="window.location.href='../Voice%20Room/voice-rooms.html'">
+                    <button class="room-join-btn" onclick="window.location.href='../Voice%20Room/voice-rooms.html?id=${room._id || room.id}'">
                         <i class="fas fa-microphone"></i>
                         Join Room
                     </button>
@@ -2538,17 +2590,19 @@ function updateGenreCategoryWithError(genre) {
             });
         }
 
-        function generateVoiceRooms() {
+        function renderEmptyVoiceRooms() {
             const container = document.getElementById('voiceRoomsGrid');
             if (!container) return;
-            
-            const fallbackRooms = [
-                { id: 'f1', name: 'Fantasy Book Club', participants: 24, host: { name: 'Emma R.' }, tags: ['Fantasy', 'Public'] },
-                { id: 'f2', name: 'Thriller Theories', participants: 12, host: { name: 'James K.' }, tags: ['Thriller', 'Public'] },
-                { id: 'f3', name: 'Classic Literature', participants: 8, host: { name: 'Sophia L.' }, tags: ['Classics', 'Public'] }
-            ];
-            
-            renderRealVoiceRooms(fallbackRooms);
+            container.innerHTML = `
+                <div class="empty-voice-rooms">
+                    <div class="empty-state-icon">🎙️</div>
+                    <h3 class="empty-state-title">No live voice rooms available right now.</h3>
+                    <p class="empty-state-desc">Be the first to start a conversation! Create a voice room to discuss your favorite books with fellow readers.</p>
+                    <a href="../Voice%20Room/voice-rooms.html" class="empty-state-btn">
+                        <i class="fas fa-microphone"></i> Start a Room
+                    </a>
+                </div>
+            `;
         }
 
         function generateDiscussions() {
@@ -2608,10 +2662,12 @@ function updateGenreCategoryWithError(genre) {
                         Go Now
                     </button>
                 `;
+                const navAction = () => handleQuickAction(action.action);
                 card.querySelector('.quick-action-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    handleQuickAction(action.action);
+                    navAction();
                 });
+                card.addEventListener('click', navAction);
                 container.appendChild(card);
             });
         }
@@ -2619,22 +2675,22 @@ function updateGenreCategoryWithError(genre) {
         function handleQuickAction(action) {
             const actions = {
                 'viewVoiceRooms': () => {
-                    document.querySelector('.voice-rooms-grid')?.scrollIntoView({ behavior: 'smooth' });
+                    window.location.href = '../Voice%20Room/voice-rooms.html';
                 },
                 'viewDiscussions': () => {
-                    document.querySelector('.discussions-list')?.scrollIntoView({ behavior: 'smooth' });
+                    window.location.href = '../Discussion%20Board/discussion.html';
                 },
                 'findMatches': () => {
-                    document.querySelector('.matches-list')?.scrollIntoView({ behavior: 'smooth' });
+                    window.location.href = '../Profile/view-profile.html';
                 },
                 'viewClubs': () => {
-                    document.querySelector('.clubs-grid')?.scrollIntoView({ behavior: 'smooth' });
+                    window.location.href = '../Discussion%20Board/discussion.html';
                 },
                 'startDiscussion': () => {
-                    showMessageModal('Coming Soon', 'Opening discussion creator...', 'info');
+                    window.location.href = '../Discussion%20Board/discussion.html';
                 },
                 'createClub': () => {
-                    showMessageModal('Coming Soon', 'Opening club creator...', 'info');
+                    window.location.href = '../Discussion%20Board/discussion.html';
                 }
             };
             

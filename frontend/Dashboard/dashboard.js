@@ -697,6 +697,55 @@ function stopNotificationPolling() {
     }
 }
 
+// ===== UNREAD MESSAGE COUNT =====
+
+async function fetchUnreadMessageCount() {
+    const token = getAuthToken();
+    if (!token) return 0;
+    try {
+        const response = await fetch('http://localhost:5002/api/chat/unread-count', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.success) {
+            return data.unreadCount || 0;
+        }
+        return 0;
+    } catch (error) {
+        console.warn('Error fetching unread message count:', error);
+        return 0;
+    }
+}
+
+function updateUnreadMessageBadge(count) {
+    const badge = document.getElementById('unreadMessageBadge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+let unreadMessagePollingInterval = null;
+
+function startUnreadMessagePolling() {
+    if (unreadMessagePollingInterval) clearInterval(unreadMessagePollingInterval);
+    fetchUnreadMessageCount().then(updateUnreadMessageBadge);
+    unreadMessagePollingInterval = setInterval(async () => {
+        const count = await fetchUnreadMessageCount();
+        updateUnreadMessageBadge(count);
+    }, 30000);
+}
+
+function stopUnreadMessagePolling() {
+    if (unreadMessagePollingInterval) {
+        clearInterval(unreadMessagePollingInterval);
+        unreadMessagePollingInterval = null;
+    }
+}
+
 function getMockNotifications() {
     return [
         {
@@ -888,6 +937,19 @@ function initUserWebSocket(token) {
         if (menu && menu.classList.contains('active')) loadNotifications();
     });
 
+    // ── Real-time unread message count ──────────────────────────────────
+    if (_notifClient.socket) {
+        _notifClient.socket.on('unread-count-updated', (data) => {
+            console.log('💬 Unread count updated:', data.unreadCount);
+            updateUnreadMessageBadge(data.unreadCount || 0);
+        });
+    } else {
+        _notifClient.on('unread-count-updated', (data) => {
+            console.log('💬 Unread count updated:', data.unreadCount);
+            updateUnreadMessageBadge(data.unreadCount || 0);
+        });
+    }
+
     _notifClient.connect();
 }
 
@@ -986,37 +1048,23 @@ document.addEventListener('DOMContentLoaded', async function () {
     dashboardUserId = user._id || user.id;
     console.log('✅ Authenticated user:', user.name);
 
+    // Profile completion gate: redirect if < 30%
+    const completion = user.completionPercentage || 0;
+    if (completion < 30) {
+        console.warn(`⚠️ Profile only ${completion}% complete — redirecting to profile`);
+        if (typeof showNotification === 'function') {
+            showNotification('Please complete at least 30% of your profile before accessing the dashboard.', 'warning');
+        }
+        setTimeout(() => {
+            window.location.href = '../Profile/profile.html';
+        }, 2000);
+        return;
+    }
+
     initNotifications();
     initUserWebSocket(token);
+    startUnreadMessagePolling();
     updateWelcomeCard(user);
-
-    // Gating Check: Profile Completion (Must be >= 20%)
-    try {
-        const dashboardResponse = await fetch(`http://localhost:5002/api/dashboard/${dashboardUserId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (dashboardResponse.ok) {
-            const dashboardData = await dashboardResponse.json();
-            if (dashboardData.success && dashboardData.dashboard && dashboardData.dashboard.user) {
-                const completion = dashboardData.dashboard.user.completionPercentage || 0;
-                if (completion < 20) {
-                    console.warn('⚠️ Profile completion too low:', completion + '%');
-                    if (typeof showMessageModal === 'function') {
-                        showMessageModal('Profile Incomplete', 'Please complete at least 20% of your profile to access the dashboard.', 'info');
-                    } else {
-                        alert('Please complete at least 20% of your profile to access the dashboard.');
-                    }
-                    setTimeout(() => {
-                        window.location.href = '../Profile/profile.html?incomplete=true';
-                    }, 2000);
-                    return;
-                }
-            }
-        }
-    } catch (gatingError) {
-        console.error('Error during gating check:', gatingError);
-    }
 
     try {
         showLoadingState();
