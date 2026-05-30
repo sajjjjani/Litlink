@@ -1570,7 +1570,10 @@ function renderCircleManagementModal(circle) {
     const deleteBtn = modal.querySelector('#deleteCircleBtn');
     if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
-            if (confirm('⚠️ WARNING: This will permanently delete the circle and all its threads. This action cannot be undone. Are you absolutely sure?')) {
+            const confirmed = await new Promise(resolve => {
+                showConfirmModal('Delete Circle', '⚠️ WARNING: This will permanently delete the circle and all its threads. This action cannot be undone. Are you absolutely sure?', () => resolve(true), () => resolve(false));
+            });
+            if (confirmed) {
                 try {
                     const token = getAuthToken();
                     const response = await fetch(`http://localhost:5002/api/discussions/circles/${circle.circleId}`, {
@@ -3861,9 +3864,10 @@ async function deleteThread(threadId) {
         return;
     }
 
-    if (!confirm('⚠️ Are you sure you want to delete this post? This action cannot be undone.')) {
-        return;
-    }
+    const confirmed = await new Promise(resolve => {
+        showConfirmModal('Delete Post', '⚠️ Are you sure you want to delete this post? This action cannot be undone.', () => resolve(true), () => resolve(false));
+    });
+    if (!confirmed) return;
 
     try {
         const response = await fetch(`http://localhost:5002/api/discussions/threads/${threadId}`, {
