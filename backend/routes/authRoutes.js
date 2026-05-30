@@ -24,8 +24,8 @@ function formatUserResponse(user) {
     adminLevel: user.adminLevel || 'none',
     adminPermissions: user.adminPermissions || [],
     isVerified: user.isVerified,
-    readingHabit: user.readingHabit || 'Not set',
-    readingGoal: user.readingGoal || 12,
+    readingHabit: user.readingHabit || null,
+    readingGoal: typeof user.readingGoal === 'number' ? user.readingGoal : 0,
     favoriteGenres: user.favoriteGenres || [],
     favoriteAuthors: user.favoriteAuthors || [],
     favoriteBooks: user.favoriteBooks || [],
@@ -38,7 +38,12 @@ function formatUserResponse(user) {
     followers: user.followers || [],
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    lastLogin: user.lastLogin
+    lastLogin: user.lastLogin,
+    completionPercentage: user.completionPercentage || 0,
+    isSuspended: user.isSuspended || false,
+    isBanned: user.isBanned || false,
+    isDeactivated: user.isDeactivated || false,
+    accountStatus: user.isDeactivated ? 'deactivated' : user.isBanned ? 'banned' : user.isSuspended ? 'suspended' : 'active'
   };
 }
 
@@ -59,10 +64,14 @@ router.get('/me', authenticate, async (req, res) => {
 // PUT /api/auth/change-password
 router.put('/change-password', authenticate, async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'Passwords do not match' });
     }
 
     if (typeof newPassword !== 'string' || newPassword.length < 8) {
@@ -159,7 +168,6 @@ router.post('/signup', async (req, res) => {
       message: emailSent ? 
         'Account created successfully! Please check your email for verification link.' :
         'Account created but verification email failed to send. Please contact support.',
-      verificationCode: verificationCode,
       user: {
         id: user._id,
         name: user.name,
@@ -199,6 +207,12 @@ router.post('/login', async (req, res) => {
       });
     }
     
+    if (user.isDeactivated) {
+      user.isDeactivated = false;
+      user.deactivatedAt = null;
+      await user.save();
+    }
+    
     if (!user.isAdmin && !user.isVerified) {
       return res.json({
         success: false,
@@ -221,7 +235,15 @@ router.post('/login', async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
     
-    const redirectPath = user.isAdmin ? '../Admin%20Dashboard/admin.html' : '../Profile/profile.html';
+    const completionPct = user.completionPercentage || 0;
+    let redirectPath;
+    if (user.isAdmin) {
+      redirectPath = '../Admin%20Dashboard/admin.html';
+    } else if (completionPct < 30) {
+      redirectPath = '../Profile/profile.html';
+    } else {
+      redirectPath = '../Dashboard/dashboard.html';
+    }
     
     res.json({
       success: true,
@@ -309,7 +331,7 @@ router.post('/resend-verification', async (req, res) => {
     await verification.save();
     await sendVerificationEmail(email, verificationCode, user.name);
     
-    res.json({ success: true, message: 'New verification email sent successfully.', verificationCode });
+    res.json({ success: true, message: 'New verification email sent successfully.' });
     
   } catch (error) {
     console.error('Resend verification error:', error);
@@ -342,7 +364,7 @@ router.post('/forgot-password', async (req, res) => {
       return res.json({ success: false, message: 'Failed to send reset email.' });
     }
     
-    res.json({ success: true, message: 'Password reset email sent!', otp });
+    res.json({ success: true, message: 'Password reset email sent!' });
     
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -449,8 +471,9 @@ router.put('/user/:userId', authenticate, async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const freshUser = await User.findById(userId).select('-password -verificationCode -resetToken');
     
-    res.json({ success: true, message: 'Profile updated successfully', user: formatUserResponse(user) });
+    res.json({ success: true, message: 'Profile updated successfully', user: formatUserResponse(freshUser) });
     
   } catch (error) {
     console.error('Update profile error:', error);
@@ -461,7 +484,27 @@ router.put('/user/:userId', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/auth/user/:userId
+// PUT /api/auth/deactivate
+router.put('/deactivate', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.isDeactivated) {
+      return res.status(400).json({ success: false, message: 'Account is already deactivated' });
+    }
+    user.isDeactivated = true;
+    user.deactivatedAt = new Date();
+    await user.save();
+    res.json({ success: true, message: 'Account deactivated successfully. You can reactivate by logging in again.' });
+  } catch (error) {
+    console.error('Deactivate account error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/auth/user/:userId — soft-delete: marks as deactivated + wipes personal data
 router.delete('/user/:userId', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -475,7 +518,25 @@ router.delete('/user/:userId', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    await User.deleteOne({ _id: userId });
+    user.isDeactivated = true;
+    user.deactivatedAt = new Date();
+    user.name = 'Deleted User';
+    user.email = `deleted-${userId}@litlink.local`;
+    user.username = `deleted-${userId}`;
+    user.password = await bcrypt.hash(userId + Date.now(), 10);
+    user.profilePicture = '';
+    user.bio = '';
+    user.favoriteGenres = [];
+    user.favoriteAuthors = [];
+    user.favoriteBooks = [];
+    user.booksRead = [];
+    user.currentlyReading = [];
+    user.wantToRead = [];
+    user.followers = [];
+    user.following = [];
+    user.blockedUsers = [];
+    await user.save();
+    
     await Verification.deleteMany({ email: user.email.toLowerCase() });
     
     res.json({ success: true, message: 'Account deleted successfully' });

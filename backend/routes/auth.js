@@ -13,7 +13,7 @@ async function checkAuthAndInitialize() {
     
     if (!token || !user.isAdmin) {
         console.log('❌ Not authenticated as admin, redirecting to login...');
-        alert('Admin access required. Please login as administrator.');
+        window.SystemModal.warning('Admin Access', 'Admin access required. Please login as administrator.');
         window.location.href = '../login.html';
         return;
     }
