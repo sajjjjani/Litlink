@@ -12,8 +12,7 @@ const transporter = nodemailer.createTransport({
 async function sendVerificationEmail(email, verificationCode, userName) {
   try {
     const verificationLink = getHomepageUrl('verify-email.html', {
-      email,
-      code: verificationCode
+      email
     });
     
     const mailOptions = {
@@ -91,8 +90,7 @@ async function sendVerificationEmail(email, verificationCode, userName) {
 async function sendPasswordResetEmail(email, otp, userName) {
   try {
     const resetLink = getHomepageUrl('verify-otp.html', {
-      email,
-      otp
+      email
     });
     
     const mailOptions = {

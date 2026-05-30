@@ -52,6 +52,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  isDeactivated: {
+    type: Boolean,
+    default: false
+  },
+  deactivatedAt: {
+    type: Date,
+    default: null
+  },
   banReason: {
     type: String,
     default: ''
@@ -284,27 +292,28 @@ userSchema.index({
 
 userSchema.virtual('completionPercentage').get(function() {
   const fields = [
-    { value: this.profilePicture && this.profilePicture !== '📚', weight: 10 },
-    { value: this.bio && this.bio !== 'Book lover and avid reader', weight: 10 },
+    { value: this.profilePicture && this.profilePicture !== '📚' && this.profilePicture !== '', weight: 10 },
+    { value: this.bio && this.bio !== 'Book lover and avid reader' && this.bio !== 'Welcome to Litlink! Start your reading journey here.', weight: 10 },
     { value: this.location, weight: 10 },
     { value: this.pronouns, weight: 5 },
     { value: this.favoriteGenres && this.favoriteGenres.length > 0, weight: 15 },
     { value: this.favoriteAuthors && this.favoriteAuthors.length > 0, weight: 10 },
-    { value: this.favoriteBooks && this.favoriteBooks.length > 0, weight: 10 },
-    { value: this.readingHabit, weight: 10 },
-    { value: this.readingGoal, weight: 10 },
+    { value: (this.favoriteBooks && this.favoriteBooks.length > 0) || (this.booksRead && this.booksRead.length > 0), weight: 10 },
+    { value: this.readingHabit && String(this.readingHabit).trim().toLowerCase() !== 'not set', weight: 10 },
+    { value: this.readingGoal > 0, weight: 10 },
     { value: this.discussionPreferences && this.discussionPreferences.length > 0, weight: 10 }
   ];
-  
+
   let score = 0;
   let totalWeight = 0;
-  
+
   fields.forEach(f => {
     totalWeight += f.weight;
     if (f.value) score += f.weight;
   });
-  
-  return Math.round((score / totalWeight) * 100);
+
+  const result = Math.round((score / totalWeight) * 100);
+  return Number.isFinite(result) ? result : 0;
 });
 
 userSchema.set('toJSON', { virtuals: true });

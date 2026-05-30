@@ -25,6 +25,10 @@ const roomParticipantSchema = new mongoose.Schema({
   },
   isMuted: {
     type: Boolean,
+    default: true
+  },
+  canSpeak: {
+    type: Boolean,
     default: false
   },
   handRaised: {
