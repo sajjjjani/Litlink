@@ -20,6 +20,9 @@ let isInQueue        = false;
 let isCurrentSpeaker = false;
 let topicPrompt      = null;
 
+// ── Host permission state for current user ────────────────
+let canSpeak         = false;
+
 // ═════════════════════════════════════════════════════════════
 // SCRIPT LOADERS
 // ═════════════════════════════════════════════════════════════
@@ -60,22 +63,61 @@ function isCurrentUserHost() {
 function addHostControls() {
   const controls = document.getElementById('room-controls');
   if (!controls) return;
-  document.getElementById('ctrl-end-room')?.remove();
+  document.getElementById('ctrl-host-menu')?.remove();
 
   if (isCurrentUserHost()) {
-    const endBtn = document.createElement('button');
-    endBtn.id        = 'ctrl-end-room';
-    endBtn.className = 'ctrl-btn ctrl-end-room';
-    endBtn.setAttribute('aria-label', 'End Room');
-    endBtn.title     = 'End Room for everyone';
-    endBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
+    const wrap = document.createElement('div');
+    wrap.id = 'ctrl-host-menu';
+    wrap.className = 'ctrl-host-menu-wrap';
+
+    const btn = document.createElement('button');
+    btn.id        = 'ctrl-host-menu-btn';
+    btn.className = 'ctrl-btn ctrl-host-menu-btn';
+    btn.setAttribute('aria-label', 'Host options');
+    btn.title     = 'Host options';
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
     </svg>`;
-    endBtn.addEventListener('click', confirmEndRoom);
+
+    const dropdown = document.createElement('div');
+    dropdown.id = 'ctrl-host-dropdown';
+    dropdown.className = 'ctrl-host-dropdown';
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = `
+      <button id="ctrl-mute-everyone">🔇 Mute Everyone</button>
+      <button id="ctrl-unmute-everyone">🎤 Unmute Everyone</button>
+      <hr/>
+      <button id="ctrl-end-room" class="danger">⛔ End Room</button>
+    `;
+
+    wrap.appendChild(btn);
+    wrap.appendChild(dropdown);
+
+    // Insert before leave button
     const leaveBtn = document.getElementById('ctrl-leave');
-    leaveBtn ? controls.insertBefore(endBtn, leaveBtn) : controls.appendChild(endBtn);
+    leaveBtn ? controls.insertBefore(wrap, leaveBtn) : controls.appendChild(wrap);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = document.getElementById('ctrl-host-dropdown');
+      const isVisible = dd.style.display === 'block';
+      document.querySelectorAll('.ctrl-host-dropdown').forEach(m => m.style.display = 'none');
+      dd.style.display = isVisible ? 'none' : 'block';
+    });
+
+    document.getElementById('ctrl-mute-everyone').addEventListener('click', () => {
+      if (socket?.connected) socket.emit('host-mute-all', { roomId });
+      showToast('All participants muted', 'warning');
+      document.getElementById('ctrl-host-dropdown').style.display = 'none';
+    });
+
+    document.getElementById('ctrl-unmute-everyone').addEventListener('click', () => {
+      if (socket?.connected) socket.emit('host-unmute-all', { roomId });
+      showToast('All participants unmuted', 'success');
+      document.getElementById('ctrl-host-dropdown').style.display = 'none';
+    });
+
+    document.getElementById('ctrl-end-room').addEventListener('click', confirmEndRoom);
   }
 
   addRotatingModeToggle();
@@ -241,6 +283,12 @@ function connectToRoom(token) {
     socket.on('room-joined', (data) => {
       participants = data.participants || [];
 
+      // Set my canSpeak from server data
+      const me = participants.find(p => p.userId === currentUser.id);
+      if (me) {
+        canSpeak = me.canSpeak === true;
+      }
+
       if (roomData) {
         roomData.hostId = { _id: data.hostId, name: data.hostName };
       } else {
@@ -262,7 +310,7 @@ function connectToRoom(token) {
       renderParticipants();
       showToast(`Joined ${data.roomName}`, 'success');
       addHostControls();
-      if (typeof SimplePeer !== 'undefined') initWebRTC(participants);
+      initWebRTC(participants);
     });
 
     socket.on('user-joined', (data) => {
@@ -345,6 +393,152 @@ function connectToRoom(token) {
     // NOTE: No separate 'reconnect' handler needed.
     // Socket.IO fires 'connect' again after a successful reconnect,
     // which re-authenticates and then re-joins via the 'authenticated' handler above.
+
+    // ── Host moderation events ─────────────────────────────────────
+    socket.on('host-muted-user', (data) => {
+      // If I was muted by host, immediately disable my mic
+      if (data.userId === currentUser.id) {
+        canSpeak = false;
+        if (localStream) {
+          localStream.getAudioTracks().forEach(t => t.enabled = false);
+        }
+        isMicOn = false;
+        const micBtn = document.getElementById('ctrl-mic');
+        if (micBtn) {
+          micBtn.className = 'ctrl-btn ctrl-mic-neutral';
+          document.getElementById('mic-off-svg').style.display = 'block';
+          document.getElementById('mic-on-svg').style.display  = 'none';
+        }
+        showToast('You were muted by the host.', 'warning');
+      }
+      updateParticipantMute(data.userId, true);
+    });
+
+    socket.on('host-mute-all', (data) => {
+      // Update ALL participants in local state (except the host) so UI is instantly correct
+      participants.forEach(p => {
+        if (p.userId?.toString() !== data.exceptUserId?.toString()) {
+          p.isMuted = true;
+          p.canSpeak = false;
+        }
+      });
+      // Force-disable audio for the current user if they are not the host
+      if (data.exceptUserId?.toString() !== currentUser.id?.toString()) {
+        canSpeak = false;
+        if (localStream) {
+          localStream.getAudioTracks().forEach(t => t.enabled = false);
+        }
+        isMicOn = false;
+        const micBtn = document.getElementById('ctrl-mic');
+        if (micBtn) {
+          micBtn.className = 'ctrl-btn ctrl-mic-neutral';
+          document.getElementById('mic-off-svg').style.display = 'block';
+          document.getElementById('mic-on-svg').style.display  = 'none';
+        }
+      }
+      renderParticipants();
+      showToast('The host muted all participants', 'warning');
+    });
+
+    socket.on('host-unmute-all', (data) => {
+      // Update ALL participants in local state (except the host) so UI is instantly correct
+      participants.forEach(p => {
+        if (p.userId?.toString() !== data.exceptUserId?.toString()) {
+          p.isMuted = false;
+          p.canSpeak = true;
+        }
+      });
+      // Re-enable audio for the current user if they are not the host
+      if (data.exceptUserId?.toString() !== currentUser.id?.toString()) {
+        canSpeak = true;
+        if (localStream) {
+          localStream.getAudioTracks().forEach(t => t.enabled = true);
+        }
+        isMicOn = true;
+        const micBtn = document.getElementById('ctrl-mic');
+        if (micBtn) {
+          micBtn.className = 'ctrl-btn ctrl-mic-active';
+          document.getElementById('mic-off-svg').style.display = 'none';
+          document.getElementById('mic-on-svg').style.display  = 'block';
+        }
+      }
+      renderParticipants();
+      showToast('The host unmuted all participants', 'success');
+    });
+
+    socket.on('user-speak-allowed', (data) => {
+      // Update participant state for ALL users in the room
+      const p = participants.find(p => p.userId === data.userId);
+      if (p) p.canSpeak = data.canSpeak;
+
+      if (data.userId === currentUser.id) {
+        canSpeak = data.canSpeak;
+        if (data.canSpeak) {
+          showToast('The host has given you permission to speak! 🎤', 'success');
+          // Re-enable audio tracks if they were disabled by mute-all
+          // so the participant's mic state matches the granted permission
+          if (localStream) {
+            localStream.getAudioTracks().forEach(t => t.enabled = true);
+          }
+          isMicOn = true;
+          // Notify server of the local mic state change
+          if (socket?.connected) socket.emit('toggle-mute', { roomId, userId: currentUser.id, isMuted: false });
+          const micBtn = document.getElementById('ctrl-mic');
+          if (micBtn) {
+            micBtn.className = 'ctrl-btn ctrl-mic-active';
+            document.getElementById('mic-off-svg').style.display = 'none';
+            document.getElementById('mic-on-svg').style.display  = 'block';
+          }
+          const mic = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-mic`);
+          if (mic) { mic.className = 'pc-mic active'; mic.innerHTML = '🎤'; }
+          const st = document.querySelector(`[data-user-id="${currentUser.id}"] .pc-status`);
+          if (st) st.textContent = window.lastSpeakingStatus ? 'Speaking' : 'Listening';
+        } else {
+          // Revoked — force mute
+          if (localStream) {
+            localStream.getAudioTracks().forEach(t => t.enabled = false);
+          }
+          isMicOn = false;
+          canSpeak = false;
+          const micBtn = document.getElementById('ctrl-mic');
+          if (micBtn) {
+            micBtn.className = 'ctrl-btn ctrl-mic-neutral';
+            document.getElementById('mic-off-svg').style.display = 'block';
+            document.getElementById('mic-on-svg').style.display  = 'none';
+          }
+          showToast('Your speaking permission was removed by the host.', 'warning');
+        }
+      }
+      renderParticipants();
+    });
+
+    socket.on('user-kicked', (data) => {
+      if (data.userId === currentUser.id || data.message) {
+        showToast(data.message || 'You were removed from the room.', 'error');
+        cleanupWebRTC();
+        clearRotatingTimer();
+        setTimeout(() => window.location.href = 'voice-rooms.html', 2000);
+      }
+    });
+
+    socket.on('mute-denied', (data) => {
+      showToast(data.message || 'You do not have permission to speak.', 'warning');
+      // Reset mic state
+      if (localStream) {
+        localStream.getAudioTracks().forEach(t => t.enabled = false);
+      }
+      isMicOn = false;
+      const micBtn = document.getElementById('ctrl-mic');
+      if (micBtn) {
+        micBtn.className = 'ctrl-btn ctrl-mic-neutral';
+        document.getElementById('mic-off-svg').style.display = 'block';
+        document.getElementById('mic-on-svg').style.display  = 'none';
+      }
+    });
+
+    socket.on('report-submitted', (data) => {
+      showToast(data.message || 'Report submitted. Thank you.', 'success');
+    });
 
     socket.on('signal', async (data) => {
       const { from, signal } = data;
@@ -817,14 +1011,32 @@ async function initWebRTC(existingParticipants) {
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
+    // ── FIX: Join muted by default ──
+    localStream.getAudioTracks().forEach(t => t.enabled = false);
+    isMicOn = false;
+    canSpeak = false;
     window.localStream = localStream;
     initAudioAnalysis();
-    for (const p of existingParticipants) {
-      if (p.userId !== currentUser.id && typeof SimplePeer !== 'undefined') {
-        await createPeerConnection(p.userId, true);
+    // Only create peer connections if SimplePeer loaded successfully
+    if (typeof SimplePeer !== 'undefined') {
+      for (const p of existingParticipants) {
+        if (p.userId !== currentUser.id) {
+          await createPeerConnection(p.userId, true);
+        }
       }
+    } else {
+      console.warn('SimplePeer not available — peer connections skipped, local mic still works');
+    }
+    // Ensure mic UI reflects muted state
+    const micBtn = document.getElementById('ctrl-mic');
+    if (micBtn) {
+      micBtn.className = 'ctrl-btn ctrl-mic-neutral';
+      micBtn.disabled = false;
+      document.getElementById('mic-off-svg').style.display = 'block';
+      document.getElementById('mic-on-svg').style.display  = 'none';
     }
   } catch (err) {
+    console.error('initWebRTC error:', err);
     showToast('Please allow microphone access to join voice chat', 'error');
     const micBtn = document.getElementById('ctrl-mic');
     if (micBtn) micBtn.disabled = true;
@@ -937,6 +1149,7 @@ function renderParticipants() {
     initials  : getInitials(currentUser.name),
     isHost    : amHost,
     isMuted   : !isMicOn,
+    canSpeak  : canSpeak,
     handRaised: isHandUp,
     isSpeaking: window.lastSpeakingStatus || false,
     color     : '#C9A27B'
@@ -1022,8 +1235,20 @@ function renderParticipantCard(p, i, currentSpeakerId) {
   const isSpkr = currentSpeakerId && p.userId?.toString() === currentSpeakerId;
   const inQ    = roomMode === 'rotating' &&
     rotatingState?.queue?.some(u => u.userId === p.userId?.toString());
+  const amHost = isCurrentUserHost();
+  const isMe   = p.userId?.toString() === currentUser.id?.toString();
+  // Status line
+  let statusText;
+  if (isSpkr)            statusText = '🎙 Speaking';
+  else if (p.isSpeaking) statusText = 'Speaking';
+  else if (p.isMuted)    statusText = 'Muted';
+  else if (inQ)          statusText = 'In Queue';
+  else if (p.canSpeak)   statusText = 'Can Speak';
+  else                   statusText = 'Listening';
+
+  const canSpeakCls = p.canSpeak && !p.isMuted && !isSpkr && !inQ ? ' can-speak' : '';
   return `
-    <div class="participant-card ${isSpkr ? 'is-current-speaker' : ''}"
+    <div class="participant-card${canSpeakCls} ${isSpkr ? 'is-current-speaker' : ''}"
       data-user-id="${p.userId}" style="animation-delay:${i * 0.06}s">
       <div class="pc-avatar-wrap">
         <div class="pc-avatar ${p.isSpeaking ? 'speaking' : ''}"
@@ -1038,13 +1263,29 @@ function renderParticipantCard(p, i, currentSpeakerId) {
         </div>
       </div>
       <div class="pc-name">${escapeHtml(p.name)}</div>
-      <div class="pc-status">
-        ${isSpkr      ? '🎙 Speaking'
-          : p.isSpeaking? 'Speaking'
-          : p.isMuted   ? 'Muted'
-          : inQ         ? 'In Queue'
-          : 'Listening'}
-      </div>
+      <div class="pc-status">${statusText}</div>
+          ${!isMe ? `
+        <div class="pc-more-options" data-target-user-id="${p.userId}">
+          <button class="pc-more-btn" onclick="toggleMoreMenu('${p.userId}')" aria-label="More options">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+            </svg>
+          </button>
+          <div class="pc-more-dropdown" id="more-menu-${p.userId}" style="display:none">
+            ${amHost ? `
+              <button onclick="hostToggleMuteParticipant('${p.userId}')">
+                ${p.isMuted ? '🎤 Unmute' : '🔇 Mute'}
+              </button>
+              <button onclick="hostKickUser('${p.userId}')" class="danger">
+                👢 Throw Out of Room
+              </button>
+            ` : ''}
+            <button onclick="openReportModal('${p.userId}', '${escapeHtml(p.name)}')" class="report">
+              ⚑ Report
+            </button>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -1110,13 +1351,19 @@ function renderSidebar() {
         </div>
         ${participants
           .filter(p => p.userId?.toString() !== currentUser.id?.toString())
-          .map(p => `
+          .map(p => {
+            let statusIcon = '';
+            if (p.isHost)        statusIcon = '<span class="rsb-p-icon crown">👑</span>';
+            else if (p.handRaised) statusIcon = '<span class="rsb-p-icon" style="color:var(--accent-gold)">✋</span>';
+            else if (p.canSpeak && !p.isMuted) statusIcon = '<span class="rsb-p-icon" style="color:#10b981">🎤</span>';
+            else if (p.isMuted)  statusIcon = '<span class="rsb-p-icon muted">🔇</span>';
+            return `
           <div class="rsb-p-row">
             <div class="rsb-p-av ${p.isSpeaking ? 'speaking' : ''}">${getInitials(p.name)}</div>
             <span class="rsb-p-name">${escapeHtml(p.name)}</span>
-            ${p.isHost     ? '<span class="rsb-p-icon crown">👑</span>' : ''}
-            ${p.handRaised ? '<span class="rsb-p-icon" style="color:var(--accent-gold)">✋</span>' : ''}
-          </div>`).join('')}
+            ${statusIcon}
+          </div>`;
+          }).join('')}
       </div>
     </div>
   `;
@@ -1136,16 +1383,170 @@ function renderChatReactions() {
 }
 
 // ═════════════════════════════════════════════════════════════
+// MORE OPTIONS MENU
+// ═════════════════════════════════════════════════════════════
+function toggleMoreMenu(userId) {
+  const menu = document.getElementById(`more-menu-${userId}`);
+  if (!menu) return;
+  const isVisible = menu.style.display === 'block';
+  // Close all other menus
+  document.querySelectorAll('.pc-more-dropdown').forEach(m => m.style.display = 'none');
+  menu.style.display = isVisible ? 'none' : 'block';
+}
+
+// Close menus on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.pc-more-options')) {
+    document.querySelectorAll('.pc-more-dropdown').forEach(m => m.style.display = 'none');
+  }
+  if (!e.target.closest('.ctrl-host-menu-wrap')) {
+    document.querySelectorAll('.ctrl-host-dropdown').forEach(m => m.style.display = 'none');
+  }
+});
+
+function hostToggleMuteParticipant(targetUserId) {
+  if (!socket?.connected) { showToast('Not connected', 'error'); return; }
+  const p = participants.find(p => p.userId === targetUserId);
+  if (!p) return;
+
+  if (p.isMuted || !p.canSpeak) {
+    // Currently muted → unmute (grant speaking permission)
+    socket.emit('host-allow-speak', { roomId, targetUserId });
+    // Optimistic update so UI reflects immediately
+    p.isMuted = false;
+    p.canSpeak = true;
+    showToast('Unmuted participant', 'success');
+  } else {
+    // Currently unmuted → mute
+    socket.emit('host-mute-user', { roomId, targetUserId });
+    // Optimistic update so UI reflects immediately
+    p.isMuted = true;
+    p.canSpeak = false;
+    showToast('Muted participant', 'warning');
+  }
+  document.getElementById(`more-menu-${targetUserId}`).style.display = 'none';
+  renderParticipants();
+}
+
+function hostKickUser(targetUserId) {
+  window.showConfirmModal(
+    'Remove Participant',
+    'Are you sure you want to remove this participant from the room?',
+    () => {
+      if (socket?.connected) socket.emit('host-kick-user', { roomId, targetUserId });
+      document.getElementById(`more-menu-${targetUserId}`).style.display = 'none';
+    }
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// REPORT MODAL
+// ═════════════════════════════════════════════════════════════
+const REPORT_REASONS = [
+  { value: 'harassment', label: 'Harassment' },
+  { value: 'spam', label: 'Spam' },
+  { value: 'inappropriate_behavior', label: 'Inappropriate Behavior' },
+  { value: 'hate_speech', label: 'Hate Speech' },
+  { value: 'other', label: 'Other' }
+];
+
+const REPORT_CATEGORIES = {
+  harassment: 'harassment',
+  spam: 'spam',
+  inappropriate_behavior: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  other: 'other'
+};
+
+let reportTargetUserId = null;
+let reportTargetName = '';
+
+function openReportModal(userId, userName) {
+  reportTargetUserId = userId;
+  reportTargetName = userName;
+  document.getElementById('report-modal-backdrop')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'report-modal-backdrop';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;
+    align-items:center;justify-content:center;z-index:10000;animation:fadeIn .2s ease both;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--bg-secondary);border-radius:12px;padding:24px;max-width:400px;width:90%;
+                box-shadow:0 24px 48px rgba(0,0,0,.4);animation:modalIn .2s ease both">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="color:var(--text-primary);font-size:18px;font-weight:600">⚑ Report User</h3>
+        <button onclick="this.closest('#report-modal-backdrop').remove()" style="color:var(--text-muted);font-size:18px;padding:4px">✕</button>
+      </div>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">
+        Report <strong style="color:var(--text-primary)">${escapeHtml(userName)}</strong> for:
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        ${REPORT_REASONS.map((r, i) => `
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+                        background:var(--bg-tertiary);border-radius:8px;cursor:pointer;
+                        border:1px solid transparent;transition:border-color .2s"
+                 onmouseenter="this.style.borderColor='var(--border-hover)'"
+                 onmouseleave="this.style.borderColor='transparent'">
+            <input type="radio" name="report-reason" value="${r.value}"
+                   style="accent-color:var(--accent)"
+                   ${i === 0 ? 'checked' : ''}>
+            <span style="color:var(--text-primary);font-size:14px">${r.label}</span>
+          </label>
+        `).join('')}
+      </div>
+      <div style="display:flex;gap:12px">
+        <button onclick="this.closest('#report-modal-backdrop').remove()"
+          style="flex:1;padding:10px;background:transparent;border:1px solid var(--border);
+                 border-radius:8px;color:var(--text-muted);font-size:14px;cursor:pointer">
+          Cancel
+        </button>
+        <button onclick="submitReport()"
+          style="flex:2;padding:10px;background:var(--live-red);border:none;border-radius:8px;
+                 color:white;font-weight:600;font-size:14px;cursor:pointer">
+          Submit Report
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function submitReport() {
+  const selected = document.querySelector('input[name="report-reason"]:checked');
+  if (!selected) { showToast('Please select a reason.', 'error'); return; }
+
+  const reasonLabel = selected.value;
+  const category = REPORT_CATEGORIES[reasonLabel] || 'other';
+
+  if (socket?.connected) {
+    socket.emit('report-user', {
+      roomId,
+      reportedUserId: reportTargetUserId,
+      reason: REPORT_REASONS.find(r => r.value === reasonLabel)?.label || reasonLabel,
+      category
+    });
+  } else {
+    showToast('Cannot submit report while offline.', 'error');
+    return;
+  }
+
+  document.getElementById('report-modal-backdrop')?.remove();
+  showToast('Report submitted. Our team will review it.', 'success');
+}
+
+// ═════════════════════════════════════════════════════════════
 // PARTICIPANT UI HELPERS
 // ═════════════════════════════════════════════════════════════
 function addParticipantToUI(data) {
   if (document.querySelector(`[data-user-id="${data.userId}"]`)) return;
   participants.push({
     userId: data.userId, name: data.userName,
-    isMuted: false, handRaised: false, isSpeaking: false, color: getRandomColor()
+    isMuted: true, canSpeak: false, handRaised: false, isSpeaking: false, color: getRandomColor()
   });
   renderParticipants();
-  document.getElementById('hdr-count').textContent = (participants.length + 1) + ' participants';
+  document.getElementById('hdr-count').textContent = participants.length + ' participants';
 }
 
 function removeParticipantFromUI(userId) {
@@ -1161,11 +1562,8 @@ function updateParticipantMute(userId, isMuted) {
   const p = participants.find(p => p.userId === userId);
   if (p) {
     p.isMuted = isMuted;
-    const mic = document.querySelector(`[data-user-id="${userId}"] .pc-mic`);
-    if (mic) { mic.className = `pc-mic ${isMuted ? 'muted' : 'active'}`; mic.innerHTML = isMuted ? '🔇' : '🎤'; }
-    const st = document.querySelector(`[data-user-id="${userId}"] .pc-status`);
-    if (st) st.textContent = isMuted ? 'Muted' : (p.isSpeaking ? 'Speaking' : 'Listening');
   }
+  renderParticipants();
 }
 
 function updateParticipantHand(userId, raised) {
@@ -1262,6 +1660,12 @@ function toggleMute() {
   // In rotating mode, non-speakers cannot unmute
   if (roomMode === 'rotating' && !isCurrentSpeaker && !isMicOn) {
     showToast('Wait for your turn to speak 🔄', 'warning');
+    return;
+  }
+
+  // Trying to unmute — check speaking permission
+  if (isMicOn === false && !canSpeak && !isCurrentUserHost()) {
+    showToast('You do not have permission to speak. Wait for the host to grant it.', 'warning');
     return;
   }
 
@@ -1526,3 +1930,7 @@ window.sendEmojiReaction = sendEmojiReaction;
 window.voteSkip          = voteSkip;
 window.skipMyTurn        = skipMyTurn;
 window.submitTopicPrompt = submitTopicPrompt;
+window.toggleMoreMenu          = toggleMoreMenu;
+window.hostToggleMuteParticipant = hostToggleMuteParticipant;
+window.hostKickUser            = hostKickUser;
+window.openReportModal         = openReportModal;

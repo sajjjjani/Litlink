@@ -372,7 +372,6 @@ function setupEventListeners() {
   document.getElementById('m-time')?.addEventListener('change', validateModal);
   document.getElementById('modal-submit')?.addEventListener('click', handleModalSubmit);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-  document.querySelector('.nav-dashboard')?.addEventListener('click', () => window.location.href = '../Dashboard/dashboard.html');
   document.querySelector('.nav-explore')?.addEventListener('click', () => window.location.href = '../Dashboard/dashexplore.html');
   document.querySelector('.nav-avatar')?.addEventListener('click',  () => window.location.href = '../Profile/profile.html');
 }

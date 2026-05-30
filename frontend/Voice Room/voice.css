@@ -327,20 +327,76 @@ a{text-decoration:none;color:inherit}
 .chat-send-btn:disabled{color:var(--sidebar-muted);cursor:not-allowed}
 .chat-send-btn svg{width:16px;height:16px;display:block}
 
-/* End Room Button */
+/* Host moderation three-dot menu */
+.ctrl-host-menu-wrap {
+  position: relative;
+}
+.ctrl-host-menu-btn {
+  border-color: var(--text-dim);
+  color: var(--text-muted);
+  background: rgba(59,29,20,.85);
+}
+.ctrl-host-menu-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(201,162,123,.15);
+}
+.ctrl-host-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  z-index: 100;
+  animation: fadeInUp .15s ease both;
+  margin-bottom: 8px;
+}
+.ctrl-host-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-radius: 6px;
+  transition: background .15s;
+  cursor: pointer;
+  background: none;
+  border: none;
+  white-space: nowrap;
+}
+.ctrl-host-dropdown button:hover {
+  background: var(--bg-tertiary);
+}
+.ctrl-host-dropdown button.danger {
+  color: var(--live-red);
+}
+.ctrl-host-dropdown button.danger:hover {
+  background: rgba(232,93,74,.15);
+}
+.ctrl-host-dropdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* End Room standalone button (legacy support) */
 .ctrl-end-room {
   border-color: var(--live-red);
   background: rgba(232, 93, 74, 0.2);
   color: var(--live-red);
   transition: all 0.2s;
 }
-
 .ctrl-end-room:hover {
   background: var(--live-red);
   color: white;
   transform: scale(1.05);
 }
-
 .ctrl-end-room svg {
   width: 24px;
   height: 24px;
@@ -392,3 +448,79 @@ a{text-decoration:none;color:inherit}
 .ctrl-end-room svg{width:24px;height:24px}
 .pc-hand{position:absolute;top:-4px;right:-4px;width:28px;height:28px;border-radius:50%;background:var(--accent-gold);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--bg-primary);animation:fadeInUp .2s ease;z-index:5}
 .pc-crown{position:absolute;top:-8px;left:-4px;font-size:20px;animation:fadeInUp .2s ease;z-index:5}
+
+/* =================================================================
+   MORE OPTIONS MENU
+   ================================================================= */
+.pc-more-options {
+  position: relative;
+  margin-top: 4px;
+  align-self: center;
+}
+.pc-more-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim);
+  background: rgba(255,255,255,.05);
+  transition: all .2s;
+  border: 1px solid transparent;
+}
+.pc-more-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-color: var(--border-hover);
+}
+.pc-more-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  z-index: 100;
+  animation: fadeInUp .15s ease both;
+  margin-bottom: 6px;
+}
+.pc-more-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 6px;
+  transition: background .15s;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.pc-more-dropdown button:hover {
+  background: var(--bg-tertiary);
+}
+.pc-more-dropdown button.danger {
+  color: var(--live-red);
+}
+.pc-more-dropdown button.danger:hover {
+  background: rgba(232,93,74,.15);
+}
+.pc-more-dropdown button.report {
+  color: var(--accent-gold);
+}
+.pc-more-dropdown button.report:hover {
+  background: rgba(201,162,64,.12);
+}
+.pc-more-dropdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* Can Speak status indicator */
+.participant-card.can-speak .pc-status {
+  color: #10b981;
+}
