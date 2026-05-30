@@ -66,17 +66,27 @@ router.put('/preferences', authenticate, async (req, res) => {
 // GET /api/users - Get all users (excluding current user, admins, banned)
 router.get('/', authenticate, async (req, res) => {
   try {
+    const currentUserId = req.user._id.toString();
+
     const users = await User.find({
       _id: { $ne: req.user._id },
       isBanned: false,
       isSuspended: false,
       isAdmin: false
     }).select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry -adminLevel -adminPermissions');
+
+    // Filter out users who have blocked the current user
+    const visibleUsers = users.filter(u => {
+      if (u.blockedUsers && u.blockedUsers.some(id => id.toString() === currentUserId)) {
+        return false;
+      }
+      return true;
+    });
     
     res.json({
       success: true,
-      users: users,
-      total: users.length
+      users: visibleUsers,
+      total: visibleUsers.length
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -87,16 +97,79 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/users/:userId - Get specific user by ID
+// GET /api/users/:userId - Get specific user by ID (with privacy enforcement)
 router.get('/:userId', authenticate, async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId)
+    const targetUserId = req.params.userId;
+    const viewerId = req.user._id.toString();
+    
+    // Check profile visibility
+    const UserSettings = require('../models/UserSettings');
+    const settings = await UserSettings.findOne({ userId: targetUserId });
+    let profilePrivacy = 'everyone';
+    if (settings && settings.privacy && settings.privacy.profilePrivacy) {
+      profilePrivacy = settings.privacy.profilePrivacy;
+    }
+
+    const isOwner = viewerId === targetUserId;
+
+    if (!isOwner && profilePrivacy === 'private') {
+      return res.json({
+        success: true,
+        user: {
+          _id: targetUserId,
+          name: 'Private Profile',
+          profilePicture: '🔒',
+          bio: '',
+          privacyRestricted: true,
+          privacyReason: 'This profile is private.'
+        }
+      });
+    }
+
+    if (!isOwner && profilePrivacy === 'followers') {
+      const targetUser = await User.findById(targetUserId).select('followers');
+      if (targetUser) {
+        const isFollower = targetUser.followers &&
+          targetUser.followers.some(id => id.toString() === viewerId);
+        if (!isFollower) {
+          return res.json({
+            success: true,
+            user: {
+              _id: targetUserId,
+              name: 'Private Profile',
+              profilePicture: '🔒',
+              bio: '',
+              privacyRestricted: true,
+              privacyReason: 'This profile is only visible to followers.'
+            }
+          });
+        }
+      }
+    }
+
+    const user = await User.findById(targetUserId)
       .select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry');
     
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
+      });
+    }
+
+    // Also check if viewer is blocked by this user
+    if (!isOwner && user.blockedUsers && user.blockedUsers.some(id => id.toString() === viewerId)) {
+      return res.json({
+        success: true,
+        user: {
+          _id: targetUserId,
+          name: 'Private Profile',
+          profilePicture: '🔒',
+          bio: '',
+          privacyRestricted: true,
+          privacyReason: 'This profile is not available.'
+        }
       });
     }
     
@@ -117,6 +190,7 @@ router.get('/:userId', authenticate, async (req, res) => {
 router.get('/search', authenticate, async (req, res) => {
   try {
     const { query, genre, limit = 20 } = req.query;
+    const currentUserId = req.user._id.toString();
     
     let searchCriteria = {
       _id: { $ne: req.user._id },
@@ -142,8 +216,16 @@ router.get('/search', authenticate, async (req, res) => {
       .select('-password -resetToken -resetTokenExpiry -verificationCode -verificationExpiry')
       .limit(parseInt(limit))
       .sort({ lastLogin: -1 });
+
+    // Filter out users who have blocked current user
+    const filteredUsers = users.filter(u => {
+      if (u.blockedUsers && u.blockedUsers.some(id => id.toString() === currentUserId)) {
+        return false;
+      }
+      return true;
+    });
     
-    const usersWithMatches = users.map(user => {
+    const usersWithMatches = filteredUsers.map(user => {
       const match = matchService.calculateMatchScore(req.user, user);
       return {
         ...user.toObject(),
@@ -772,6 +854,14 @@ router.post('/:userId/follow', authenticate, async (req, res) => {
       });
     }
     
+    // Check if current user is blocked by the target user
+    if (userToFollow.blockedUsers && userToFollow.blockedUsers.some(id => id.toString() === req.user._id.toString())) {
+      return res.status(403).json({
+        success: false,
+        message: 'You cannot follow this user'
+      });
+    }
+
     const currentUser = req.user;
     
     if (currentUser.following && currentUser.following.includes(userId)) {

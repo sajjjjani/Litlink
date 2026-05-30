@@ -3,6 +3,7 @@ const router  = express.Router();
 const mongoose = require('mongoose');
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
+const UserSettings = require('../models/UserSettings');
 const Conversation = require('../models/Conversation');
 const FilterService = require('../services/filterService');
 
@@ -49,6 +50,43 @@ async function isBlocked(userId, targetId) {
   return user.blockedUsers && user.blockedUsers.some(id => id.toString() === targetId);
 }
 
+// Helper to check message privacy — returns true if sender is allowed to message recipient
+async function canMessageUser(senderId, recipientId) {
+  const settings = await UserSettings.findOne({ userId: recipientId });
+  if (!settings || !settings.privacy) return true;
+  const privacy = settings.privacy.messagePrivacy || 'everyone';
+  if (privacy === 'everyone') return true;
+  if (privacy === 'none') return false;
+  if (privacy === 'followers') {
+    const recipient = await User.findById(recipientId).select('followers');
+    if (!recipient) return false;
+    return recipient.followers && recipient.followers.some(id => id.toString() === senderId);
+  }
+  return true;
+}
+
+// Helper to check profile visibility — returns { allowed, reason }
+async function checkProfileVisibility(viewerId, targetUserId) {
+  if (viewerId === targetUserId) return { allowed: true };
+  const settings = await UserSettings.findOne({ userId: targetUserId });
+  if (!settings || !settings.privacy) return { allowed: true };
+  const privacy = settings.privacy.profilePrivacy || 'everyone';
+  if (privacy === 'everyone') return { allowed: true };
+  if (privacy === 'private') {
+    return { allowed: false, reason: 'This profile is private.' };
+  }
+  if (privacy === 'followers') {
+    const target = await User.findById(targetUserId).select('followers');
+    if (!target) return { allowed: false, reason: 'User not found.' };
+    const isFollower = target.followers && target.followers.some(id => id.toString() === viewerId);
+    if (!isFollower) {
+      return { allowed: false, reason: 'This profile is only visible to followers.' };
+    }
+    return { allowed: true };
+  }
+  return { allowed: true };
+}
+
 // Helper to check if user is suspended
 async function isUserSuspended(userId) {
   const user = await User.findById(userId);
@@ -65,6 +103,27 @@ async function isUserSuspended(userId) {
   }
   return false;
 }
+
+// ─── GET /api/chat/unread-count ────────────────────────────────────────────
+router.get('/unread-count', authenticate, async (req, res) => {
+  try {
+    const me = req.user._id.toString();
+
+    const conversations = await Conversation.find({ participants: me }).lean();
+
+    let totalUnread = 0;
+    conversations.forEach(conv => {
+      if (conv.unreadCount) {
+        totalUnread += (conv.unreadCount.get ? (conv.unreadCount.get(me) || 0) : (conv.unreadCount[me] || 0));
+      }
+    });
+
+    res.json({ success: true, unreadCount: totalUnread });
+  } catch (error) {
+    console.error('Unread count error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // ─── GET /api/chat/matches ─────────────────────────────────────────────────
 router.get('/matches', authenticate, async (req, res) => {
@@ -299,6 +358,20 @@ router.post('/messages', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'You cannot message this user' });
     }
 
+    // Check recipient's message privacy setting
+    const canMsg = await canMessageUser(me, matchId);
+    if (!canMsg) {
+      const recipientSettings = await UserSettings.findOne({ userId: matchId });
+      const msgPrivacy = recipientSettings?.privacy?.messagePrivacy || 'everyone';
+      let msg;
+      if (msgPrivacy === 'none') {
+        msg = 'This user is not accepting messages.';
+      } else {
+        msg = 'This user only accepts messages from followers.';
+      }
+      return res.status(403).json({ success: false, message: msg, privacyBlocked: true });
+    }
+
     // Apply content filtering
     const filterResult = await FilterService.checkAndProcess(content, me, 'chat', matchId);
     
@@ -402,6 +475,20 @@ router.post('/messages/attachment', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'You cannot message this user' });
     }
 
+    // Check recipient's message privacy setting
+    const canMsg = await canMessageUser(me, recipientId);
+    if (!canMsg) {
+      const recipientSettings = await UserSettings.findOne({ userId: recipientId });
+      const msgPrivacy = recipientSettings?.privacy?.messagePrivacy || 'everyone';
+      let msg;
+      if (msgPrivacy === 'none') {
+        msg = 'This user is not accepting messages.';
+      } else {
+        msg = 'This user only accepts messages from followers.';
+      }
+      return res.status(403).json({ success: false, message: msg, privacyBlocked: true });
+    }
+
     // Apply content filtering to caption if present
     let finalCaption = caption || '';
     let filterResult = null;
@@ -483,6 +570,23 @@ router.post('/conversations', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Cannot create conversation with blocked user' });
     }
 
+    // Check if current user is blocked by the participant
+    const isBlockedByParticipant = await isBlocked(participantId, me);
+    if (isBlockedByParticipant) {
+      return res.status(403).json({ success: false, message: 'You cannot message this user' });
+    }
+
+    // Check message privacy setting
+    const canMsg = await canMessageUser(me, participantId);
+    if (!canMsg) {
+      const settings = await UserSettings.findOne({ userId: participantId });
+      const msgPrivacy = settings?.privacy?.messagePrivacy || 'everyone';
+      const msg = msgPrivacy === 'none'
+        ? 'This user is not accepting messages.'
+        : 'This user only accepts messages from followers.';
+      return res.status(403).json({ success: false, message: msg });
+    }
+
     let conv = await Conversation.findOne({ participants: { $all: [me, participantId], $size: 2 } });
     if (!conv) {
       conv = new Conversation({ participants: [me, participantId], messages: [], unreadCount: {} });
@@ -519,6 +623,20 @@ router.post('/conversations/:conversationId/messages', authenticate, async (req,
     const isRecipientBlocked = await isBlocked(me, recipientId);
     if (isRecipientBlocked) {
       return res.status(403).json({ success: false, message: 'You cannot message a blocked user' });
+    }
+
+    // Check recipient's message privacy setting
+    const canMsg = await canMessageUser(me, recipientId);
+    if (!canMsg) {
+      const recipientSettings = await UserSettings.findOne({ userId: recipientId });
+      const msgPrivacy = recipientSettings?.privacy?.messagePrivacy || 'everyone';
+      let msg;
+      if (msgPrivacy === 'none') {
+        msg = 'This user is not accepting messages.';
+      } else {
+        msg = 'This user only accepts messages from followers.';
+      }
+      return res.status(403).json({ success: false, message: msg, privacyBlocked: true });
     }
 
     const { content } = req.body;

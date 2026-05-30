@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const UserSettings = require('../models/UserSettings');
+const UserNotificationService = require('../services/UserNotificationService');
 
 function sanitizeSettings(settingsDoc) {
   if (!settingsDoc) return null;
@@ -34,7 +35,19 @@ router.put('/me', authenticate, async (req, res) => {
       'emailNotifications',
       'matchNotifications',
       'messageNotifications',
-      'discussionNotifications'
+      'newDirectMessages',
+      'unreadAlerts',
+      'roomReminders',
+      'roomStartedAlerts',
+      'discussionLikes',
+      'discussionComments',
+      'discussionReplies',
+      'discussionMentions',
+      'newFollowers',
+      'followRequests',
+      'circleEventUpdates',
+      'circleSuggestedBooks',
+      'circleAnnouncements'
     ]);
     const allowedPrivacyKeys = new Set(['messagePrivacy', 'profilePrivacy']);
     const allowedPrimaryKeys = new Set(['notificationsEnabled', 'darkMode']);
@@ -72,6 +85,11 @@ router.put('/me', authenticate, async (req, res) => {
       { $set: update, $setOnInsert: { userId: req.userId } },
       { new: true, upsert: true, runValidators: true }
     );
+
+    // Invalidate notification preference cache so next check reads fresh data
+    if (UserNotificationService.invalidateCache) {
+      UserNotificationService.invalidateCache(req.userId);
+    }
 
     res.json({ success: true, message: 'Settings updated', settings: sanitizeSettings(settings) });
   } catch (error) {

@@ -2378,11 +2378,22 @@ router.put('/threads/:threadId', authMiddleware, async (req, res) => {
     thread.updatedAt = new Date();
     await thread.save();
 
-    // Notify users who liked this post
+    // Notify users who liked this post (respect their discussionLikes preference)
     if (thread.likes && thread.likes.length > 0) {
       const Notification = require('../models/Notification');
-      const notificationPromises = thread.likes.map(async (likerId) => {
+      const UserSettings = require('../models/UserSettings');
+      const prefResults = await Promise.allSettled(
+        thread.likes.map(id =>
+          UserSettings.findOne({ userId: id }).lean()
+            .then(s => s?.notifications?.discussionLikes !== false)
+            .catch(() => true)
+        )
+      );
+      const notificationPromises = thread.likes.map(async (likerId, i) => {
         if (likerId.toString() !== req.userId) {
+          const r = prefResults[i];
+          const allowed = r.status === 'fulfilled' ? r.value : true;
+          if (!allowed) return;
           try {
             await Notification.createUserNotification(
               likerId,
@@ -2450,11 +2461,22 @@ router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
     thread.deletedAt = new Date();
     await thread.save();
 
-    // Notify users who liked this post
+    // Notify users who liked this post (respect their discussionLikes preference)
     if (thread.likes && thread.likes.length > 0) {
       const Notification = require('../models/Notification');
-      const notificationPromises = thread.likes.map(async (likerId) => {
+      const UserSettings = require('../models/UserSettings');
+      const prefResults = await Promise.allSettled(
+        thread.likes.map(id =>
+          UserSettings.findOne({ userId: id }).lean()
+            .then(s => s?.notifications?.discussionLikes !== false)
+            .catch(() => true)
+        )
+      );
+      const notificationPromises = thread.likes.map(async (likerId, i) => {
         if (likerId.toString() !== req.userId) {
+          const r = prefResults[i];
+          const allowed = r.status === 'fulfilled' ? r.value : true;
+          if (!allowed) return;
           try {
             await Notification.createUserNotification(
               likerId,
@@ -2826,7 +2848,8 @@ router.get('/user/:userId/threads', authMiddleware, async (req, res) => {
 
     const threads = await DiscussionThread.find({ 
       author: userId,
-      isDeleted: false 
+      isDeleted: false,
+      isCircleThread: { $ne: true }
     })
       .populate('author', 'name username profilePicture')
       .sort({ createdAt: -1 })
@@ -2836,7 +2859,8 @@ router.get('/user/:userId/threads', authMiddleware, async (req, res) => {
 
     const total = await DiscussionThread.countDocuments({ 
       author: userId,
-      isDeleted: false 
+      isDeleted: false,
+      isCircleThread: { $ne: true }
     });
 
     res.json({
