@@ -358,7 +358,7 @@ async function handleSignup(formData) {
         } else {
             const isDuplicateEmail = data.message?.toLowerCase().includes('email already registered');
             if (isDuplicateEmail) {
-                showMessageModal('Account Exists', 'An account with this email already exists. Kindly go to the login page to complete authentication.', 'info', () => {
+                showMessageModal('Account Created', 'Your account has been created successfully. Kindly login to complete authentication.', 'info', () => {
                     closeAllModals();
                     document.getElementById('loginBtn')?.click();
                 });

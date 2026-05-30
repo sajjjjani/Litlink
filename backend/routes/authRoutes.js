@@ -329,9 +329,13 @@ router.post('/resend-verification', async (req, res) => {
     });
     
     await verification.save();
-    await sendVerificationEmail(email, verificationCode, user.name);
+    const emailSent = await sendVerificationEmail(email, verificationCode, user.name);
     
-    res.json({ success: true, message: 'New verification email sent successfully.' });
+    if (emailSent) {
+      res.json({ success: true, message: 'New verification code sent! Please check your email.' });
+    } else {
+      res.json({ success: false, message: 'Failed to send verification email. Please contact support.' });
+    }
     
   } catch (error) {
     console.error('Resend verification error:', error);
