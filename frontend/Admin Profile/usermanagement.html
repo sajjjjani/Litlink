@@ -1312,7 +1312,7 @@
         }
         
         function redirectToLogin() {
-            alert('Admin access required. Please login as administrator.');
+            showToast('Admin access required. Please login as administrator.', 'error');
             localStorage.clear();
             setTimeout(() => {
                 window.location.href = '../Homepage/index.html';
@@ -1362,20 +1362,24 @@
         }
         
         function logoutAdmin() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('user');
-                sessionStorage.removeItem('litlink_token');
-                sessionStorage.removeItem('litlink_user');
-                sessionStorage.removeItem('authToken');
-                sessionStorage.removeItem('user');
-                
-                showToast('Logged out successfully!', 'success');
-                
-                setTimeout(() => {
-                    window.location.href = '../Homepage/index.html';
-                }, 1000);
-            }
+            window.SystemModal.confirm(
+                'Logout',
+                'Are you sure you want to logout?',
+                () => {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('user');
+                    sessionStorage.removeItem('litlink_token');
+                    sessionStorage.removeItem('litlink_user');
+                    sessionStorage.removeItem('authToken');
+                    sessionStorage.removeItem('user');
+                    
+                    showToast('Logged out successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '../Homepage/index.html';
+                    }, 1000);
+                }
+            );
+        }
         }
         
         // ===== USER MANAGEMENT FUNCTIONS =====
@@ -2298,5 +2302,6 @@
             }
         }, 30000);
     </script>
+    <script src="../utils/modal.js"></script>
     <script src="../utils/textSize.js"></script>
 </body>

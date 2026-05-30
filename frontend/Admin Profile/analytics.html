@@ -443,11 +443,15 @@ function initNavbar() {
 
     document.getElementById('logoutBtnSidebar')?.addEventListener('click', (e) => {
         e.preventDefault();
-        if (confirm('Are you sure you want to logout?')) {
-            sessionStorage.clear();
-            localStorage.clear();
-            window.location.href = '../Homepage/index.html';
-        }
+        window.SystemModal.confirm(
+            'Logout',
+            'Are you sure you want to logout?',
+            () => {
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.href = '../Homepage/index.html';
+            }
+        );
     });
 }
 
@@ -495,7 +499,7 @@ async function loadAnalytics() {
       fetchWithAuth(`${API_BASE}/admin/dashboard/stats`),
       fetchWithAuth(`${API_BASE}/analytics/activity?days=${days}`),
       fetchWithAuth(`${API_BASE}/analytics/activity/top-users?days=${days}`),
-      fetchWithAuth(`${API_BASE}/discussions/threads?limit=10&sortBy=replies`),
+      fetchWithAuth(`${API_BASE}/discussions/threads?limit=10&sort=mostReplies`),
       fetchWithAuth(`${API_BASE}/voice-rooms/rooms/live`),
       fetchWithAuth(`${API_BASE}/admin/reports?limit=50`),
       fetchWithAuth(`${API_BASE}/admin/filter-words?limit=100`),
@@ -1027,20 +1031,16 @@ function startAutoRefresh() {
   }, 60000);
 }
 
-// Initialize
-(async function init() {
-  if (await checkAuth()) {
-    await loadAnalytics();
-    startAutoRefresh();
-  }
-})();
+// Initialize — only after DOM is ready
 window.addEventListener('DOMContentLoaded', async () => {
   if (await checkAuth()) {
     initNavbar();
-    loadAnalytics();
+    await loadAnalytics();
+    startAutoRefresh();
   }
 });
 </script>
+    <script src="../utils/modal.js"></script>
     <script src="../utils/textSize.js"></script>
 </body>
 </html>

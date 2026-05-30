@@ -1164,25 +1164,33 @@
         }
         
         function logoutAdmin() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('user');
-                sessionStorage.removeItem('litlink_token');
-                sessionStorage.removeItem('litlink_user');
-                sessionStorage.removeItem('authToken');
-                sessionStorage.removeItem('user');
-                
-                showToast('Logged out successfully!', 'success');
-                setTimeout(() => {
-                    window.location.href = '../Homepage/index.html';
-                }, 1000);
-            }
+            window.SystemModal.confirm(
+                'Logout',
+                'Are you sure you want to logout?',
+                () => {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('user');
+                    sessionStorage.removeItem('litlink_token');
+                    sessionStorage.removeItem('litlink_user');
+                    sessionStorage.removeItem('authToken');
+                    sessionStorage.removeItem('user');
+                    
+                    showToast('Logged out successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '../Homepage/index.html';
+                    }, 1000);
+                }
+            );
         }
         
         async function logoutAllSessions() {
-            if (confirm('Are you sure you want to logout of all other sessions?')) {
-                showToast('All other sessions have been logged out', 'success');
-            }
+            window.SystemModal.confirm(
+                'Logout All Sessions',
+                'Are you sure you want to logout of all other sessions?',
+                () => {
+                    showToast('All other sessions have been logged out', 'success');
+                }
+            );
         }
         
         // ===== INITIALIZATION =====
@@ -1244,6 +1252,7 @@
             }
         });
     </script>
+    <script src="../utils/modal.js"></script>
     <script src="../utils/textSize.js"></script>
 </body>
 </html>
