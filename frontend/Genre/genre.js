@@ -622,7 +622,7 @@ window.addToLibrary = async function(event, bookId, genre) {
     const userId = user ? (user.id || user._id) : null;
 
     if (!token || !userId) {
-      alert('Please log in to add books to your library.');
+      window.SystemModal.warning('Login Required', 'Please log in to add books to your library.');
       return;
     }
 
@@ -682,7 +682,7 @@ window.addToLibrary = async function(event, bookId, genre) {
 
   } catch (error) {
     console.error('Error adding book:', error);
-    alert('Failed to add book. Please try again later.');
+    window.SystemModal.error('Error', 'Failed to add book. Please try again later.');
   }
 };
 

@@ -628,73 +628,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-function formatCompatibility(val) {
-    let score = val || 0;
-    if (score > 0 && score <= 1) {
-        return Math.round(score * 100);
-    } else if (score > 1 && score <= 100) {
-        return Math.round(score);
-    } else if (score > 100) {
-        if (score % 100 === 0 && score <= 10000) {
-            return Math.round(score / 100);
-        }
-        return Math.round(score % 100);
-    }
-    return Math.round(score);
-}
-
-// Load readers from API
+// Load readers from API — uses same endpoint as dashboard for consistent percentages
 async function loadReaders() {
     try {
         const token = localStorage.getItem('litlink_token');
         
-        // First, get matches for the current user
-        const matchesResponse = await fetch('http://localhost:5002/api/matches/matches?limit=50', {
+        const response = await fetch('http://localhost:5002/api/chat/matches?source=explore', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        let matchesMap = new Map();
-        if (matchesResponse.ok) {
-            const matchesData = await matchesResponse.json();
-            if (matchesData.success && matchesData.matches) {
-                matchesData.matches.forEach(match => {
-                    matchesMap.set(match.userId || match._id, {
-                        percentage: match.matchPercentage,
-                        score: match.score,
-                        commonInterests: match.details
-                    });
-                });
-            }
+        if (!response.ok) {
+            throw new Error(`Failed to load readers: ${response.status}`);
         }
         
-        // Get all users from the users endpoint
-        const usersResponse = await fetch('http://localhost:5002/api/users', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const data = await response.json();
         
-        if (!usersResponse.ok) {
-            throw new Error(`Failed to load users: ${usersResponse.status}`);
+        if (!data.success || !data.matches) {
+            throw new Error('Invalid response from server');
         }
         
-        const usersData = await usersResponse.json();
-        
-        // Filter and process users
-        allReaders = (usersData.users || []).filter(user => {
-            // Exclude current user, system admin, and banned users
+        // Filter out current user, system admin, and banned users
+        allReaders = data.matches.filter(user => {
             return user._id !== currentUser._id && 
                    user.name !== 'System Admin' &&
                    user.name !== 'Admin' &&
                    !user.isBanned &&
                    !user.isSuspended;
-        }).map(user => {
-            const rawPct = matchesMap.get(user._id)?.percentage || matchesMap.get(user._id)?.score || 0;
-            return {
-                ...user,
-                matchPercentage: formatCompatibility(rawPct),
-                matchDetails: matchesMap.get(user._id)?.commonInterests || {},
-                online: user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false
-            };
-        });
+        }).map(user => ({
+            ...user,
+            matchPercentage: user.compatibility || 0,
+            online: user.lastLogin ? (Date.now() - new Date(user.lastLogin) < 5 * 60 * 1000) : false
+        }));
         
         // Sort by match percentage (highest first)
         allReaders.sort((a, b) => b.matchPercentage - a.matchPercentage);
