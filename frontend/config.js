@@ -223,6 +223,67 @@
     }
   };
 
+  // Profile completion gate — blocks users with <30% completion from accessing
+  // restricted pages. Redirects to profile page with a warning message.
+  window.checkProfileGate = async function checkProfileGate() {
+    var token = (window.LitlinkSessionAuth && window.LitlinkSessionAuth.getToken()) || null;
+    if (!token) return true;
+
+    // Prevent redirect loops: if we just came from a gate redirect, skip check
+    if (sessionStorage.getItem('_gate_redirected') === '1') {
+      sessionStorage.removeItem('_gate_redirected');
+      return true;
+    }
+
+    var currentPath = window.location.pathname;
+    var currentFile = currentPath.split('/').pop() || '';
+
+    // Allowed pages — user can always access these even with low completion
+    var allowedFiles = ['profile.html', 'settings.html', 'view-profile.html', 'index.html'];
+    if (allowedFiles.indexOf(currentFile) !== -1) return true;
+
+    var isHomepage = /Homepage/i.test(currentPath) && !/Dashboard|Chat|Discussion|Voice|Genre|Circle/i.test(currentPath);
+    var isAdminPage = /Admin/i.test(currentPath);
+    if (isHomepage || isAdminPage) return true;
+
+    try {
+      var apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+      var resp = await fetch(apiBase + '/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      var data = await resp.json();
+      if (data.success && data.user) {
+        var completion = data.user.completionPercentage || 0;
+        if (completion < 30) {
+          if (typeof showMessageModal === 'function') {
+            showMessageModal(
+              'Profile Incomplete',
+              'Please complete at least 30% of your profile before accessing other sections.',
+              'warning'
+            );
+          } else {
+            alert('Please complete at least 30% of your profile before accessing other sections.');
+          }
+          sessionStorage.setItem('_gate_redirected', '1');
+          setTimeout(function() {
+            window.location.href = '../Profile/profile.html';
+          }, 2000);
+          return false;
+        }
+      }
+    } catch (e) {
+      console.error('Profile gate check error:', e);
+    }
+    return true;
+  };
+
+  // Auto-run gate check on DOMContentLoaded for any page that loads config.js
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window.checkProfileGate === 'function') {
+      window.checkProfileGate();
+    }
+  });
+
   // Match percentage + activity helpers shared across dashboard/chat.
   window.LitlinkMatchUtils = {
     normalizePercentage: function (value) {
