@@ -85,7 +85,8 @@
                 }
                 
                 try {
-                    const response = await fetch('http://localhost:5002/api/auth/verify-email', {
+                    const apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+                    const response = await fetch(apiBase + '/auth/verify-email', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -130,7 +131,8 @@
                 e.preventDefault();
                 
                 try {
-                    const response = await fetch('http://localhost:5002/api/auth/resend-verification', {
+                    const apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+                    const response = await fetch(apiBase + '/auth/resend-verification', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

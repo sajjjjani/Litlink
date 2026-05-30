@@ -164,7 +164,8 @@
                 }
                 
                 try {
-                    const response = await fetch('http://localhost:5002/api/auth/verify-otp', {
+                    const apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+                    const response = await fetch(apiBase + '/auth/verify-otp', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -211,7 +212,8 @@
                 }
                 
                 try {
-                    const response = await fetch('http://localhost:5002/api/auth/reset-password', {
+                    const apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+                    const response = await fetch(apiBase + '/auth/reset-password', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -255,7 +257,8 @@
                 e.preventDefault();
                 
                 try {
-                    const response = await fetch('http://localhost:5002/api/auth/forgot-password', {
+                    const apiBase = window.API_BASE_URL || 'http://localhost:5002/api';
+                    const response = await fetch(apiBase + '/auth/forgot-password', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
