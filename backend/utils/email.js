@@ -14,7 +14,7 @@ function createTransporter() {
   const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
 
   const config = {
-    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+    host: process.env.EMAIL_HOST || 'smtp.sendgrid.net',
     port,
     secure,
     auth: { user, pass }
@@ -32,7 +32,7 @@ async function sendVerificationEmail(email, verificationCode, userName) {
     const verificationLink = getHomepageUrl('verify-email.html', { email });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || 'Litlink <noreply@litlink.app>',
       to: email,
       subject: 'Verify Your Email - Litlink',
       html: `
@@ -111,7 +111,7 @@ async function sendPasswordResetEmail(email, otp, userName) {
     const resetLink = getHomepageUrl('verify-otp.html', { email });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || `"Litlink" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || 'Litlink <noreply@litlink.app>',
       to: email,
       subject: 'Reset Your Password - Litlink',
       html: `
