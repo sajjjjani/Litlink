@@ -442,6 +442,79 @@ function initDashboard() {
     setupInteractions();
     startRealtimeUpdates();
     loadDashboardData();
+    loadAdminAppearance();
+}
+
+// ===== ADMIN APPEARANCE =====
+async function loadAdminAppearance() {
+    try {
+        const response = await fetch(`${API_ROOT}/admin/settings`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await response.json();
+        if (data.success && data.settings && data.settings.appearance) {
+            const app = data.settings.appearance;
+            
+            // Apply primary color
+            if (app.primaryColor) {
+                document.documentElement.style.setProperty('--primary', app.primaryColor);
+                const hex = app.primaryColor.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                if (!isNaN(r + g + b)) {
+                    document.documentElement.style.setProperty('--primary-rgb', `${r}, ${g}, ${b}`);
+                }
+            }
+            
+            // Apply theme mode
+            if (app.themeMode === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else if (app.themeMode === 'auto') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', prefersDark ? '' : 'light');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            
+            // Apply animations
+            if (app.enableAnimations === false) {
+                document.documentElement.classList.add('no-animations');
+            } else {
+                document.documentElement.classList.remove('no-animations');
+            }
+            
+            // Apply compact mode
+            if (app.compactMode) {
+                document.documentElement.classList.add('compact-mode');
+            } else {
+                document.documentElement.classList.remove('compact-mode');
+            }
+            
+            // Apply widget visibility
+            if (app.widgets) {
+                const statsGrid = document.getElementById('widget-stats-grid');
+                if (statsGrid) statsGrid.style.display = app.widgets.users !== false ? '' : 'none';
+                
+                const reportsSection = document.getElementById('widget-reports-section');
+                if (reportsSection) reportsSection.style.display = app.widgets.reports !== false ? '' : 'none';
+                
+                const reportsRecent = document.getElementById('widget-reports-recent');
+                if (reportsRecent) reportsRecent.style.display = app.widgets.reports !== false ? '' : 'none';
+                
+                const activitySection = document.getElementById('widget-activity-section');
+                if (activitySection) activitySection.style.display = app.widgets.activity !== false ? '' : 'none';
+                
+                const systemSection = document.getElementById('widget-system-section');
+                if (systemSection) systemSection.style.display = app.widgets.system !== false ? '' : 'none';
+                
+                const safeguardsSection = document.getElementById('widget-safeguards-section');
+                if (safeguardsSection) safeguardsSection.style.display = app.widgets.system !== false ? '' : 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading admin appearance:', error);
+    }
 }
 
 // ===== DATA LOADING =====
@@ -1697,7 +1770,7 @@ function showVoiceRoomsModal(rooms) {
             <div id="liveTab" class="tab-content">
                 <div style="margin-bottom: 24px; padding: 16px; background: rgba(220, 38, 38, 0.1); border-left: 4px solid #dc2626; border-radius: 4px;">
                     <div style="font-weight: 600; color: #dc2626; margin-bottom: 4px;">Admin Note</div>
-                    <div style="font-size: 13px; color: rgba(232, 213, 196, 0.8);">Voice rooms are monitored by AI. High-risk rooms are flagged automatically. You can join rooms as a silent listener or end them if they violate terms.</div>
+                    <div style="font-size: 13px; color: rgba(232, 213, 196, 0.8);">Voice rooms are monitored by AI. High-risk rooms are flagged automatically. You can force-end rooms that violate terms or check reports linked to them.</div>
                 </div>
 
                 <div style="overflow-x: auto;">
@@ -1728,9 +1801,9 @@ function showVoiceRoomsModal(rooms) {
                                             ${(room.riskLevel || 'Low').toUpperCase()}
                                         </span>
                                     </td>
-                                    <td style="padding: 12px;">
-                                        <button class="action-btn join-room" data-room-id="${room._id}" style="padding: 4px 8px; font-size: 12px;">Listen</button>
-                                        <button class="action-btn end-room" data-room-id="${room._id}" style="padding: 4px 8px; font-size: 12px; background: #dc2626; color: white;">End</button>
+                                    <td style="padding: 12px; display: flex; gap: 6px;">
+                                        <button class="action-btn force-end-room" data-room-id="${room._id}" data-room-name="${room.name}" data-host-name="${room.hostName || 'Unknown'}" style="padding: 4px 8px; font-size: 12px; background: #dc2626; color: white;">Force End</button>
+                                        <button class="action-btn check-room-reports" data-room-id="${room._id}" data-room-name="${room.name}" data-host-id="${room.hostId || ''}" style="padding: 4px 8px; font-size: 12px; background: #d4a574; color: #1a1a2e;">Check Report</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1828,7 +1901,24 @@ async function loadHistoryTable() {
                     const roomId = btn.dataset.roomId;
                     const room = data.rooms.find(r => r._id === roomId);
                     if (room) {
-                        alert(`Room: ${room.name}\nHost: ${room.hostName || 'Unknown'}\nEnded: ${new Date(room.endedAt).toLocaleString()}\nDuration: ${room.duration || 0} mins\nDescription: ${room.description || 'No description'}`);
+                        const modal = document.createElement('div');
+                        modal.className = 'modal-overlay';
+                        modal.innerHTML = `
+                            <div class="modal-content" style="max-width: 500px; width: 100%;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                    <h3 style="margin: 0; color: #e8d5c4;">Room Details</h3>
+                                    <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
+                                </div>
+                                <div style="margin-bottom: 12px;"><span style="color: #a78c6d;">Room:</span> <span style="color: #e8d5c4;">${room.name}</span></div>
+                                <div style="margin-bottom: 12px;"><span style="color: #a78c6d;">Host:</span> <span style="color: #e8d5c4;">${room.hostName || 'Unknown'}</span></div>
+                                <div style="margin-bottom: 12px;"><span style="color: #a78c6d;">Ended:</span> <span style="color: #e8d5c4;">${new Date(room.endedAt).toLocaleString()}</span></div>
+                                <div style="margin-bottom: 12px;"><span style="color: #a78c6d;">Duration:</span> <span style="color: #e8d5c4;">${room.duration || 0} mins</span></div>
+                                <div style="margin-bottom: 12px;"><span style="color: #a78c6d;">Description:</span> <span style="color: #e8d5c4;">${room.description || 'No description'}</span></div>
+                            </div>
+                        `;
+                        document.body.appendChild(modal);
+                        modal.querySelector('.close-modal').onclick = () => modal.remove();
+                        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
                     }
                 };
             });
@@ -1840,13 +1930,7 @@ async function loadHistoryTable() {
 }
 
 function setupLiveRoomActions(modal) {
-    modal.querySelectorAll('.join-room').forEach(btn => {
-        btn.onclick = () => {
-            showToast('Joining as silent listener...', 'info');
-        };
-    });
-    
-    modal.querySelectorAll('.end-room').forEach(btn => {
+    modal.querySelectorAll('.force-end-room').forEach(btn => {
         btn.onclick = async () => {
             if (confirm('Are you sure you want to forcibly end this voice room?')) {
                 const roomId = btn.dataset.roomId;
@@ -1867,6 +1951,68 @@ function setupLiveRoomActions(modal) {
             }
         };
     });
+    
+    modal.querySelectorAll('.check-room-reports').forEach(btn => {
+        btn.onclick = async () => {
+            const roomId = btn.dataset.roomId;
+            const roomName = btn.dataset.roomName;
+            const hostId = btn.dataset.hostId;
+            showToast(`Checking reports for "${roomName}"...`, 'info');
+            try {
+                const response = await fetch(`${API_ROOT}/admin/reports?itemType=voice_room`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const roomReports = data.reports.filter(r => r.reportedItemId === roomId || (r.reportedUser && r.reportedUser._id === hostId));
+                    if (roomReports.length > 0) {
+                        showRoomReportsModal(roomName, roomReports);
+                    } else {
+                        showToast(`No reports found for "${roomName}"`, 'success');
+                    }
+                } else {
+                    showToast('Failed to fetch reports', 'error');
+                }
+            } catch (error) {
+                console.error('Error checking reports:', error);
+                showToast('Could not load report data', 'warning');
+            }
+        };
+    });
+}
+
+function showRoomReportsModal(roomName, reports) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 700px; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; color: #e8d5c4;">Reports for "${roomName}"</h3>
+                <button class="close-modal" style="background: none; border: none; color: #a78c6d; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <div style="margin-bottom: 16px; color: #a78c6d; font-size: 13px;">${reports.length} report(s) found</div>
+            <div style="max-height: 400px; overflow-y: auto;">
+                ${reports.map(r => `
+                    <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid ${r.status === 'resolved' ? '#16a34a' : r.status === 'dismissed' ? '#6b7280' : '#eab308'}; border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-weight: 600; color: #e8d5c4; text-transform: capitalize;">${r.category || 'N/A'}</span>
+                            <span style="color: ${r.status === 'resolved' ? '#16a34a' : r.status === 'dismissed' ? '#6b7280' : '#eab308'}; font-size: 12px; text-transform: capitalize;">${r.status}</span>
+                        </div>
+                        <div style="color: rgba(232, 213, 196, 0.7); font-size: 13px; margin-bottom: 4px;">${r.description || 'No description'}</div>
+                        ${r.reportedUser ? `<div style="color: #a78c6d; font-size: 12px;">Reported user: ${r.reportedUser.name || 'Unknown'}</div>` : ''}
+                        <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">${getTimeAgo(r.createdAt)}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div style="margin-top: 16px; text-align: right;">
+                <button class="action-btn close-modal-btn" style="padding: 8px 16px; background: #d4a574; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
+    modal.querySelector('.close-modal-btn').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 }
 
 function setupViewAllButton() {
@@ -2038,26 +2184,30 @@ function showToast(message, type = 'info') {
 }
 
 function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        if (window.AuthState) {
-            AuthState.clearAuth();
-        } else {
-            localStorage.removeItem('litlink_token');
-            localStorage.removeItem('litlink_user');
-            sessionStorage.removeItem('litlink_token');
-            sessionStorage.removeItem('litlink_user');
+    window.SystemModal.confirm(
+        'Logout',
+        'Are you sure you want to logout?',
+        () => {
+            if (window.AuthState) {
+                AuthState.clearAuth();
+            } else {
+                localStorage.removeItem('litlink_token');
+                localStorage.removeItem('litlink_user');
+                sessionStorage.removeItem('litlink_token');
+                sessionStorage.removeItem('litlink_user');
+            }
+            
+            if (socket) {
+                socket.disconnect();
+            }
+            if (refreshInterval) clearInterval(refreshInterval);
+            if (typeof showToast === 'function') showToast('Logged out successfully', 'success');
+            setTimeout(() => {
+                console.trace('↪️ Admin manual logout redirect');
+                window.location.href = '../Homepage/index.html';
+            }, 1000);
         }
-        
-        if (socket) {
-            socket.disconnect();
-        }
-        if (refreshInterval) clearInterval(refreshInterval);
-        if (typeof showToast === 'function') showToast('Logged out successfully', 'success');
-        setTimeout(() => {
-            console.trace('↪️ Admin manual logout redirect');
-            window.location.href = '../Homepage/index.html';
-        }, 1000);
-    }
+    );
 }
 
 // Add CSS animations
