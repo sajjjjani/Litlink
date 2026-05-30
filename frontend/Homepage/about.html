@@ -35,7 +35,7 @@
             margin: 0 auto;
         }
         
-        .story-section, .mission-section, .team-section {
+        .story-section, .mission-section, .vision-section, .dev-section {
             padding: 80px 20px;
         }
         
@@ -47,18 +47,28 @@
             background: #4a3123;
         }
         
-        .team-section {
+        .vision-section {
             background: #3d2617;
         }
+
+        .dev-section {
+            background: #4a3123;
+        }
         
-        .story-content, .mission-content {
+        .story-content, .mission-content, .vision-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 60px;
             align-items: center;
         }
+
+        .dev-content {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
         
-        .story-text h2, .mission-text h2, .team-section h2 {
+        .story-text h2, .mission-text h2, .vision-text h2 {
             font-size: 2.5rem;
             margin-bottom: 20px;
             color: #f5e6d3;
@@ -83,53 +93,17 @@
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
         
-        .team-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin-top: 40px;
-        }
-        
-        .team-card {
-            background: #4a3123;
-            border-radius: 16px;
-            padding: 30px;
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-        
-        .team-card:hover {
-            transform: translateY(-10px);
-        }
-        
-        .team-avatar {
-            width: 100px;
-            height: 100px;
-            background: #f5e6d3;
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .dev-text h2 {
             font-size: 2.5rem;
-            color: #2c1810;
-        }
-        
-        .team-card h3 {
-            font-size: 1.3rem;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
             color: #f5e6d3;
         }
-        
-        .team-card p {
+
+        .dev-text p {
             color: #d4b5a0;
-            font-size: 0.9rem;
-        }
-        
-        .team-role {
-            color: #f5e6d3 !important;
-            font-weight: 600;
-            margin-bottom: 15px !important;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
         }
         
         @media (max-width: 768px) {
@@ -142,27 +116,23 @@
                 font-size: 2.5rem;
             }
             
-            .story-text h2, .mission-text h2, .team-section h2 {
+        .story-text h2, .mission-text h2, .vision-text h2 {
                 font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Navbar (same as homepage) -->
+    <!-- Navbar -->
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
-                <a href="index.html" style="text-decoration: none; color: inherit;">
+                <a href="index.html" id="navLogo" style="text-decoration: none; color: inherit;">
                     <div class="logo">
                         <i class="fas fa-book-open"></i>
                         <span>Litlink</span>
                     </div>
                 </a>
-            </div>
-            <div class="nav-links">
-                <a href="index.html#loginBtn" class="btn btn-login">Login</a>
-                <a href="index.html#signupBtn" class="btn btn-signup">Sign Up</a>
             </div>
         </div>
     </nav>
@@ -170,8 +140,8 @@
     <!-- About Hero -->
     <section class="about-hero">
         <div class="container">
-            <h1>Our Story</h1>
-            <p>Connecting readers through their shared love of stories since 2024</p>
+            <h1>About Litlink</h1>
+            <p>A Final Year Project connecting readers through the stories they love</p>
         </div>
     </section>
 
@@ -181,9 +151,8 @@
             <div class="story-content">
                 <div class="story-text">
                     <h2>How It All Began</h2>
-                    <p>Litlink was founded in 2024 by a group of passionate readers who noticed something missing in the digital reading community. While there were plenty of platforms for reviewing books or tracking reading habits, there was no dedicated space for readers to truly connect with each other.</p>
-                    <p>Our founder, Sarah Chen, an avid book club organizer, realized that the most meaningful literary discussions happened face-to-face. She wanted to recreate that magic online—a place where you could not only discuss books but also find reading companions who shared your specific tastes.</p>
-                    <p>What started as a small book matching platform has grown into a vibrant community of over 10,000 readers worldwide, all connected by their love of stories.</p>
+                    <p>Litlink was created as a Final Year Project with a simple vision — to build a dedicated space where readers can connect, share, and discover books together. While there are plenty of platforms for reviewing books or tracking reading habits, there was no single place designed for meaningful reader-to-reader connection.</p>
+                    <p>What started as an academic project quickly grew into something more — a platform where book lovers can find their reading community, join discussions, participate in voice rooms, and discover their next great read through AI-powered matching.</p>
                 </div>
                 <div class="story-image">
                     📚
@@ -192,59 +161,30 @@
         </div>
     </section>
 
-    <!-- Our Mission -->
-    <section class="mission-section">
+    <!-- Project Vision -->
+    <section class="vision-section" id="vision">
         <div class="container">
-            <div class="mission-content">
-                <div class="mission-image">
+            <div class="vision-content">
+                <div class="vision-image story-image">
                     🌟
                 </div>
-                <div class="mission-text">
-                    <h2>Our Mission</h2>
-                    <p>At Litlink, we believe that every book is better when shared. Our mission is to build bridges between readers, creating meaningful connections through literature.</p>
-                    <p>We're not just another social media platform—we're a dedicated space for bibliophiles to find their reading tribe. Whether you're into epic fantasy, literary fiction, or niche nonfiction, there's a community here waiting for you.</p>
-                    <p>Through our AI-powered matching system, real-time chat features, and diverse discussion spaces, we're making it easier than ever to find and connect with fellow readers who understand why that particular paragraph moved you to tears or that plot twist kept you up all night.</p>
+                <div class="vision-text">
+                    <h2>Project Vision</h2>
+                    <p>Litlink was built to solve a simple problem: reading is better when shared. The platform brings together everything a reader needs — AI-powered matching to find compatible book lovers, reading circles for group discussions, discussion boards for threaded conversations, voice rooms for real-time talk, and direct messaging for private connections.</p>
+                    <p>Beyond discoverability, Litlink is about building reading communities. Whether you are looking for a deep discussion about literary fiction, a casual book club for fantasy readers, or simply someone who shares your niche genre interests, Litlink helps you find your people.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Our Team -->
-    <section class="team-section" id="team">
+    <!-- About the Developer -->
+    <section class="dev-section" id="developer">
         <div class="container">
-            <h2>Meet Our Team</h2>
-            <div class="team-grid">
-                <div class="team-card">
-                    <div class="team-avatar">
-                        👩‍💼
-                    </div>
-                    <h3>Sarah Chen</h3>
-                    <p class="team-role">Founder & CEO</p>
-                    <p>Former book club organizer with 10+ years in community building</p>
-                </div>
-                <div class="team-card">
-                    <div class="team-avatar">
-                        👨‍💻
-                    </div>
-                    <h3>Marcus Johnson</h3>
-                    <p class="team-role">CTO</p>
-                    <p>AI specialist passionate about connecting people through technology</p>
-                </div>
-                <div class="team-card">
-                    <div class="team-avatar">
-                        👩‍🎨
-                    </div>
-                    <h3>Elena Rodriguez</h3>
-                    <p class="team-role">Head of Community</p>
-                    <p>Literary scholar dedicated to fostering meaningful discussions</p>
-                </div>
-                <div class="team-card">
-                    <div class="team-avatar">
-                        👨‍💼
-                    </div>
-                    <h3>David Kim</h3>
-                    <p class="team-role">Product Designer</p>
-                    <p>Creates beautiful, intuitive experiences for book lovers</p>
+            <div class="dev-content">
+                <div class="dev-text">
+                    <h2>About the Developer</h2>
+                    <p>Litlink is being developed as an individual Final Year Project. The platform is designed to demonstrate how modern web technologies — including real-time communication, AI-powered recommendations, and community-driven features — can come together to create meaningful social reading experiences.</p>
+                    <p>The goal of this project is to explore how technology can strengthen reading communities by making it easier for readers to find each other, share recommendations, and engage in thoughtful literary discussion. Future development will continue to expand the platform's features based on community feedback and evolving reader needs.</p>
                 </div>
             </div>
         </div>
@@ -263,7 +203,6 @@
                         <h4>About Us</h4>
                         <ul>
                             <li><a href="about.html">About</a></li>
-                            <li><a href="about.html#team">Team</a></li>
                         </ul>
                     </div>
                     <div class="footer-column">
@@ -290,5 +229,21 @@
 
     <script src="script.js"></script>
     <script src="../utils/textSize.js"></script>
+    <script>
+        (function() {
+            var logo = document.getElementById('navLogo');
+            if (logo) {
+                var token = window.LitlinkSessionAuth && window.LitlinkSessionAuth.getToken();
+                if (token) {
+                    var user = window.LitlinkSessionAuth && window.LitlinkSessionAuth.getUser();
+                    if (user && user.isAdmin) {
+                        logo.href = '../Admin Dashboard/admin.html';
+                    } else {
+                        logo.href = '../Dashboard/dashboard.html';
+                    }
+                }
+            }
+        })();
+    </script>
 </body>
 </html>
