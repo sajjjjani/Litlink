@@ -181,16 +181,12 @@
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
-                <a href="index.html" style="text-decoration: none; color: inherit;">
+                <a href="index.html" id="navLogo" style="text-decoration: none; color: inherit;">
                     <div class="logo">
                         <i class="fas fa-book-open"></i>
                         <span>Litlink</span>
                     </div>
                 </a>
-            </div>
-            <div class="nav-links">
-                <a href="index.html#loginBtn" class="btn btn-login">Login</a>
-                <a href="index.html#signupBtn" class="btn btn-signup">Sign Up</a>
             </div>
         </div>
     </nav>
@@ -214,105 +210,125 @@
                 
                 <div class="faq-item">
                     <div class="faq-question">
+                        <h3>How do I join a reading circle?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Reading circles are group discussions centered around specific books or genres. To join one:</p>
+                        <ol>
+                            <li>Navigate to the Circles section from your dashboard</li>
+                            <li>Browse available circles or search by genre or book title</li>
+                            <li>Click on a circle to view its details and active discussions</li>
+                            <li>Press "Join Circle" to become a member</li>
+                            <li>Participate in discussions, share thoughts, and track the group's reading list</li>
+                        </ol>
+                        <p>You can join multiple circles and leave at any time. Circle hosts can set privacy levels and moderate discussions.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do voice rooms work?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Voice rooms are real-time audio spaces where readers can talk about books, host discussions, or just hang out. Here is how they work:</p>
+                        <ul>
+                            <li>Rooms can be in <strong>free mode</strong> (anyone can speak) or <strong>rotating speaker mode</strong> (queued turns)</li>
+                            <li>Join any active room from the Community or Voice Room section</li>
+                            <li>By default you join muted — click the mic icon to request to speak</li>
+                            <li>In rotating mode, raise your hand to join the speaker queue</li>
+                            <li>Hosts can moderate who speaks, mute participants, and manage the room</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do I create a discussion thread?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>To start a new discussion on the Discussion Board:</p>
+                        <ol>
+                            <li>Go to the Discussion Board from your dashboard navigation</li>
+                            <li>Click the "Create Thread" or "New Discussion" button</li>
+                            <li>Give your thread a clear, descriptive title</li>
+                            <li>Write your post — you can include text, format with basic markup, and add images</li>
+                            <li>Select relevant tags or categories to help others find your thread</li>
+                            <li>Submit your thread to make it visible to the community</li>
+                        </ol>
+                        <p>Other users can reply, like, and share your thread. You can edit or delete your own threads at any time.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do I message another user?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Litlink offers direct messaging between matched and connected users. To send a message:</p>
+                        <ul>
+                            <li>Go to your Chat section from the dashboard</li>
+                            <li>Select a match from your matches list to open the conversation</li>
+                            <li>Type your message in the input box and press Enter or click Send</li>
+                            <li>You can also send images and files as attachments</li>
+                            <li>Messages are delivered in real time when the recipient is online</li>
+                        </ul>
+                        <p>You can only message users you have matched with. Use the block feature if you need to restrict communication with a specific user.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>Why must I complete at least 30% of my profile?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>The 30% profile completion requirement ensures that AI-powered matching has enough data to find compatible reading partners for you. By completing key fields such as:</p>
+                        <ul>
+                            <li>Your favorite genres and authors</li>
+                            <li>A brief bio about your reading preferences</li>
+                            <li>Your profile picture</li>
+                        </ul>
+                        <p>you help the system make better recommendations. This also helps other users learn about you before connecting. Once you reach 30%, all sections of the platform become fully accessible.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>How do notification settings work?</h3>
+                        <div class="faq-icon">+</div>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Notification settings let you control what alerts you receive. You can manage these from your Settings page under the Notifications tab:</p>
+                        <ul>
+                            <li><strong>Message notifications</strong> — alerts for new direct messages</li>
+                            <li><strong>Match notifications</strong> — when you get a new reader match</li>
+                            <li><strong>Discussion activity</strong> — likes, comments, and replies on your threads</li>
+                            <li><strong>Circle updates</strong> — new events, announcements, and suggested books from your circles</li>
+                            <li><strong>Room reminders</strong> — upcoming voice room sessions</li>
+                            <li><strong>Follower notifications</strong> — when someone follows you or sends a follow request</li>
+                        </ul>
+                        <p>You can toggle each notification type on or off independently. Changes take effect immediately.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h3>How does the AI matching system work?</h3>
                         <div class="faq-icon">+</div>
                     </div>
                     <div class="faq-answer">
                         <p>Our AI analyzes your reading preferences, favorite genres, authors, and reading habits to find other users with similar tastes. The algorithm considers multiple factors including:</p>
                         <ul>
-                            <li>Book ratings and reviews you've shared</li>
+                            <li>Book ratings and reviews you have shared</li>
                             <li>Genres and authors you follow</li>
                             <li>Your reading activity and discussions</li>
                             <li>Compatibility with other users' reading preferences</li>
                         </ul>
                         <p>Matches are updated regularly as you interact more with the platform.</p>
-                    </div>
-                </div>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h3>Is Litlink free to use?</h3>
-                        <div class="faq-icon">+</div>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Yes! Litlink is completely free for all basic features including:</p>
-                        <ul>
-                            <li>Creating a profile and adding books</li>
-                            <li>AI-powered reader matching</li>
-                            <li>Text chat with matched readers</li>
-                            <li>Joining and participating in discussion boards</li>
-                            <li>Basic voice room access</li>
-                        </ul>
-                        <p>We may introduce premium features in the future, but the core connection experience will always remain free.</p>
-                    </div>
-                </div>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h3>How do I join a voice room?</h3>
-                        <div class="faq-icon">+</div>
-                    </div>
-                    <div class="faq-answer">
-                        <p>To join a voice room:</p>
-                        <ol>
-                            <li>Navigate to the Community section</li>
-                            <li>Look for voice rooms marked with the 🎙️ icon</li>
-                            <li>Click on any active voice room</li>
-                            <li>Press the "Join Room" button</li>
-                            <li>Allow microphone access when prompted</li>
-                        </ol>
-                        <p>You can listen without speaking, or raise your virtual hand to contribute to the discussion.</p>
-                    </div>
-                </div>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h3>Can I create my own book club or discussion group?</h3>
-                        <div class="faq-icon">+</div>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Absolutely! To create your own group:</p>
-                        <ul>
-                            <li>Go to the Community section</li>
-                            <li>Click "Create Group" in the top right corner</li>
-                            <li>Choose between a discussion board or voice room group</li>
-                            <li>Set your group name, description, and privacy settings</li>
-                            <li>Invite members or make it public for anyone to join</li>
-                        </ul>
-                        <p>Group creators have moderation tools to manage discussions and members.</p>
-                    </div>
-                </div>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h3>How do I report inappropriate behavior?</h3>
-                        <div class="faq-icon">+</div>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Your safety is our priority. To report inappropriate behavior:</p>
-                        <ul>
-                            <li>In chat: Click the three dots next to any message and select "Report"</li>
-                            <li>In voice rooms: Click the participant's name and select "Report"</li>
-                            <li>On profiles: Visit the user's profile and click "Report User"</li>
-                            <li>Email us directly at: safety@litlink.com</li>
-                        </ul>
-                        <p>All reports are reviewed by our moderation team within 24 hours. We have a zero-tolerance policy for harassment.</p>
-                    </div>
-                </div>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h3>Can I use Litlink on mobile?</h3>
-                        <div class="faq-icon">+</div>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Yes! Litlink is fully responsive and works on all devices:</p>
-                        <ul>
-                            <li><strong>Mobile Web:</strong> Access through any mobile browser</li>
-                            <li><strong>iOS App:</strong> Available on the App Store (coming soon)</li>
-                            <li><strong>Android App:</strong> Available on Google Play (coming soon)</li>
-                        </ul>
-                        <p>All features are available on mobile, including voice rooms and real-time chat.</p>
                     </div>
                 </div>
             </div>
@@ -382,7 +398,6 @@
                         <h4>About Us</h4>
                         <ul>
                             <li><a href="about.html">About</a></li>
-                            <li><a href="about.html#team">Team</a></li>
                         </ul>
                     </div>
                     <div class="footer-column">
@@ -446,6 +461,22 @@
                 }
             });
         });
+    </script>
+    <script>
+        (function() {
+            var logo = document.getElementById('navLogo');
+            if (logo) {
+                var token = window.LitlinkSessionAuth && window.LitlinkSessionAuth.getToken();
+                if (token) {
+                    var user = window.LitlinkSessionAuth && window.LitlinkSessionAuth.getUser();
+                    if (user && user.isAdmin) {
+                        logo.href = '../Admin Dashboard/admin.html';
+                    } else {
+                        logo.href = '../Dashboard/dashboard.html';
+                    }
+                }
+            }
+        })();
     </script>
     <script src="script.js"></script>
     <script src="../utils/textSize.js"></script>
