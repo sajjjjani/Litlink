@@ -1659,7 +1659,9 @@
 
     <script>
         // ===== API CONFIGURATION =====
-        const API_BASE_URL = 'http://localhost:5002/api';
+        const API_BASE_URL = window.location.port === '5500' || window.location.hostname === 'localhost'
+            ? 'http://localhost:5002/api'
+            : window.location.origin + '/api';
         const OPEN_LIBRARY_URL = 'https://openlibrary.org';
 
         // ===== STATE =====
@@ -2653,7 +2655,7 @@ function displayBookDetails(data) {
                 // 0. First try local backend PDF retrieval for this book.
                 if (token) {
                     try {
-                        const pdfRes = await fetch(`http://localhost:5002/api/books/${bookId}/pdf`, {
+                        const pdfRes = await fetch(`${API_BASE_URL}/books/${bookId}/pdf`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         if (pdfRes.ok) {
