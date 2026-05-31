@@ -245,78 +245,17 @@ router.get('/details/:bookId', authenticate, async (req, res) => {
   }
 });
 
-// Generate a placeholder PDF for books that don't have one
-function generatePlaceholderPdf(bookId, bookTitle) {
-  const title = bookTitle || `Book ${bookId}`;
-  const text = `${title}\n\n\nThis book is being prepared for reading on Litlink.\n\nCheck back later for the full content.\n\n---\nLitlink Reading App`;
-
-  const esc = (s) => s.replace(/[\\()\n]/g, (c) =>
-    c === '\\' ? '\\\\' : c === '(' ? '\\(' : c === ')' ? '\\)' : c === '\n' ? '\\n' : c
-  );
-
-  const content = `
-BT
-/F1 24 Tf
-50 720 Td
-(${esc(title)}) Tj
-/F1 14 Tf
-50 680 Td
-(This book is being prepared for reading on Litlink.) Tj
-50 660 Td
-(Check back later for the full content.) Tj
-/F1 10 Tf
-50 40 Td
-(Litlink Reading App) Tj
-ET`;
-
-  const streamLen = Buffer.byteLength(content);
-
-  const pdf = Buffer.concat([
-    Buffer.from('%PDF-1.4\n'),
-    Buffer.from('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'),
-    Buffer.from('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'),
-    Buffer.from('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n'),
-    Buffer.from(`4 0 obj\n<< /Length ${streamLen} >>\nstream\n`),
-    Buffer.from(content),
-    Buffer.from('\nendstream\nendobj\n'),
-    Buffer.from('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n'),
-    Buffer.from('xref\n0 6\n0000000000 65535 f \n'),
-    Buffer.from('0000000009 00000 n \n'),
-    Buffer.from('0000000058 00000 n \n'),
-    Buffer.from('0000000115 00000 n \n'),
-    Buffer.from('0000000266 00000 n \n'),
-    Buffer.from(`0000000${String(266 + streamLen).padStart(5, '0')} 00000 n \n`),
-    Buffer.from('trailer\n<< /Size 6 /Root 1 0 R >>\n'),
-    Buffer.from(`startxref\n${266 + streamLen + 70}\n%%EOF\n`)
-  ]);
-
-  return pdf;
-}
-
 // GET /api/books/:id/pdf - stream locally stored PDF for a book
 router.get('/:id/pdf', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    let absPath = resolvePdfPathByBookId(id);
+    const absPath = resolvePdfPathByBookId(id);
 
     if (!absPath) {
-      const uploadsDir = path.join(__dirname, '..', 'uploads', 'books');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-      absPath = path.join(uploadsDir, `${id}.pdf`);
-
-      let title = `Book ${id}`;
-      try {
-        const fetch = require('../utils/fetch');
-        const olRes = await fetch(`https://openlibrary.org/works/${id}.json`);
-        if (olRes.ok) {
-          const data = await olRes.json();
-          title = data.title || title;
-        }
-      } catch (_) {}
-
-      const pdf = generatePlaceholderPdf(id, title);
-      fs.writeFileSync(absPath, pdf);
-      console.log(`Generated placeholder PDF for ${id}: ${title}`);
+      return res.status(404).json({
+        success: false,
+        message: 'PDF not found for this book'
+      });
     }
 
     const stat = fs.statSync(absPath);
