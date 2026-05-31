@@ -2715,17 +2715,6 @@ function displayBookDetails(data) {
                 }
 
                 if (foundIaId) {
-                    if (pdfUrl) {
-                        try {
-                            const blobRes = await fetch(pdfUrl);
-                            if (blobRes.ok) {
-                                const blob = await blobRes.blob();
-                                const blobUrl = URL.createObjectURL(blob);
-                                openInlineReader(null, blobUrl, null, true);
-                                return;
-                            }
-                        } catch (_) {}
-                    }
                     openInlineReader(foundIaId, pdfUrl, epubUrl, false);
                 } else {
                     showNotAvailableModal();
